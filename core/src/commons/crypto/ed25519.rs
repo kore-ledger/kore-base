@@ -4,7 +4,7 @@ use crate::identifier;
 use identifier::error::Error;
 
 use ed25519_dalek::{
-    ExpandedSecretKey, PublicKey, SecretKey, Signature, Verifier, KEYPAIR_LENGTH, SECRET_KEY_LENGTH,
+    SigningKey, VerifyingKey, Signer, Signature, Verifier, KEYPAIR_LENGTH, SECRET_KEY_LENGTH,
 };
 
 use base64::{Engine as _, engine::general_purpose};
@@ -13,14 +13,13 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 /// Ed25519 cryptographic key pair
-pub type Ed25519KeyPair = BaseKeyPair<PublicKey, SecretKey>;
+pub type Ed25519KeyPair = BaseKeyPair<VerifyingKey, SigningKey>;
 
 impl KeyGenerator for Ed25519KeyPair {
     fn from_seed(seed: &[u8]) -> Self {
         let secret_seed = create_seed(seed).expect("invalid seed");
-        let sk: SecretKey =
-            SecretKey::from_bytes(&secret_seed).expect("cannot generate secret key");
-        let pk: PublicKey = (&sk).try_into().expect("cannot generate public key");
+        let sk = SigningKey::from_bytes(&secret_seed);
+        let pk = sk.verifying_key();
         Self {
             public_key: pk,
             secret_key: Some(sk),
@@ -29,14 +28,14 @@ impl KeyGenerator for Ed25519KeyPair {
 
     fn from_public_key(public_key: &[u8]) -> Self {
         Self {
-            public_key: PublicKey::from_bytes(public_key).expect("cannot generate public key"),
+            public_key: VerifyingKey::try_from(public_key).expect("invalid public key"),
             secret_key: None,
         }
     }
 
     fn from_secret_key(secret_key: &[u8]) -> Ed25519KeyPair {
-        let sk: SecretKey = SecretKey::from_bytes(secret_key).expect("cannot generate secret key");
-        let pk: PublicKey = (&sk).try_into().expect("cannot generate public key");
+        let sk = SigningKey::try_from(secret_key).expect("cannot generate secret key");
+        let pk = (&sk).try_into().expect("cannot generate public key");
 
         Ed25519KeyPair {
             secret_key: Some(sk),
@@ -66,16 +65,12 @@ impl KeyMaterial for Ed25519KeyPair {
 
 impl DSA for Ed25519KeyPair {
     fn sign(&self, payload: Payload) -> Result<Vec<u8>, Error> {
-        let esk: ExpandedSecretKey = match &self.secret_key {
-            Some(x) => x,
-            None => return Err(Error::SignError("Secret key not found".to_owned())),
-        }
-        .into();
+        let sk = self
+            .secret_key
+            .as_ref()
+            .ok_or(Error::SignError("No secret key".into()))?;
         match payload {
-            Payload::Buffer(msg) => Ok(esk
-                .sign(msg.as_slice(), &self.public_key)
-                .to_bytes()
-                .to_vec()),
+            Payload::Buffer(msg) => Ok(sk.sign(msg.as_slice()).to_bytes().to_vec()),
             _ => Err(Error::SignError(
                 "Payload type not supported for this key".into(),
             )),
