@@ -1,6 +1,6 @@
 use crate::identifier::derive::{digest::DigestDerivator, Derivator};
 use base64::{Engine as _, engine::general_purpose};
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, to_vec};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -9,7 +9,7 @@ use super::error::Error;
 use super::Derivable;
 
 /// Digest based identifier
-#[derive(Debug, PartialEq, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord)]
 pub struct DigestIdentifier {
     pub derivator: DigestDerivator,
     pub digest: Vec<u8>,
@@ -26,10 +26,8 @@ impl DigestIdentifier {
         serializable: T,
         digest_derivator: DigestDerivator
     ) -> Result<Self, crate::commons::errors::Error> {
-        let bytes = match serializable.try_to_vec() {
-            Ok(bytes) => bytes,
-            Err(_) => return Err(crate::commons::errors::Error::BorshSerializationFailed),
-        };
+        let bytes = to_vec(&serializable)
+            .map_err(|_| crate::commons::errors::Error::BorshSerializationFailed)?;
         let bytes = digest_derivator.digest(&bytes);
         Ok(DigestIdentifier::new(digest_derivator, &bytes))
     }
@@ -37,10 +35,8 @@ impl DigestIdentifier {
     pub fn generate_with_blake3<T: BorshSerialize>(
         serializable: T,
     ) -> Result<Self, crate::commons::errors::Error> {
-        let bytes = match serializable.try_to_vec() {
-            Ok(bytes) => bytes,
-            Err(_) => return Err(crate::commons::errors::Error::BorshSerializationFailed),
-        };
+        let bytes = to_vec(&serializable)
+            .map_err(|_| crate::commons::errors::Error::BorshSerializationFailed)?;
         let bytes = DigestDerivator::Blake3_256.digest(&bytes);
         Ok(DigestIdentifier::new(DigestDerivator::Blake3_256, &bytes))
     }

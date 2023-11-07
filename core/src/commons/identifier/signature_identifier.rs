@@ -13,7 +13,7 @@ use super::{
 };
 
 /// Signature based identifier
-#[derive(Debug, PartialEq, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord)]
 pub struct SignatureIdentifier {
     pub derivator: SignatureDerivator,
     pub signature: Vec<u8>,

@@ -50,7 +50,7 @@ macro_rules! test_database_manager_trait {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
-            use borsh::{BorshDeserialize, BorshSerialize};
+            use borsh::{BorshDeserialize, BorshSerialize, to_vec};
 
             #[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
             struct Data {
@@ -73,15 +73,15 @@ macro_rules! test_database_manager_trait {
                     value: "C".into(),
                 };
                 #[rustfmt::skip] // let-else not supported yet
-                let Ok(data1) = data1.try_to_vec() else {
+                let Ok(data1) = to_vec(&data1) else {
                     return Err(Error::SerializeError);
                 };
                 #[rustfmt::skip] // let-else not supported yet
-                let Ok(data2) = data2.try_to_vec() else {
+                let Ok(data2) = to_vec(&data2) else {
                     return Err(Error::SerializeError);
                 };
                 #[rustfmt::skip] // let-else not supported yet
-                let Ok(data3) = data3.try_to_vec() else {
+                let Ok(data3) = to_vec(&data3) else {
                     return Err(Error::SerializeError);
                 };
                 Ok(vec![data1, data2, data3])

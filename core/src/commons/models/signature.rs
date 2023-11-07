@@ -40,6 +40,7 @@ use super::{timestamp::TimeStamp, HashId};
     BorshSerialize,
     BorshDeserialize,
     PartialOrd,
+    Ord,
     PartialEq,
     Hash,
 )]

@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::context::MemoryManager;
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, to_vec};
 use serde::{Deserialize, Serialize};
 use wasmtime::{Caller, Engine, Linker, Module, Store};
 
@@ -126,16 +126,12 @@ impl ContractExecutor {
         event: &ValueWrapper,
     ) -> Result<(MemoryManager, u32, u32), ExecutorErrorResponses> {
         let mut context = MemoryManager::new();
-        let state_ptr = context.add_data_raw(
-            &state
-                .try_to_vec()
-                .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?,
-        );
-        let event_ptr = context.add_data_raw(
-            &event
-                .try_to_vec()
-                .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?,
-        );
+        let state_bytes = to_vec(&state)
+            .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
+        let state_ptr = context.add_data_raw(&state_bytes);
+        let event_bytes = to_vec(&event)
+            .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
+        let event_ptr = context.add_data_raw(&event_bytes);
         Ok((context, state_ptr as u32, event_ptr as u32))
     }
 

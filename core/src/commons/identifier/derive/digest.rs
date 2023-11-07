@@ -25,6 +25,7 @@ use super::Derivator;
     BorshSerialize,
     BorshDeserialize,
     PartialOrd,
+    Ord,
 )]
 pub enum DigestDerivator {
     Blake3_256,

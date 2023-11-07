@@ -21,6 +21,7 @@ use crate::identifier::{error::Error, key_identifier::KeyIdentifier};
     BorshSerialize,
     BorshDeserialize,
     PartialOrd,
+    Ord,
 )]
 pub enum KeyDerivator {
     /// The Ed25519 key derivator.

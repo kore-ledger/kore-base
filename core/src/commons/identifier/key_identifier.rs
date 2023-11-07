@@ -19,7 +19,7 @@ use crate::commons::crypto::{
 };
 
 /// Key based identifier
-#[derive(Debug, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd)]
+#[derive(Debug, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord)]
 pub struct KeyIdentifier {
     pub public_key: Vec<u8>,
 
