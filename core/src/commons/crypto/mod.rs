@@ -12,7 +12,7 @@ use std::io::Read;
 use borsh::{BorshDeserialize, BorshSerialize};
 use identifier::error::Error;
 
-use base64::encode_config;
+use base64::{Engine as _, engine::general_purpose};
 pub use ed25519::Ed25519KeyPair;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1KeyPair;
@@ -81,7 +81,7 @@ pub trait KeyMaterial {
 
     /// Returns String from key pair encoded in base64
     fn to_str(&self) -> String {
-        encode_config(self.to_bytes(), base64::URL_SAFE_NO_PAD)
+        general_purpose::URL_SAFE_NO_PAD.encode(self.to_bytes())
     }
 }
 
@@ -160,8 +160,6 @@ impl KeyMaterial for KeyPair {
             KeyPair::Ed25519(x) => x.secret_key_bytes(),
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(x) => x.secret_key_bytes(),
-            // #[cfg(feature = "x25519")]
-            // KeyPair::X25519(x) => x.secret_key_bytes(),
         }
     }
 
@@ -170,8 +168,6 @@ impl KeyMaterial for KeyPair {
             KeyPair::Ed25519(x) => x.to_bytes(),
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(x) => x.to_bytes(),
-            // #[cfg(feature = "x25519")]
-            // KeyPair::X25519(x) => x.to_bytes(),
         }
     }
 }
@@ -182,9 +178,6 @@ impl DSA for KeyPair {
             KeyPair::Ed25519(x) => x.sign(payload),
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(x) => x.sign(payload),
-            // _ => Err(Error::KeyPairError(
-            //     "DSA is not supported for this key type".to_owned(),
-            // )),
         }
     }
 
@@ -193,10 +186,6 @@ impl DSA for KeyPair {
             KeyPair::Ed25519(x) => x.verify(payload, signature),
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(x) => x.verify(payload, signature),
-            // #[cfg(feature = "x25519")]
-            // KeyPair::X25519(_) => Err(Error::KeyPairError(
-            //     "DSA is not supported for this key type".to_owned(),
-            // )),
         }
     }
 }
@@ -316,33 +305,4 @@ mod tests {
         matches!(valid, Ok(()));
     }
 
-    // #[test]
-    // #[cfg(feature = "bls12381")]
-    // fn test_bls12381() {
-    //     let key_pair = generate::<Bls12381KeyPair>(None);
-    //     let messages = vec![
-    //         b"secret message 1".to_vec(),
-    //         b"secret message 2".to_vec(),
-    //         b"secret message 3".to_vec(),
-    //         b"secret message 4".to_vec(),
-    //         b"secret message 5".to_vec(),
-    //     ];
-    //     let signature = key_pair
-    //         .sign(Payload::BufferArray(messages.clone()))
-    //         .unwrap();
-    //     let valid =
-    //         key_pair.verify(Payload::BufferArray(messages.clone()), &signature);
-
-    //     matches!(valid, Ok(()));
-    // }
-
-    // #[test]
-    // #[cfg(feature = "x25519")]
-    // fn test_x25519() {
-    //     let key_pair1 = generate::<X25519KeyPair>(None);
-    //     let key_pair2 = generate::<X25519KeyPair>(None);
-    //     let secret1 = key_pair1.key_exchange(&key_pair2).unwrap();
-    //     let secret2 = key_pair2.key_exchange(&key_pair1).unwrap();
-    //     assert_eq!(secret1, secret2);
-    // }
 }

@@ -1,6 +1,6 @@
 //! KeyIdentifier module
 
-use base64::decode_config;
+use base64::{Engine as _, engine::general_purpose};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -86,7 +86,7 @@ impl FromStr for KeyIdentifier {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let code = KeyDerivator::from_str(s)?;
         if s.len() == code.material_len() {
-            let k_vec = decode_config(&s[code.code_len()..code.material_len()], base64::URL_SAFE)?;
+            let k_vec = general_purpose::URL_SAFE_NO_PAD.decode(&s[code.code_len()..code.material_len()])?;
             Ok(Self {
                 derivator: code,
                 public_key: k_vec,
@@ -150,7 +150,6 @@ mod tests {
         let key_pair = Ed25519KeyPair::new();
         let print = KeyIdentifier::new(KeyDerivator::Ed25519, &key_pair.public_key_bytes());
         let string = print.to_str();
-        println!("{}", string);
         let from_str = KeyIdentifier::from_str(&string);
         assert!(from_str.is_ok());
         let des = from_str.unwrap();

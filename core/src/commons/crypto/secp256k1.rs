@@ -1,7 +1,7 @@
 //! Adapter for pure Rust implementation of the secp256k1 curve and fast ECDSA signatures
 //!
 
-use base64::decode_config;
+use base64::{Engine as _, engine::general_purpose};
 use serde::{de::Deserializer, Deserialize, Serialize, Serializer};
 
 use crate::identifier;
@@ -132,7 +132,7 @@ impl<'de> Deserialize<'de> for Secp256k1KeyPair {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let bytes = decode_config(&s, base64::URL_SAFE).map_err(serde::de::Error::custom)?;
+        let bytes = general_purpose::URL_SAFE_NO_PAD.decode(&s).map_err(serde::de::Error::custom)?;
 
         Ok(Secp256k1KeyPair::from_secret_key(
             &bytes[..SECRET_KEY_LENGTH],

@@ -1,4 +1,4 @@
-use base64::decode_config;
+use base64::{Engine as _, engine::general_purpose};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -51,7 +51,7 @@ impl FromStr for SignatureIdentifier {
         if s.len() == code.material_len() {
             Ok(Self::new(
                 code,
-                &decode_config(&s[code.code_len()..code.material_len()], base64::URL_SAFE)?,
+                &general_purpose::URL_SAFE_NO_PAD.decode(&s[code.code_len()..code.material_len()])?,
             ))
         } else {
             Err(Error::SemanticError(format!(

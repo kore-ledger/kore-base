@@ -11,7 +11,7 @@ pub use digest_identifier::DigestIdentifier;
 pub use key_identifier::KeyIdentifier;
 pub use signature_identifier::SignatureIdentifier;
 
-use base64::encode_config;
+use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
@@ -53,7 +53,7 @@ pub trait Derivable: FromStr<Err = Error> {
             0 => "".to_string(),
             _ => [
                 self.derivation_code(),
-                encode_config(self.derivative(), base64::URL_SAFE_NO_PAD),
+                general_purpose::URL_SAFE_NO_PAD.encode(&self.derivative()),
             ]
             .join(""),
         }
