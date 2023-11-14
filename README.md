@@ -1,8 +1,4 @@
-<div align="center">
-<img src="https://raw.githubusercontent.com/opencanarias/public-resources/master/images/taple-logo-readme.png">
-</div>
-
-# TAPLE Core
+# Kore Base
 TAPLE (pronounced T+🍎 ['tapəl]) stands for Tracking (Autonomous) of Provenance and Lifecycle Events. TAPLE is a permissioned DLT solution for traceability of assets and processes. It is:
 
 - **Scalable**: Scaling to a sufficient level for traceability use cases. 
