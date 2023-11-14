@@ -1,6 +1,6 @@
 use libp2p::identity::ed25519::Keypair as EdKeyPair;
 use libp2p::PeerId;
-use taple_core::{
+use kore_base::{
     crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair},
     request::StartRequest,
     signature::{Signature, Signed},

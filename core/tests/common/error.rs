@@ -13,5 +13,5 @@ pub enum NotifierError {
 #[derive(Error, Debug)]
 pub enum TapleError {
     #[error("Taple Start Error {0}")]
-    StartError(taple_core::Error),
+    StartError(kore_base::Error),
 }

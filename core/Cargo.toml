@@ -1,5 +1,5 @@
 [package]
-name = "taple-core"
+name = "kore-base"
 version.workspace = true
 description.workspace = true
 authors.workspace = true
@@ -17,7 +17,7 @@ all = ["default", "evaluation", "approval", "validation"]
 evaluation = ["dep:wasmtime", "dep:async-std"]
 approval = []
 validation = []
-secp256k1 = ["dep:libsecp256k1"]
+secp256k1 = ["dep:k256"]
 
 [dependencies]
 tokio = { workspace = true, features = ["time", "sync", "macros"] }
@@ -53,12 +53,13 @@ base64 = { workspace = true }
 getrandom = { workspace = true }
 json-patch = { workspace = true }
 ed25519-dalek = { workspace = true, features = ["serde"] }
-libsecp256k1 = { workspace = true, optional = true }
+k256 = { workspace = true, optional = true }
 blake2 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
 wasmtime = { workspace = true, features = ["cache"], optional = true }
 
 [dev-dependencies]
-taple-core = { path = ".", features = ["all"] }
+kore-base = { path = ".", features = ["all"] }
 serial_test = { workspace = true }
+

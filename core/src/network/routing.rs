@@ -1,5 +1,6 @@
 // Composed Behaviour for routing with kademlia and identify
 use instant::Duration;
+use libp2p::identify::*;
 use libp2p::identify::Identify;
 use libp2p::identify::IdentifyConfig;
 use libp2p::identify::IdentifyEvent;

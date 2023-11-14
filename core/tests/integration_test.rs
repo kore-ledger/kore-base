@@ -1,7 +1,7 @@
 mod common;
 use common::{generate_mc, NodeBuilder};
 use serial_test::serial;
-use taple_core::DigestDerivator;
+use kore_base::DigestDerivator;
 
 use crate::common::{check_subject, create_governance_request};
 
@@ -29,7 +29,7 @@ fn create_governance() {
         let mut node = result.unwrap();
         let node_api = node.get_api();
         let public_key = node_api
-            .add_keys(taple_core::KeyDerivator::Ed25519)
+            .add_keys(kore_base::KeyDerivator::Ed25519)
             .await
             .expect("MC creation failed");
         let event_request = create_governance_request("", public_key, "");

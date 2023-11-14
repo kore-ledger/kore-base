@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use taple_core::{
+use kore_base::{
     Api, DigestIdentifier, Error, ListenAddr, MemoryCollection, MemoryManager, Notification,
     Settings,
 };
 
-use taple_core::Node;
+use kore_base::Node;
 use tokio::time::{sleep, Duration};
 
 use super::error::NotifierError;

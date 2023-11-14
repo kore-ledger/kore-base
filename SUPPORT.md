@@ -6,7 +6,7 @@ This article explains where to get help with remark. Please read through the fol
 
 ## Asking quality questions
 
-Questions can go to [GitHub discussions](https://github.com/opencanarias/taple-core/discussions).
+Questions can go to [GitHub discussions](https://github.com/kore-ledger/kore-base/discussions).
 
 Help us help you! Spend time framing questions and add links and resources. Spending the extra time up front can help save everyone time in the long run. Here are some tips:
 

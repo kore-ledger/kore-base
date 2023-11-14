@@ -1,8 +1,5 @@
-<div align="center">
-<img src="https://raw.githubusercontent.com/opencanarias/public-resources/master/images/taple-logo-readme.png">
-</div>
+# Kore Base
 
-# TAPLE Core
 TAPLE (pronounced T+🍎 ['tapəl]) stands for Tracking (Autonomous) of Provenance and Lifecycle Events. TAPLE is a permissioned DLT solution for traceability of assets and processes. It is:
 
 - **Scalable**: Scaling to a sufficient level for traceability use cases. 
@@ -20,9 +17,9 @@ TAPLE Core is the reference library that implements all the necessary functional
 [Discover](https://www.taple.es/docs/discover) | [Learn](https://www.taple.es/docs/learn) | [Build](https://www.taple.es/docs/build) | [Code](https://github.com/search?q=topic%3Ataple+org%3Aopencanarias++fork%3Afalse+archived%3Afalse++is%3Apublic&type=repositories)
 
 ## Build
+
 Minimium supported rust versión (MSRV) is 1.67.
 
-A basic usage example can be found at [examples](https://github.com/opencanarias/taple-core/tree/main/examples) directory. You can find more information about TAPLE technology and how to develop for TAPLE on [TAPLE Website](https://www.taple.es). 
-
 ## License
+
 This project is licensed under the [AGPL license][agpl-url].

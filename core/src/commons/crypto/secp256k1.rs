@@ -8,22 +8,22 @@ use crate::identifier;
 use identifier::error::Error;
 
 use super::{create_seed, BaseKeyPair, KeyGenerator, KeyMaterial, KeyPair, Payload, DHKE, DSA};
-use libsecp256k1::{Message, PublicKey, SecretKey, Signature};
+use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::{Signer,Verifier}};
 use sha2::{Digest, Sha256};
 
 /// Secp256k1 cryptographic key pair
-pub type Secp256k1KeyPair = BaseKeyPair<PublicKey, SecretKey>;
+pub type Secp256k1KeyPair = BaseKeyPair<VerifyingKey, SigningKey>;
 
 /// Defines constants
 pub const SECRET_KEY_LENGTH: usize = 32;
-pub const KEYPAIR_LENGTH: usize = 97;
+pub const KEYPAIR_LENGTH: usize = 65;
 
 /// Keys generation
 impl KeyGenerator for Secp256k1KeyPair {
     fn from_seed(seed: &[u8]) -> Self {
         let secret_seed = create_seed(seed).expect("invalid seed");
-        let sk = SecretKey::parse(&secret_seed).expect("Couldn't create key");
-        let pk = PublicKey::from_secret_key(&sk);
+        let sk = SigningKey::from_slice(&secret_seed).expect("invalid seed");
+        let pk = VerifyingKey::from(&sk);
         Secp256k1KeyPair {
             public_key: pk,
             secret_key: Some(sk),
@@ -31,8 +31,7 @@ impl KeyGenerator for Secp256k1KeyPair {
     }
 
     fn from_public_key(pk: &[u8]) -> Self {
-        let pk = PublicKey::parse_slice(pk, None).expect("Could not parse public key");
-
+        let pk = VerifyingKey::from_sec1_bytes(pk).expect("Could not parse public key");
         Secp256k1KeyPair {
             secret_key: None,
             public_key: pk,
@@ -40,8 +39,8 @@ impl KeyGenerator for Secp256k1KeyPair {
     }
 
     fn from_secret_key(secret_key: &[u8]) -> Self {
-        let sk = SecretKey::parse_slice(secret_key).unwrap();
-        let pk = PublicKey::from_secret_key(&sk);
+        let sk = SigningKey::from_slice(secret_key).expect("Could not parse secret key");
+        let pk = VerifyingKey::from(&sk);
 
         Secp256k1KeyPair {
             public_key: pk,
@@ -52,13 +51,13 @@ impl KeyGenerator for Secp256k1KeyPair {
 
 impl KeyMaterial for Secp256k1KeyPair {
     fn public_key_bytes(&self) -> Vec<u8> {
-        self.public_key.serialize().to_vec()
+        self.public_key.to_sec1_bytes().to_vec()
     }
 
     fn secret_key_bytes(&self) -> Vec<u8> {
         self.secret_key
             .as_ref()
-            .map_or(vec![], |x| x.serialize().to_vec())
+            .map_or(vec![], |x| x.to_bytes().to_vec())
     }
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -73,15 +72,15 @@ impl DSA for Secp256k1KeyPair {
     fn sign(&self, payload: Payload) -> Result<Vec<u8>, Error> {
         match payload {
             Payload::Buffer(payload) => {
-                let signature = match &self.secret_key {
+                let signature: Signature = match &self.secret_key {
                     Some(sig) => {
-                        let message = Message::parse(&get_hash(&payload));
-                        libsecp256k1::sign(&message, sig).0
+                        let message = get_hash(&payload);
+                        sig.sign(&message)
                     }
                     None => panic!("secret key not found"),
                 };
-                let signature = signature.serialize();
-                Ok(signature.as_ref().to_vec())
+                //let signature = signature.serialize();
+                Ok(signature.to_bytes().to_vec())
             }
             _ => Err(Error::SignError(
                 "Payload type not supported for this key".into(),
@@ -92,11 +91,11 @@ impl DSA for Secp256k1KeyPair {
     fn verify(&self, payload: Payload, signature: &[u8]) -> Result<(), Error> {
         let verified = match payload {
             Payload::Buffer(payload) => {
-                let message = Message::parse(&get_hash(&payload));
+                let message = get_hash(&payload);
                 let signature =
-                    Signature::parse_standard_slice(signature).expect("Couldn't parse signature");
+                    Signature::from_slice(signature).expect("Couldn't parse signature");
 
-                libsecp256k1::verify(&message, &signature, &self.public_key)
+                self.public_key.verify(&message, &signature).is_ok()
             }
             _ => unimplemented!("payload type not supported for this key"),
         };
@@ -172,4 +171,5 @@ mod tests {
             .verify(Payload::Buffer(msg.to_vec()), &signature);
         assert!(result.is_ok());
     }
+
 }
