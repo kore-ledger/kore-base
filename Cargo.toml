@@ -7,7 +7,7 @@ members = [
 resolver = "1"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Kore Ledger, SL <info@kore-ledger.com>"]
 description = "Kore Ledger base library"
@@ -33,7 +33,7 @@ async-trait = "0.1.56"
 getrandom = "0.2"
 borsh = { version = "1.1", features = ["std", "derive"] }
 async-std = "1.12"
-config = "0.13.2"
+config = "0.13"
 json-patch = "1"
 jsonschema = { version = "0.17", default_features = false }
 rand = "0.8.5"
