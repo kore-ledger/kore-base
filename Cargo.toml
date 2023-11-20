@@ -7,7 +7,7 @@ members = [
 resolver = "1"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Kore Ledger, SL <info@kore-ledger.com>"]
 description = "Kore Ledger base library"
@@ -20,8 +20,8 @@ rust-version = "1.73"
 
 [workspace.dependencies]
 kore-tell = { path = "protocols/kore-tell" }
-serde = "1.0.100"
-serde_json = "1.0.97"
+serde = "1.0"
+serde_json = "1.0"
 tokio = "1.20"
 tokio-util = "0.7"
 tokio-stream = "0.1"

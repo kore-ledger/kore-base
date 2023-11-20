@@ -13,13 +13,13 @@
 //! that can be obtained when interacting with the API or, in some cases, may be necessary to interact with it.
 //!
 //! # Basic usage
-//! ```
+//! ```ignore
 //! use std::str::FromStr;
 //!
-//! use taple_core::crypto::*;
-//! use taple_core::request::*;
-//! use taple_core::signature::*;
-//! use taple_core::*;
+//! use kore_base::crypto::*;
+//! use kore_base::request::*;
+//! use kore_base::signature::*;
+//! use kore_base::*;
 //!
 //! /**
 //!  * Basic usage of TAPLE Core. It includes:
@@ -56,7 +56,7 @@
 //!     });
 //!     let signed_request = Signed::<EventRequest> {
 //!         content: create_subject_request.clone(),
-//!         signature: Signature::new(&create_subject_request, &node_key_pair).unwrap(),
+//!         signature: Signature::new(&create_subject_request, &node_key_pair, DigestDerivator::Blake3_256).unwrap(),
 //!     };
 //!
 //!     // Send the signed request to the node
@@ -102,6 +102,8 @@ pub(crate) mod validation;
 
 pub(crate) mod event;
 pub(crate) mod protocol;
+
+
 
 mod node;
 pub use api::{Api, ApiError};

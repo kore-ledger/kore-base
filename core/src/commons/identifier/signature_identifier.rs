@@ -89,7 +89,7 @@ mod tests {
 
     use super::{SignatureDerivator, SignatureIdentifier};
 
-    use crate::identifier::KeyIdentifier;
+    use crate::{identifier::{KeyIdentifier, derive::key}, crypto::{Secp256k1KeyPair, DSA, KeyGenerator, Payload, KeyMaterial}};
 
     #[test]
     fn test_to_from_string() {
@@ -102,11 +102,10 @@ mod tests {
         let ki = KeyIdentifier::from_str(&key_str).unwrap();
         assert!(ki.verify(message, &si).is_ok());
         // ECDSAsecp256k1
-        let sig_str = "SSRFbutVG3-KHv_Fuexdx24aukwvj_RqN9jiPt9EQyDYRWsMJ-kpcLfX7\
-        CHmERmULScNSiG2l4_DDQF1qui8rEjQ";
+        let sig_str = "SSdKRafkDIPL3IM8zc5RfGcNo502fQxK-3pzOkNCO8tg4tEyOZUwx\
+        qntzDmAwaHINVAN7hwHYfVq5HabqEodrxxQ";
         let si = SignatureIdentifier::from_str(&sig_str).unwrap();
-        let key_str = "SBKR60N9QMBPtFhwELb4XV1MIoAoZyYpdcvracq1wEW4UfrFBNh1wYajlGe\
-        07VddYGgB2YbOp4aUBWkISPgu2JkQ";
+        let key_str = "SAsH8KCN4qfIKmas-2HZeI4IRhTbmMlsjC0EunOP66dqy";
         let ki = KeyIdentifier::from_str(&key_str).unwrap();
         assert!(ki.verify(message, &si).is_ok());
     }

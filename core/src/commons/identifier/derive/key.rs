@@ -53,7 +53,7 @@ impl Derivator for KeyDerivator {
     fn derivative_len(&self) -> usize {
         match self {
             Self::Ed25519 => 43,
-            Self::Secp256k1 => 87,
+            Self::Secp256k1 => 44,
         }
     }
 

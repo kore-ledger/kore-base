@@ -154,6 +154,14 @@ mod tests {
         assert!(from_str.is_ok());
         let des = from_str.unwrap();
         assert_eq!(des, print);
+
+        let key_pair = Secp256k1KeyPair::new();
+        let print = KeyIdentifier::new(KeyDerivator::Secp256k1, &key_pair.public_key_bytes());
+        let string = print.to_str();
+        let from_str = KeyIdentifier::from_str(&string);
+        assert!(from_str.is_ok());
+        let des = from_str.unwrap();
+        assert_eq!(des, print);
     }
 
     #[test]
