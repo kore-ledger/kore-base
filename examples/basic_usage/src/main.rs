@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use taple_core::crypto::*;
-use taple_core::request::*;
-use taple_core::signature::*;
-use taple_core::*;
+use kore_base::crypto::*;
+use kore_base::request::*;
+use kore_base::signature::*;
+
+use kore_base::*;
 
 /**
  * Basic usage of TAPLE Core. It includes:
@@ -40,7 +41,7 @@ async fn main() {
     });
     let signed_request = Signed::<EventRequest> {
         content: create_subject_request.clone(),
-        signature: Signature::new(&create_subject_request, &node_key_pair).unwrap(),
+        signature: Signature::new(&create_subject_request, &node_key_pair, DigestDerivator::Blake3_256).unwrap(),
     };
 
     // Send the signed request to the node
