@@ -153,7 +153,7 @@ impl<C: DatabaseCollection, G: GovernanceInterface> Compiler<C, G> {
         }
 
         std::fs::create_dir_all(format!(
-            "/tmp/taple_contracts/{}/{}",
+            "/tmp/kore_contracts/{}/{}",
             governance_id, schema_id
         ))
         .map_err(|_| CompilerErrorResponses::TempFolderCreationFailed)?;

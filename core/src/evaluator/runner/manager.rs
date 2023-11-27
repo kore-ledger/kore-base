@@ -17,14 +17,14 @@ use crate::{
 
 use super::executor::{Contract, ContractExecutor, ContractResult};
 use crate::database::Error as DbError;
-pub struct TapleRunner<C: DatabaseCollection, G: GovernanceInterface> {
+pub struct KoreRunner<C: DatabaseCollection, G: GovernanceInterface> {
     database: DB<C>,
     executor: ContractExecutor,
     gov_api: G,
     derivator: DigestDerivator
 }
 
-impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
+impl<C: DatabaseCollection, G: GovernanceInterface> KoreRunner<C, G> {
     pub fn new(database: DB<C>, engine: Engine, gov_api: G, derivator: DigestDerivator,) -> Self {
         Self {
             database,

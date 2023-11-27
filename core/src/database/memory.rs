@@ -36,7 +36,7 @@ impl DataStore {
     }
 }
 
-/// In-memory database implementation for TAPLE.
+/// In-memory database implementation for KORE.
 pub struct MemoryManager {
     data: RwLock<HashMap<String, Arc<DataStore>>>,
 }

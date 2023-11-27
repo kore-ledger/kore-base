@@ -28,7 +28,7 @@ use crate::message::{
     NetworkEvent,
 };
 use crate::network::network::NetworkProcessor;
-use crate::protocol::protocol_message_manager::{ProtocolManager, TapleMessages};
+use crate::protocol::protocol_message_manager::{ProtocolManager, KoreMessages};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
 use crate::validation::manager::ValidationManager;
@@ -47,9 +47,9 @@ use crate::error::Error;
 
 const BUFFER_SIZE: usize = 1000;
 
-/// Structure representing a TAPLE node
+/// Structure representing a KORE node
 ///
-/// A node must be instantiated using the [`Taple::build`] method, which requires a set
+/// A node must be instantiated using the [`Kore::build`] method, which requires a set
 /// of [configuration](Settings) parameters in order to be properly initialized.
 ///
 #[derive(Debug)]
@@ -61,7 +61,7 @@ pub struct Node<M: DatabaseManager<C>, C: DatabaseCollection> {
 }
 
 impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C> {
-    /// This method creates and initializes a TAPLE node.
+    /// This method creates and initializes a KORE node.
     /// # Possible results
     /// If the process is successful, the method will return `Ok(())`.
     /// An error will be returned only if it has not been possible to generate the necessary data
@@ -90,10 +90,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let (governance_update_sx, governance_update_rx) = broadcast::channel(BUFFER_SIZE);
 
         let (task_rx, task_tx) =
-            MpscChannel::<MessageTaskCommand<TapleMessages>, ()>::new(BUFFER_SIZE);
+            MpscChannel::<MessageTaskCommand<KoreMessages>, ()>::new(BUFFER_SIZE);
 
         let (protocol_rx, protocol_tx) =
-            MpscChannel::<Signed<MessageContent<TapleMessages>>, ()>::new(BUFFER_SIZE);
+            MpscChannel::<Signed<MessageContent<KoreMessages>>, ()>::new(BUFFER_SIZE);
 
         let (distribution_rx, distribution_tx) = MpscChannel::<
             DistributionMessagesNew,
@@ -281,7 +281,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             settings.node.digest_derivator
         );
 
-        let taple = Node {
+        let kore = Node {
             notification_rx,
             token,
             _m: PhantomData::default(),
@@ -350,7 +350,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             api_manager.run().await;
         });
 
-        Ok((taple, api))
+        Ok((kore, api))
     }
 
     /// Receive a single notification

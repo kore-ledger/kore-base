@@ -43,10 +43,10 @@ use tokio_util::sync::CancellationToken;
 #[cfg(test)]
 use libp2p::kad::{record::Key, QueryId, Quorum, Record};
 
-const LOG_TARGET: &str = "TAPLE_NETWORT::Network";
+const LOG_TARGET: &str = "KORE_NETWORT::Network";
 const RETRY_TIMEOUT: u64 = 30000;
 
-type TapleSwarmEvent = SwarmEvent<
+type KoreSwarmEvent = SwarmEvent<
     NetworkComposedEvent,
     EitherError<
         EitherError<std::io::Error, std::io::Error>,
@@ -62,7 +62,7 @@ pub enum SendMode {
 
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "NetworkComposedEvent")]
-pub struct TapleNetworkBehavior {
+pub struct KoreNetworkBehavior {
     routing: RoutingBehaviour,
     tell: TellBehaviour,
 }
@@ -87,11 +87,11 @@ impl From<RoutingComposedEvent> for NetworkComposedEvent {
     }
 }
 
-impl TapleNetworkBehavior {
+impl KoreNetworkBehavior {
     pub fn new(local_key: Keypair, bootstrap_nodes: Vec<(PeerId, Multiaddr)>) -> Self {
         let routing = RoutingBehaviour::new(local_key, bootstrap_nodes);
         let tell = TellBehaviour::new(100000, Duration::from_secs(10), Duration::from_secs(10));
-        TapleNetworkBehavior { routing, tell }
+        KoreNetworkBehavior { routing, tell }
     }
 
     #[cfg(test)]
@@ -149,7 +149,7 @@ fn check_listen_addr_integrity(addrs: &Vec<ListenAddr>) -> Result<ListenProtocol
 /// Network Structure for connect message-sender, message-receiver and LibP2P network stack
 pub struct NetworkProcessor {
     addr: Vec<ListenAddr>,
-    swarm: Swarm<TapleNetworkBehavior>,
+    swarm: Swarm<KoreNetworkBehavior>,
     command_sender: mpsc::Sender<Command>,
     command_receiver: mpsc::Receiver<Command>,
     event_sender: mpsc::Sender<NetworkEvent>,
@@ -199,7 +199,7 @@ impl NetworkProcessor {
         // Swarm creation
         let swarm = SwarmBuilder::new(
             transport,
-            TapleNetworkBehavior::new(local_key, bootstrap_nodes.clone()),
+            KoreNetworkBehavior::new(local_key, bootstrap_nodes.clone()),
             peer_id,
         )
         .executor(Box::new(|fut| {
@@ -295,7 +295,7 @@ impl NetworkProcessor {
         }
     }
 
-    async fn handle_event(&mut self, event: TapleSwarmEvent) {
+    async fn handle_event(&mut self, event: KoreSwarmEvent) {
         match event {
             SwarmEvent::Dialing(peer_id) => {
                 debug!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);

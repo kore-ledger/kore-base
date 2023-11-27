@@ -8,7 +8,7 @@ use super::{
 use super::{GetEvents, GetGovernanceSubjects};
 #[cfg(feature = "approval")]
 use crate::approval::manager::ApprovalAPI;
-use crate::commons::models::request::TapleRequest;
+use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::SubjectData;
 use crate::event::manager::EventAPI;
 use crate::ledger::manager::EventManagerAPI;
@@ -29,7 +29,7 @@ use libp2p::PeerId;
 use log::{error, info};
 use tokio_util::sync::CancellationToken;
 
-/// Object that allows interaction with a TAPLE node.
+/// Object that allows interaction with a KORE node.
 ///
 /// It has methods to perform all available read and write operations.
 #[derive(Clone, Debug)]
@@ -70,7 +70,7 @@ impl Api {
     pub async fn get_request(
         &self,
         request_id: DigestIdentifier,
-    ) -> Result<TapleRequest, ApiError> {
+    ) -> Result<KoreRequest, ApiError> {
         let response = self.sender.ask(APICommands::GetRequest(request_id)).await;
         if response.is_err() {
             log::debug!(

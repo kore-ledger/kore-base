@@ -15,7 +15,7 @@ use libp2p::Multiaddr;
 use libp2p::{NetworkBehaviour, PeerId};
 use log::{debug, warn};
 
-const LOG_TARGET: &str = "TAPLE_NETWORT::Routing";
+const LOG_TARGET: &str = "KORE_NETWORT::Routing";
 
 // We create a custom network behaviour that combines Kademlia and Identify.
 #[derive(NetworkBehaviour)]
@@ -35,8 +35,8 @@ impl RoutingBehaviour {
         let store = MemoryStore::new(local_peer_id);
         let mut kademlia = Kademlia::with_config(local_peer_id, store, config);
         let identify = {
-            let cfg = IdentifyConfig::new("/taple/1.0".to_string(), local_key.public())
-                .with_agent_version("taple".to_owned());
+            let cfg = IdentifyConfig::new("/kore/1.0".to_string(), local_key.public())
+                .with_agent_version("kore".to_owned());
             Identify::new(cfg)
         };
         // Add Bootstrap addresses to Kademlia routing table
@@ -173,7 +173,7 @@ impl RoutingBehaviour {
     }
 }
 
-/// TAPLE network event
+/// KORE network event
 #[derive(Debug)]
 pub enum RoutingComposedEvent {
     IdentifyEvent(IdentifyEvent),

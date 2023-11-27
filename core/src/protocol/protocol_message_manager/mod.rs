@@ -24,7 +24,7 @@ mod error;
 use error::ProtocolErrors;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub enum TapleMessages {
+pub enum KoreMessages {
     DistributionMessage(DistributionMessagesNew),
     EvaluationMessage(EvaluatorMessage),
     ValidationMessage(ValidationCommand),
@@ -33,10 +33,10 @@ pub enum TapleMessages {
     LedgerMessages(LedgerCommand),
 }
 
-impl TaskCommandContent for TapleMessages {}
+impl TaskCommandContent for KoreMessages {}
 
 pub struct ProtocolManager {
-    input: MpscChannel<Signed<MessageContent<TapleMessages>>, ()>,
+    input: MpscChannel<Signed<MessageContent<KoreMessages>>, ()>,
     distribution_sx: SenderEnd<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
     #[cfg(feature = "evaluation")]
     evaluation_sx: SenderEnd<EvaluatorMessage, EvaluatorResponse>,
@@ -52,7 +52,7 @@ pub struct ProtocolManager {
 
 impl ProtocolManager {
     pub fn new(
-        input: MpscChannel<Signed<MessageContent<TapleMessages>>, ()>,
+        input: MpscChannel<Signed<MessageContent<KoreMessages>>, ()>,
         distribution_sx: SenderEnd<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
         #[cfg(feature = "evaluation")] evaluation_sx: SenderEnd<
             EvaluatorMessage,
@@ -114,7 +114,7 @@ impl ProtocolManager {
     #[allow(unused_variables)]
     async fn process_command(
         &self,
-        command: ChannelData<Signed<MessageContent<TapleMessages>>, ()>,
+        command: ChannelData<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Result<(), ProtocolErrors> {
         let message = match command {
             ChannelData::AskData(_data) => {
@@ -128,18 +128,18 @@ impl ProtocolManager {
         let msg = message.content.content;
         let sender = message.content.sender_id;
         match msg {
-            TapleMessages::DistributionMessage(data) => {
+            KoreMessages::DistributionMessage(data) => {
                 self.distribution_sx
                     .tell(data)
                     .await
                     .map_err(|_| ProtocolErrors::ChannelClosed)?;
             }
-            TapleMessages::EventMessage(data) => self
+            KoreMessages::EventMessage(data) => self
                 .event_sx
                 .tell(data)
                 .await
                 .map_err(|_| ProtocolErrors::ChannelClosed)?,
-            TapleMessages::EvaluationMessage(data) => {
+            KoreMessages::EvaluationMessage(data) => {
                 #[cfg(feature = "evaluation")]
                 {
                     let evaluation_command = match data {
@@ -163,7 +163,7 @@ impl ProtocolManager {
                 #[cfg(not(feature = "evaluation"))]
                 log::trace!("Evaluation Message received. Current node is not able to evaluate");
             }
-            TapleMessages::ValidationMessage(data) => {
+            KoreMessages::ValidationMessage(data) => {
                 #[cfg(feature = "validation")]
                 {
                     let validation_command = match data {
@@ -187,7 +187,7 @@ impl ProtocolManager {
                 #[cfg(not(feature = "validation"))]
                 log::trace!("Validation Message received. Current node is not able to validate");
             }
-            TapleMessages::ApprovalMessages(data) => {
+            KoreMessages::ApprovalMessages(data) => {
                 #[cfg(feature = "approval")]
                 {
                     let approval_command = match data {
@@ -211,7 +211,7 @@ impl ProtocolManager {
                 #[cfg(not(feature = "approval"))]
                 log::trace!("Approval Message received. Current node is not able to aprove");
             }
-            TapleMessages::LedgerMessages(data) => self
+            KoreMessages::LedgerMessages(data) => self
                 .ledger_sx
                 .tell(data)
                 .await

@@ -8,7 +8,7 @@ readme = "../README.md"
 homepage = "https://kore-ledger.com"
 repository = "https://github.com/kore-ledger/kore-base"
 license = "AGPL-3.0-only"
-keywords = ["blockchain", "distributed-ledger", "taple", "sustainability"]
+keywords = ["blockchain", "distributed-ledger", "kore", "sustainability"]
 
 [workspace]
 

@@ -241,7 +241,7 @@ impl Signed<Event> {
     }
 }
 
-/// A struct representing the metadata of a TAPLE event.
+/// A struct representing the metadata of a KORE event.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Metadata {
     /// The namespace of the event.

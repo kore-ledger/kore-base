@@ -194,7 +194,7 @@ impl<C: DatabaseCollection> InnerApi<C> {
 
     pub async fn get_request(&self, request_id: DigestIdentifier) -> ApiResponses {
         log::debug!("SE LLAMA A GET REQUEST antes de db");
-        match self.db.get_taple_request(&request_id) {
+        match self.db.get_kore_request(&request_id) {
             Ok(request) => {
                 log::debug!("FUNCIONÓ EL GET DE LA DB");
                 ApiResponses::GetRequest(Ok(request))

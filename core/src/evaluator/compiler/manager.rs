@@ -10,14 +10,14 @@ use crate::{
 
 use super::compiler::Compiler;
 
-pub struct TapleCompiler<C: DatabaseCollection, G: GovernanceInterface> {
+pub struct KoreCompiler<C: DatabaseCollection, G: GovernanceInterface> {
     input_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     inner_compiler: Compiler<C, G>,
     token: CancellationToken,
     notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
-impl<C: DatabaseCollection, G: GovernanceInterface + Send> TapleCompiler<C, G> {
+impl<C: DatabaseCollection, G: GovernanceInterface + Send> KoreCompiler<C, G> {
     pub fn new(
         input_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         database: DB<C>,

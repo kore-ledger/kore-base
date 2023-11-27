@@ -11,7 +11,7 @@ use crate::{
 
 use super::HashId;
 
-/// An enum representing a TAPLE event request.
+/// An enum representing a KORE event request.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum EventRequest {
     /// A request to create a new subject.
@@ -102,9 +102,9 @@ pub enum RequestState {
     Processing,
 }
 
-/// A struct representing a TAPLE request.
+/// A struct representing a KORE request.
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct TapleRequest {
+pub struct KoreRequest {
     /// The identifier of the request.
     pub id: DigestIdentifier,
     /// The identifier of the subject associated with the request, if any.
@@ -119,7 +119,7 @@ pub struct TapleRequest {
     pub success: Option<bool>,
 }
 
-impl TryFrom<Signed<EventRequest>> for TapleRequest {
+impl TryFrom<Signed<EventRequest>> for KoreRequest {
     type Error = SubjectError;
 
     fn try_from(event_request: Signed<EventRequest>) -> Result<Self, Self::Error> {

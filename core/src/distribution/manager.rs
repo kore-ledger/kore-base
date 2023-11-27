@@ -8,7 +8,7 @@ use crate::{
     database::DB,
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
     message::MessageTaskCommand,
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     DatabaseCollection, Notification, Settings, DigestDerivator,
 };
 
@@ -32,7 +32,7 @@ impl<C: DatabaseCollection> DistributionManager<C> {
         governance_update_input: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         gov_api: GovernanceAPI,
         signature_manager: SelfSignatureManager,
         settings: Settings,

@@ -22,9 +22,9 @@ use crate::{
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     ledger::{LedgerCommand, LedgerResponse},
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     request::StartRequest,
-    request::TapleRequest,
+    request::KoreRequest,
     signature::{Signature, Signed, UniqueSignature},
     utils::message::{
         approval::create_approval_request, evaluator::create_evaluator_request,
@@ -47,7 +47,7 @@ const QUORUM_PORCENTAGE_AMPLIFICATION: f64 = 0.2;
 pub struct EventCompleter<C: DatabaseCollection> {
     gov_api: GovernanceAPI,
     database: DB<C>,
-    message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
     own_identifier: KeyIdentifier,
@@ -78,7 +78,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
     pub fn new(
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
         ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
         own_identifier: KeyIdentifier,
@@ -504,7 +504,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         let request_id = DigestIdentifier::generate_with_blake3(&event_request)
             .map_err(|_| EventError::HashGenerationFailed)?;
         // Comprobamos si ya tenemos la request registrada en el sistema
-        match self.database.get_taple_request(&request_id) {
+        match self.database.get_kore_request(&request_id) {
             Ok(_) => {
                 return Err(EventError::RequestAlreadyKnown);
             }
@@ -640,7 +640,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             // Make update of the phase the event is going through
             self.events_to_validate.insert(event_hash, event.clone());
             self.database
-                .set_taple_request(&request_id, &event_request.clone().try_into()?)
+                .set_kore_request(&request_id, &event_request.clone().try_into()?)
                 .map_err(|error| EventError::DatabaseError(error.to_string()))?;
             self.database
                 .set_prevalidated_event(&subject_id, event.clone())
@@ -794,11 +794,11 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             .entry(subject.governance_id.clone())
             .or_insert_with(HashSet::new)
             .insert(subject.governance_id);
-        let mut request_data: TapleRequest = event_request.clone().try_into()?;
+        let mut request_data: KoreRequest = event_request.clone().try_into()?;
         request_data.sn = Some(subject.sn + 1);
         request_data.subject_id = Some(subject.subject_id.clone());
         self.database
-            .set_taple_request(&request_id, &request_data)
+            .set_kore_request(&request_id, &request_data)
             .map_err(|error| EventError::DatabaseError(error.to_string()))?;
         self.database
             .set_request(&subject.subject_id, event_request)
@@ -1024,7 +1024,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                 self.approval_requests
                     .insert(approval_request_hash, approval_request.clone());
                 let msg = create_approval_request(approval_request);
-                // Return TapleMessage directly
+                // Return KoreMessage directly
                 (ValidationStage::Approve, msg)
             } else {
                 // No approval required
@@ -1510,7 +1510,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(LedgerCommand::GetLCE {
+                KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
                     who_asked: self.own_identifier.clone(),
                     subject_id: governance_id,
                 }),
@@ -1545,7 +1545,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
     async fn ask_signatures(
         &self,
         subject_id: &DigestIdentifier,
-        event_message: TapleMessages,
+        event_message: KoreMessages,
         signers: HashSet<KeyIdentifier>,
         quorum_size: u32,
     ) -> Result<(), EventError> {

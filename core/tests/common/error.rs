@@ -11,7 +11,7 @@ pub enum NotifierError {
 
 #[allow(dead_code)]
 #[derive(Error, Debug)]
-pub enum TapleError {
-    #[error("Taple Start Error {0}")]
+pub enum KoreError {
+    #[error("Kore Start Error {0}")]
     StartError(kore_base::Error),
 }

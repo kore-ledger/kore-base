@@ -7,7 +7,7 @@ use crate::distribution::{AskForSignatures, SignaturesReceived};
 use crate::governance::stage::ValidationStage;
 use crate::identifier::{Derivable, DigestIdentifier, KeyIdentifier};
 use crate::message::{MessageConfig, MessageTaskCommand};
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::protocol_message_manager::KoreMessages;
 use crate::signature::Signature;
 use crate::utils::message::distribution::{
     create_distribution_request, create_distribution_response,
@@ -25,7 +25,7 @@ use super::StartDistribution;
 pub struct InnerDistributionManager<G: GovernanceInterface, C: DatabaseCollection> {
     governance: G,
     db: DB<C>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     signature_manager: SelfSignatureManager,
     timeout: u32,
     replication_factor: f64,
@@ -36,7 +36,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     pub fn new(
         governance: G,
         db: DB<C>,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         signature_manager: SelfSignatureManager,
         settings: Settings,
         derivator: DigestDerivator,

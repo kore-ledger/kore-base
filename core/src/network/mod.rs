@@ -7,7 +7,7 @@ pub mod tell;
 mod tests {
     pub use crate::message::{MessageReceiver, MessageSender, NetworkEvent};
     use crate::network::{
-        network::{NetworkComposedEvent, NetworkProcessor, TapleNetworkBehavior},
+        network::{NetworkComposedEvent, NetworkProcessor, KoreNetworkBehavior},
         tell::TellBehaviourEvent,
     };
     use crate::{message::Command, network::routing::RoutingComposedEvent, ListenAddr};
@@ -697,10 +697,10 @@ mod tests {
         })
     }
 
-    // Build swarm with `TapleNodeBehaviour`
+    // Build swarm with `KoreNodeBehaviour`
     fn build_swarm(
         boot_node: Option<(&PeerId, Multiaddr)>,
-    ) -> (Swarm<TapleNetworkBehavior>, Multiaddr) {
+    ) -> (Swarm<KoreNetworkBehavior>, Multiaddr) {
         let keypair = Keypair::generate_ed25519();
 
         let noise_keys = noise::Keypair::<noise::X25519Spec>::new()
@@ -713,9 +713,9 @@ mod tests {
             .multiplex(yamux::YamuxConfig::default())
             .boxed();
         let behaviour = if let Some(boot_node) = boot_node {
-            TapleNetworkBehavior::new(keypair.clone(), vec![(boot_node.0.to_owned(), boot_node.1)])
+            KoreNetworkBehavior::new(keypair.clone(), vec![(boot_node.0.to_owned(), boot_node.1)])
         } else {
-            TapleNetworkBehavior::new(keypair.clone(), vec![])
+            KoreNetworkBehavior::new(keypair.clone(), vec![])
         };
 
         let mut swarm = Swarm::new(transport, behaviour, keypair.public().to_peer_id());

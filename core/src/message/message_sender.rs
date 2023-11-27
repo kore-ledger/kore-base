@@ -39,7 +39,7 @@ impl MessageSender {
         }
     }
 
-    /// Start listening in Taple netword
+    /// Start listening in Kore netword
     pub async fn send_message<T: TaskCommandContent>(
         &self,
         target: KeyIdentifier,

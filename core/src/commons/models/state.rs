@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{evaluation::SubjectContext, request::EventRequest, value_wrapper::ValueWrapper};
 
-/// A struct representing a TAPLE subject.
+/// A struct representing a KORE subject.
 #[derive(Debug, Deserialize, Serialize, Clone, BorshSerialize, BorshDeserialize)]
 pub struct Subject {
     /// The key pair associated with the subject, if any.
@@ -44,7 +44,7 @@ pub struct Subject {
     pub active: bool,
 }
 
-/// A struct representing the data associated with a TAPLE subject.
+/// A struct representing the data associated with a KORE subject.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SubjectData {
     /// The identifier of the subject.

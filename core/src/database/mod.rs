@@ -7,7 +7,7 @@ pub use self::memory::{MemoryCollection, MemoryManager};
 pub use db::DB;
 pub use error::Error;
 
-/// Trait to define a database compatible with Taple
+/// Trait to define a database compatible with Kore
 pub trait DatabaseManager<C>: Sync + Send
 where
     C: DatabaseCollection,
@@ -36,7 +36,7 @@ pub trait DatabaseCollection: Sync + Send {
     ) -> Box<dyn Iterator<Item = (String, Vec<u8>)> + 'a>;
 }
 
-/// Allows a TAPLE database implementation to be subjected to a battery of tests.
+/// Allows a KORE database implementation to be subjected to a battery of tests.
 /// The use must specify both a valid implementation of [DatabaseManager] and [DatabaseCollection]
 /// # Example
 /// ```rs

@@ -9,7 +9,7 @@ use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     database::DB,
     message::MessageTaskCommand,
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     DatabaseCollection, DigestIdentifier, KeyIdentifier,
 };
 
@@ -57,7 +57,7 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
     pub fn new(
         input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         our_id: KeyIdentifier,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,

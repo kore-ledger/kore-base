@@ -36,7 +36,7 @@ impl NodeBuilder {
         }];
         settings.network.known_nodes = self.access_points;
         settings.node.passvotation = self.pass_votation.unwrap_or(settings.node.passvotation);
-        let path = format!("/tmp/.taple/sc");
+        let path = format!("/tmp/.kore/sc");
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
         let database = MemoryManager::new();
@@ -65,15 +65,15 @@ pub enum PassVotation {
 }
 
 pub struct OnMemoryNode {
-    taple: Node<MemoryManager, MemoryCollection>,
+    kore: Node<MemoryManager, MemoryCollection>,
     api: Api,
 }
 
 const MAX_TIMEOUT_MS: u16 = 5000;
 
 impl OnMemoryNode {
-    pub fn new(taple: Node<MemoryManager, MemoryCollection>, api: Api) -> Self {
-        Self { taple, api }
+    pub fn new(kore: Node<MemoryManager, MemoryCollection>, api: Api) -> Self {
+        Self { kore, api }
     }
 
     pub fn get_api(&self) -> Api {
@@ -81,7 +81,7 @@ impl OnMemoryNode {
     }
 
     pub async fn shutdown(self) {
-        self.taple.shutdown_gracefully().await;
+        self.kore.shutdown_gracefully().await;
     }
 
     pub async fn wait_for_new_subject(&mut self) -> Result<DigestIdentifier, NotifierError> {
@@ -124,7 +124,7 @@ impl OnMemoryNode {
                 _ = sleep(Duration::from_millis(MAX_TIMEOUT_MS as u64)) => {
                     return Err(NotifierError::RequestTimeout);
                 },
-                notification = self.taple.recv_notification() => {
+                notification = self.kore.recv_notification() => {
                     match notification {
                         Some(data) => {
                             if let Some(result) = callback(data) {

@@ -2,7 +2,7 @@ use crate::commons::crypto::KeyGenerator;
 use crate::commons::models::approval::ApprovalState;
 use crate::commons::models::state::generate_subject_id;
 use crate::crypto::Secp256k1KeyPair;
-use crate::request::{RequestState, TapleRequest};
+use crate::request::{RequestState, KoreRequest};
 use crate::signature::Signed;
 use crate::{
     commons::{
@@ -15,7 +15,7 @@ use crate::{
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     request::EventRequest,
     signature::Signature,
     utils::message::ledger::{request_event, request_gov_event},
@@ -39,7 +39,7 @@ pub struct Ledger<C: DatabaseCollection> {
     database: DB<C>,
     subject_is_gov: HashMap<DigestIdentifier, bool>,
     ledger_state: HashMap<DigestIdentifier, LedgerState>,
-    message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     distribution_channel:
         SenderEnd<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
     our_id: KeyIdentifier,
@@ -51,7 +51,7 @@ impl<C: DatabaseCollection> Ledger<C> {
     pub fn new(
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         distribution_channel: SenderEnd<
             DistributionMessagesNew,
             Result<(), DistributionErrorResponses>,
@@ -168,13 +168,13 @@ impl<C: DatabaseCollection> Ledger<C> {
         subject_id: DigestIdentifier,
         success: bool,
     ) -> Result<(), LedgerError> {
-        let mut taple_request: TapleRequest = event_request.clone().try_into()?;
-        taple_request.sn = Some(sn);
-        taple_request.subject_id = Some(subject_id.clone());
-        taple_request.state = RequestState::Finished;
-        taple_request.success = Some(success);
+        let mut kore_request: KoreRequest = event_request.clone().try_into()?;
+        kore_request.sn = Some(sn);
+        kore_request.subject_id = Some(subject_id.clone());
+        kore_request.state = RequestState::Finished;
+        kore_request.success = Some(success);
         self.database
-            .set_taple_request(&request_id, &taple_request)?;
+            .set_kore_request(&request_id, &kore_request)?;
         Ok(())
     }
 
@@ -565,7 +565,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             validation_proof.event_hash.derivator.clone(),
         )
         .map_err(|_| LedgerError::CryptoError("Error generating event hash".to_owned()))?;
-        match self.database.get_taple_request(&request_id) {
+        match self.database.get_kore_request(&request_id) {
             Ok(_) => return Err(LedgerError::RepeatedRequestId(request_id.to_str())),
             Err(error) => match error {
                 DbError::EntryNotFound => {}
@@ -2090,7 +2090,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         let event_request = event.content.event_request.clone();
         let request_id = DigestIdentifier::generate_with_blake3(&event_request)
             .map_err(|_| LedgerError::CryptoError("Error generating request hash".to_owned()))?;
-        match self.database.get_taple_request(&request_id) {
+        match self.database.get_kore_request(&request_id) {
             Ok(_) => return Err(LedgerError::RepeatedRequestId(request_id.to_str())),
             Err(error) => match error {
                 DbError::EntryNotFound => {}
@@ -2445,7 +2445,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
                     event: event.clone(),
                 }),
                 vec![who_asked],
@@ -2469,7 +2469,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
                     sender: self.our_id.clone(),
                     event: event.clone(),
                     signatures: signatures.clone(),
@@ -2498,7 +2498,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
                     sender: self.our_id.clone(),
                     event: event.clone(),
                     signatures: signatures.clone(),

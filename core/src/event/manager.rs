@@ -8,7 +8,7 @@ use crate::governance::error::RequestError;
 use crate::governance::GovernanceUpdatedMessage;
 use crate::identifier::KeyIdentifier;
 use crate::ledger::{LedgerCommand, LedgerResponse};
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::protocol_message_manager::KoreMessages;
 use crate::signature::Signed;
 use crate::{EventRequest, DigestDerivator};
 use crate::{
@@ -60,7 +60,7 @@ impl<C: DatabaseCollection> EventManager<C> {
         gov_api: GovernanceAPI,
         database: DB<C>,
         token: CancellationToken,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
         ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
         own_identifier: KeyIdentifier,

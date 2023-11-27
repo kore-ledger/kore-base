@@ -1,9 +1,9 @@
 #![recursion_limit = "256"]
-//! TAPLE is a DLT focused on traceability characterized by its level of scalability,
+//! KORE is a DLT focused on traceability characterized by its level of scalability,
 //! its flexibility to be employed in different devices and use cases and its reduced resource consumption,
 //! including power consumption.
 //!
-//! The TAPLE crate provides the library that allows instantiating nodes of this DLT in order to create a
+//! The KORE crate provides the library that allows instantiating nodes of this DLT in order to create a
 //! functional network through a single structure containing all the required logic.
 //! Applications can interact with these nodes through the API they expose, thus enabling read and write operations
 //! against the network. The API also allows the design and creation of customized clients for the technology
@@ -22,7 +22,7 @@
 //! use kore_base::*;
 //!
 //! /**
-//!  * Basic usage of TAPLE Core. It includes:
+//!  * Basic usage of KORE Core. It includes:
 //!  * - Node inicialization with on-memory DB (only for testing purpouse)
 //!  * - Minimal governance creation example
 //!  */
@@ -39,7 +39,7 @@
 //!     };
 //!
 //!     // Build node
-//!     let (mut node, api) = Node::build(settings, MemoryManager::new()).expect("TAPLE node built");
+//!     let (mut node, api) = Node::build(settings, MemoryManager::new()).expect("KORE node built");
 //!
 //!     // Create a minimal governance
 //!     // Compose and sign the subject creation request

@@ -7,14 +7,14 @@ use super::{
 use config::Value;
 use serde::Deserialize;
 
-/// Configuration parameters of a TAPLE node divided into categories.
+/// Configuration parameters of a KORE node divided into categories.
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct Settings {
     pub network: NetworkSettings,
     pub node: NodeSettings,
 }
 
-/// P2P network configuration parameters of a TAPLE node.
+/// P2P network configuration parameters of a KORE node.
 #[derive(Debug, Deserialize, Clone)]
 pub struct NetworkSettings {
     /// [Multiaddr](https://github.com/multiformats/multiaddr) to consider by the node.
@@ -39,7 +39,7 @@ impl Default for NetworkSettings {
 
 const DEFAULT_PORT: u32 = 40040;
 
-/// Represents a valid listening address for TAPLE. Internally, they are constituted as a MultiAddr.
+/// Represents a valid listening address for KORE. Internally, they are constituted as a MultiAddr.
 #[derive(Debug, Deserialize, Clone)]
 pub enum ListenAddr {
     /// Represents in-memory addressing.
@@ -229,7 +229,7 @@ pub struct AccessPoint {
     pub addr: String,
 }
 
-/// General settings of a TAPLE node.
+/// General settings of a KORE node.
 #[derive(Debug, Deserialize, Clone)]
 pub struct NodeSettings {
     /// [KeyDerivator] to be used by the secret key.

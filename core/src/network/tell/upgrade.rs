@@ -22,7 +22,7 @@ impl UpgradeInfo for TellProtocol {
     type InfoIter = iter::Once<Self::Info>;
 
     fn protocol_info(&self) -> Self::InfoIter {
-        iter::once(b"/taple/tell/1.0.0")
+        iter::once(b"/kore/tell/1.0.0")
     }
 }
 

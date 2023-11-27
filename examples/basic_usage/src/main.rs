@@ -7,7 +7,7 @@ use kore_base::signature::*;
 use kore_base::*;
 
 /**
- * Basic usage of TAPLE Core. It includes:
+ * Basic usage of KORE Core. It includes:
  * - Node inicialization with on-memory DB (only for testing purpouse)
  * - Minimal governance creation example
  */
@@ -24,7 +24,7 @@ async fn main() {
     };
 
     // Build node
-    let (mut node, api) = Node::build(settings, MemoryManager::new()).expect("TAPLE node built");
+    let (mut node, api) = Node::build(settings, MemoryManager::new()).expect("KORE node built");
 
     // Create a minimal governance
     // Compose and sign the subject creation request

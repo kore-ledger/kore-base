@@ -11,7 +11,7 @@ use crate::{
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
     identifier::DigestIdentifier,
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     signature::Signed,
     utils::message::event::create_approver_response,
     ApprovalRequest, DatabaseCollection, Notification, Settings, DigestDerivator,
@@ -28,7 +28,7 @@ pub struct ApprovalManager<C: DatabaseCollection> {
     token: CancellationToken,
     notification_tx: tokio::sync::mpsc::Sender<Notification>,
     governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     inner_manager: InnerApprovalManager<GovernanceAPI, RequestNotifier, C>,
 }
 
@@ -122,7 +122,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
         gov_api: GovernanceAPI,
         input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
         token: CancellationToken,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         signature_manager: SelfSignatureManager,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
@@ -242,7 +242,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                             .messenger_channel
                             .tell(MessageTaskCommand::Request(
                                 None,
-                                TapleMessages::LedgerMessages(
+                                KoreMessages::LedgerMessages(
                                     crate::ledger::LedgerCommand::GetLCE {
                                         who_asked: our_id,
                                         subject_id: gov_id,
@@ -261,7 +261,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                             .messenger_channel
                             .tell(MessageTaskCommand::Request(
                                 None,
-                                TapleMessages::EventMessage(
+                                KoreMessages::EventMessage(
                                     crate::event::EventCommand::HigherGovernanceExpected {
                                         governance_id: gov_id,
                                         who_asked: our_id,

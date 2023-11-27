@@ -5,7 +5,7 @@ use super::{
 };
 use crate::database::{DatabaseCollection, DB};
 use crate::message::MessageTaskCommand;
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::protocol_message_manager::KoreMessages;
 use crate::{Notification, DigestDerivator};
 use crate::{
     commons::{
@@ -45,7 +45,7 @@ impl<C: DatabaseCollection> ValidationManager<C> {
         signature_manager: SelfSignatureManager,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
     ) -> Self {
         Self {

@@ -4,17 +4,17 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use wasmtime::Engine;
 
-use super::compiler::manager::TapleCompiler;
+use super::compiler::manager::KoreCompiler;
 use super::errors::EvaluatorError;
 use super::{EvaluatorMessage, EvaluatorResponse};
 use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
 use crate::database::{DatabaseCollection, DatabaseManager, DB};
 use crate::evaluator::errors::ExecutorErrorResponses;
-use crate::evaluator::runner::manager::TapleRunner;
+use crate::evaluator::runner::manager::KoreRunner;
 use crate::governance::{GovernanceInterface, GovernanceUpdatedMessage};
 use crate::message::{MessageConfig, MessageTaskCommand};
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::protocol_message_manager::KoreMessages;
 use crate::request::EventRequest;
 use crate::signature::Signed;
 use crate::utils::message::event::create_evaluator_response;
@@ -28,11 +28,11 @@ pub struct EvaluatorManager<
     /// Communication channel for incoming petitions
     input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
     /// Contract executioner
-    runner: TapleRunner<C, G>,
+    runner: KoreRunner<C, G>,
     signature_manager: SelfSignatureManager,
     token: CancellationToken,
     _notification_tx: tokio::sync::mpsc::Sender<Notification>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     derivator: DigestDerivator,
     _m: PhantomData<M>,
     _g: PhantomData<G>,
@@ -53,11 +53,11 @@ impl<
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
         gov_api: G,
         contracts_path: String,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
     ) -> Self {
         let engine = Engine::default();
-        let compiler = TapleCompiler::new(
+        let compiler = KoreCompiler::new(
             compiler_channel,
             DB::new(database.clone()),
             gov_api.clone(),
@@ -71,7 +71,7 @@ impl<
         });
         Self {
             input_channel,
-            runner: TapleRunner::new(DB::new(database.clone()), engine, gov_api, derivator.clone()),
+            runner: KoreRunner::new(DB::new(database.clone()), engine, gov_api, derivator.clone()),
             signature_manager,
             token,
             _notification_tx: notification_tx,
@@ -162,7 +162,7 @@ impl<
                             self.messenger_channel
                                 .tell(MessageTaskCommand::Request(
                                     None,
-                                    TapleMessages::EventMessage(
+                                    KoreMessages::EventMessage(
                                         crate::event::EventCommand::HigherGovernanceExpected {
                                             governance_id: evaluation_request.context.governance_id,
                                             who_asked: self.signature_manager.get_own_identifier(),
@@ -181,7 +181,7 @@ impl<
                             self.messenger_channel
                                 .tell(MessageTaskCommand::Request(
                                     None,
-                                    TapleMessages::LedgerMessages(
+                                    KoreMessages::LedgerMessages(
                                         crate::ledger::LedgerCommand::GetLCE {
                                             who_asked: self.signature_manager.get_own_identifier(),
                                             subject_id: evaluation_request.context.governance_id,
@@ -271,7 +271,7 @@ mod test {
         },
         identifier::{DigestIdentifier, KeyIdentifier},
         message::MessageTaskCommand,
-        protocol::protocol_message_manager::TapleMessages,
+        protocol::protocol_message_manager::KoreMessages,
         request::{EventRequest, FactRequest},
         signature::Signed,
         MemoryManager, Metadata, ValueWrapper,
@@ -279,7 +279,7 @@ mod test {
 
     use crate::evaluator::manager::EvaluatorManager;
 
-    const SC_DIR: &str = "/tmp/taple_contracts/";
+    const SC_DIR: &str = "/tmp/kore_contracts/";
 
     pub fn create_dir() {
         remove_dir();
@@ -364,7 +364,7 @@ mod test {
     fn get_file() -> String {
         String::from(
             r#"
-            use taple_sc_rust as sdk;
+            use kore_sc_rust as sdk;
             use serde::{Deserialize, Serialize};
             
             // Intento de simulación de cómo podría ser un contrato
@@ -575,7 +575,7 @@ mod test {
         SenderEnd<EvaluatorMessage, EvaluatorResponse>,
         Sender<GovernanceUpdatedMessage>,
         SelfSignatureManager,
-        MpscChannel<MessageTaskCommand<TapleMessages>, ()>,
+        MpscChannel<MessageTaskCommand<KoreMessages>, ()>,
     ) {
         let (rx, sx) = MpscChannel::new(100);
         let (msg_rx, msg_sx) = MpscChannel::new(100);
@@ -729,7 +729,7 @@ mod test {
             } else {
                 panic!("Unexpected");
             };
-            let evaluator_response = if let TapleMessages::EventMessage(event) = message {
+            let evaluator_response = if let KoreMessages::EventMessage(event) = message {
                 match event {
                     EventCommand::EvaluatorResponse { evaluator_response } => evaluator_response,
                     _ => {

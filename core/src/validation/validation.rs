@@ -10,7 +10,7 @@ use crate::{
     event::EventCommand,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     signature::Signature,
     Derivable, DigestDerivator, KeyIdentifier, Metadata,
 };
@@ -22,7 +22,7 @@ pub struct Validation<C: DatabaseCollection> {
     gov_api: GovernanceAPI,
     database: DB<C>,
     signature_manager: SelfSignatureManager,
-    message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     derivator: DigestDerivator,
 }
 
@@ -31,7 +31,7 @@ impl<C: DatabaseCollection> Validation<C> {
         gov_api: GovernanceAPI,
         database: DB<C>,
         signature_manager: SelfSignatureManager,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
     ) -> Self {
         Self {
@@ -82,7 +82,7 @@ impl<C: DatabaseCollection> Validation<C> {
             self.message_channel
                 .tell(MessageTaskCommand::Request(
                     None,
-                    TapleMessages::EventMessage(
+                    KoreMessages::EventMessage(
                         crate::event::EventCommand::HigherGovernanceExpected {
                             governance_id: validation_event.proof.governance_id.clone(),
                             who_asked: self.signature_manager.get_own_identifier(),
@@ -136,7 +136,7 @@ impl<C: DatabaseCollection> Validation<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::EventMessage(EventCommand::ValidatorResponse {
+                KoreMessages::EventMessage(EventCommand::ValidatorResponse {
                     event_hash: validation_event.proof.event_hash,
                     signature: validation_signature.clone(),
                     governance_version: actual_gov_version,

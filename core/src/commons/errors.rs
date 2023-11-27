@@ -74,8 +74,8 @@ pub enum Error {
     #[error("Key pair error: {0}")]
     KeyPairError(String),
 
-    #[error("TAPLE error: {0}")]
-    TapleError(String),
+    #[error("KORE error: {0}")]
+    KoreError(String),
 
     #[error("Store error: {0}")]
     StoreError(String),

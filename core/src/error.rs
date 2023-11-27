@@ -1,8 +1,8 @@
-//! Possible errors of a TAPLE Node
+//! Possible errors of a KORE Node
 use config::ConfigError;
 use thiserror::Error;
 
-/// Possible errors that a TAPLE node can generate.
+/// Possible errors that a KORE node can generate.
 /// It does not include internal errors that may be produced by architecture modules.
 #[derive(Error, Debug)]
 pub enum Error {

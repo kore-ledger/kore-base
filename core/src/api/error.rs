@@ -1,4 +1,4 @@
-//! Errors that may occur when interacting with a TAPLE node through its API
+//! Errors that may occur when interacting with a KORE node through its API
 
 pub use crate::protocol::errors::EventCreationError;
 use crate::{approval::error::ApprovalErrorResponse, event::errors::EventError};
@@ -19,7 +19,7 @@ pub(crate) enum APIInternalError {
     DatabaseError(String),
 }
 
-/// Errors that may occur when using the TAPLE API
+/// Errors that may occur when using the KORE API
 #[derive(Error, Debug, Clone)]
 pub enum ApiError {
     #[error("{}", source)]

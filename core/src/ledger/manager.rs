@@ -7,7 +7,7 @@ use crate::{
     distribution::{error::DistributionErrorResponses, DistributionMessagesNew},
     governance::{error::RequestError, GovernanceAPI},
     message::MessageTaskCommand,
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::protocol_message_manager::KoreMessages,
     DatabaseCollection, KeyDerivator, KeyIdentifier, Notification, DigestDerivator,
 };
 
@@ -60,7 +60,7 @@ impl<C: DatabaseCollection> LedgerManager<C> {
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         distribution_channel: SenderEnd<
             DistributionMessagesNew,
             Result<(), DistributionErrorResponses>,

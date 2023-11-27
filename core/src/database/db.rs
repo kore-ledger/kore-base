@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::commons::models::approval::ApprovalEntity;
-use crate::commons::models::request::TapleRequest;
+use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::Subject;
 use crate::commons::models::validation::ValidationProof;
 use crate::crypto::KeyPair;
@@ -25,7 +25,7 @@ use super::{
     DatabaseCollection, DatabaseManager,
 };
 
-/// A struct representing a database that stores TAPLE data.
+/// A struct representing a database that stores KORE data.
 pub struct DB<C: DatabaseCollection> {
     /// The signature database.
     signature_db: SignatureDb<C>,
@@ -229,23 +229,23 @@ impl<C: DatabaseCollection> DB<C> {
         self.event_request_db.del_request(subject_id)
     }
 
-    pub fn get_taple_request(&self, request_id: &DigestIdentifier) -> Result<TapleRequest, Error> {
+    pub fn get_kore_request(&self, request_id: &DigestIdentifier) -> Result<KoreRequest, Error> {
         self.request_db.get_request(request_id)
     }
 
-    pub fn get_taple_all_request(&self) -> Vec<TapleRequest> {
+    pub fn get_kore_all_request(&self) -> Vec<KoreRequest> {
         self.request_db.get_all_request()
     }
 
-    pub fn set_taple_request(
+    pub fn set_kore_request(
         &self,
         request_id: &DigestIdentifier,
-        request: &TapleRequest,
+        request: &KoreRequest,
     ) -> Result<(), Error> {
         self.request_db.set_request(request_id, request)
     }
 
-    pub fn del_taple_request(&self, request_id: &DigestIdentifier) -> Result<(), Error> {
+    pub fn del_kore_request(&self, request_id: &DigestIdentifier) -> Result<(), Error> {
         self.request_db.del_request(request_id)
     }
 
