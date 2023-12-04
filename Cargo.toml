@@ -9,17 +9,16 @@ resolver = "1"
 [workspace.package]
 version = "0.1.2"
 edition = "2021"
-authors = ["Kore Ledger, SL <info@kore-ledger.com>"]
+authors = ["Kore Ledger, SL <info@kore-ledger.net>"]
 description = "Kore Ledger base library"
 readme = "README.md"
-homepage = "https://www.kore-ledger.com"
+homepage = "https://www.kore-ledger.net"
 repository = "https://github.com/kore-ledger/kore-base"
 license = "AGPL-3.0-only"
 keywords = ["traceability", "distributed-ledger", "kore", "sustainability"]
 rust-version = "1.73"
 
 [workspace.dependencies]
-kore-tell = { path = "protocols/kore-tell" }
 serde = "1.0"
 serde_json = "1.0"
 tokio = "1.20"
@@ -52,6 +51,7 @@ hex = "0.4.3"
 libp2p = { version = "0.45.1", default_features = false }
 wasmtime = "14.0"
 serial_test = "2.0"
+memsecurity = { version = "3.4.0", features = ["encryption"] }
 
 [profile.release]
 lto = true

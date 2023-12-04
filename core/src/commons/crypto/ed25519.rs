@@ -13,17 +13,19 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 /// Ed25519 cryptographic key pair
-pub type Ed25519KeyPair = BaseKeyPair<VerifyingKey, SigningKey>;
+pub type Ed25519KeyPair = BaseKeyPair<VerifyingKey>;
 
 impl KeyGenerator for Ed25519KeyPair {
     fn from_seed(seed: &[u8]) -> Self {
         let secret_seed = create_seed(seed).expect("invalid seed");
         let sk = SigningKey::from_bytes(&secret_seed);
         let pk = sk.verifying_key();
-        Self {
+        let mut kp = Self {
             public_key: pk,
-            secret_key: Some(sk),
-        }
+            secret_key: None,
+        };
+        let _ = kp.encrypt_secret_bytes(&secret_seed);
+        kp
     }
 
     fn from_public_key(public_key: &[u8]) -> Self {
@@ -37,10 +39,12 @@ impl KeyGenerator for Ed25519KeyPair {
         let sk = SigningKey::try_from(secret_key).expect("cannot generate secret key");
         let pk = (&sk).try_into().expect("cannot generate public key");
 
-        Ed25519KeyPair {
-            secret_key: Some(sk),
+        let mut kp = Ed25519KeyPair {
+            secret_key: None,
             public_key: pk,
-        }
+        };
+        let _ = kp.encrypt_secret_bytes(secret_key);
+        kp
     }
 }
 
@@ -50,9 +54,7 @@ impl KeyMaterial for Ed25519KeyPair {
     }
 
     fn secret_key_bytes(&self) -> Vec<u8> {
-        self.secret_key
-            .as_ref()
-            .map_or(vec![], |x| x.to_bytes().to_vec())
+        self.decrypt_secret_bytes().unwrap_or_default()
     }
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -65,12 +67,14 @@ impl KeyMaterial for Ed25519KeyPair {
 
 impl DSA for Ed25519KeyPair {
     fn sign(&self, payload: Payload) -> Result<Vec<u8>, Error> {
-        let sk = self
+        let encr = self
             .secret_key
             .as_ref()
             .ok_or(Error::SignError("No secret key".into()))?;
+        let sk = encr.decrypt().map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
+        let signig_key = SigningKey::try_from(sk.as_ref()).map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
         match payload {
-            Payload::Buffer(msg) => Ok(sk.sign(msg.as_slice()).to_bytes().to_vec()),
+            Payload::Buffer(msg) => Ok(signig_key.sign(msg.as_slice()).to_bytes().to_vec()),
             _ => Err(Error::SignError(
                 "Payload type not supported for this key".into(),
             )),
