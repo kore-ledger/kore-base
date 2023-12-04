@@ -12,7 +12,7 @@ use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::{Signer,Verifi
 use sha2::{Digest, Sha256};
 
 /// Secp256k1 cryptographic key pair
-pub type Secp256k1KeyPair = BaseKeyPair<VerifyingKey, SigningKey>;
+pub type Secp256k1KeyPair = BaseKeyPair<VerifyingKey>;
 
 /// Defines constants
 pub const SECRET_KEY_LENGTH: usize = 32;
@@ -24,10 +24,12 @@ impl KeyGenerator for Secp256k1KeyPair {
         let secret_seed = create_seed(seed).expect("invalid seed");
         let sk = SigningKey::from_slice(&secret_seed).expect("invalid seed");
         let pk = VerifyingKey::from(&sk);
-        Secp256k1KeyPair {
+        let mut kp = Secp256k1KeyPair {
             public_key: pk,
-            secret_key: Some(sk),
-        }
+            secret_key: None,
+        };
+        let _ = kp.encrypt_secret_bytes(&secret_seed);
+        kp
     }
 
     fn from_public_key(pk: &[u8]) -> Self {
@@ -42,10 +44,12 @@ impl KeyGenerator for Secp256k1KeyPair {
         let sk = SigningKey::from_slice(secret_key).expect("Could not parse secret key");
         let pk = VerifyingKey::from(&sk);
 
-        Secp256k1KeyPair {
+        let mut kp = Secp256k1KeyPair {
             public_key: pk,
-            secret_key: Some(sk),
-        }
+            secret_key: None,
+        };
+        let _ = kp.encrypt_secret_bytes(secret_key);
+        kp
     }
 }
 
@@ -55,9 +59,7 @@ impl KeyMaterial for Secp256k1KeyPair {
     }
 
     fn secret_key_bytes(&self) -> Vec<u8> {
-        self.secret_key
-            .as_ref()
-            .map_or(vec![], |x| x.to_bytes().to_vec())
+        self.decrypt_secret_bytes().unwrap_or_default()
     }
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -70,18 +72,19 @@ impl KeyMaterial for Secp256k1KeyPair {
 
 impl DSA for Secp256k1KeyPair {
     fn sign(&self, payload: Payload) -> Result<Vec<u8>, Error> {
+        let encr = self
+            .secret_key
+            .as_ref()
+            .ok_or(Error::SignError("No secret key".into()))?;
+        let sk = encr.decrypt().map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
+        let signing_key = SigningKey::try_from(sk.as_ref()).map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
+
         match payload {
             Payload::Buffer(payload) => {
-                let signature: Signature = match &self.secret_key {
-                    Some(sig) => {
-                        let message = get_hash(&payload);
-                        sig.sign(&message)
-                    }
-                    None => panic!("secret key not found"),
-                };
-                //let signature = signature.serialize();
+                let message = get_hash(&payload);
+                let signature: Signature = signing_key.sign(&message);
                 Ok(signature.to_bytes().to_vec())
-            }
+            },
             _ => Err(Error::SignError(
                 "Payload type not supported for this key".into(),
             )),

@@ -12,6 +12,8 @@ use std::io::Read;
 use borsh::{BorshDeserialize, BorshSerialize};
 use identifier::error::Error;
 
+use memsecurity::EncryptedMem;
+
 use base64::{Engine as _, engine::general_purpose};
 pub use ed25519::Ed25519KeyPair;
 #[cfg(feature = "secp256k1")]
@@ -55,10 +57,34 @@ pub fn generate<T: KeyGenerator + DSA + Into<KeyPair>>(seed: Option<&[u8]>) -> K
 }
 
 /// Base for asymmetric key pair
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct BaseKeyPair<P, K> {
+#[derive(Default, Debug)]
+pub struct BaseKeyPair<P> {
     pub public_key: P,
-    pub secret_key: Option<K>,
+    pub secret_key: Option<EncryptedMem>,
+}
+
+impl<P> BaseKeyPair<P> {
+    /// Decrypt secret key from encrypted memory.
+    fn decrypt_secret_bytes(&self) -> Result<Vec<u8>, Error> {
+        match &self.secret_key {
+            Some(x) => {
+                let bytes = x.decrypt().map_err(|_| Error::KeyPairError("secret key decrypting".to_owned()))?;
+                Ok(Vec::from(bytes.as_ref()))
+            },
+            None => Err(Error::KeyPairError(
+                "secret key is not available".to_owned(),
+            )),
+        }
+    }
+
+    /// Encrypt secret key into encrypted memory.
+    fn encrypt_secret_bytes(&mut self, secret_key: &[u8]) -> Result<(), Error> {
+        let encr = self.secret_key.get_or_insert(EncryptedMem::new());
+        encr.encrypt(&secret_key.to_vec())
+            .map_err(|_| Error::KeyPairError("cannot encrypt the secret in memory".to_owned()))?;
+        Ok(())
+    }
+
 }
 
 /// Represents asymetric key pair for storage (deprecated: KeyPair is serializable)

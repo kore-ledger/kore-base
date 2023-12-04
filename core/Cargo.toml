@@ -58,6 +58,7 @@ blake2 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
 wasmtime = { workspace = true, features = ["cache"], optional = true }
+memsecurity = { workspace = true, features = ["encryption"] }
 
 [dev-dependencies]
 kore-base = { path = ".", features = ["all"] }
