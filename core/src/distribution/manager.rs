@@ -9,7 +9,7 @@ use crate::{
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
     message::MessageTaskCommand,
     protocol::protocol_message_manager::TapleMessages,
-    DatabaseCollection, Notification, Settings, DigestDerivator,
+    DatabaseCollection, DigestDerivator, Notification, Settings,
 };
 
 use super::{
@@ -50,7 +50,7 @@ impl<C: DatabaseCollection> DistributionManager<C> {
                 messenger_channel,
                 signature_manager,
                 settings,
-                derivator
+                derivator,
             ),
         }
     }

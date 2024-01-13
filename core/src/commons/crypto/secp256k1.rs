@@ -1,14 +1,24 @@
 //! Adapter for pure Rust implementation of the secp256k1 curve and fast ECDSA signatures
 //!
 
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
+use ed25519_dalek::pkcs8::DecodePrivateKey;
 use serde::{de::Deserializer, Deserialize, Serialize, Serializer};
 
 use crate::identifier;
 use identifier::error::Error;
 
-use super::{create_seed, BaseKeyPair, KeyGenerator, KeyMaterial, KeyPair, Payload, DHKE, DSA};
-use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::{Signer,Verifier}};
+use super::{
+    create_seed, BaseKeyPair, KeyGenerator, KeyMaterial, KeyPair, KeyPairType, Payload, DHKE, DSA,
+};
+use k256::{
+    ecdsa::{
+        signature::{Signer, Verifier},
+        Signature, SigningKey, VerifyingKey,
+    },
+    pkcs8::EncodePrivateKey,
+    SecretKey,
+};
 use sha2::{Digest, Sha256};
 
 /// Secp256k1 cryptographic key pair
@@ -68,6 +78,38 @@ impl KeyMaterial for Secp256k1KeyPair {
         bytes[SECRET_KEY_LENGTH..].copy_from_slice(&self.public_key_bytes());
         bytes.to_vec()
     }
+
+    fn to_secret_der(&self) -> Result<Vec<u8>, Error> {
+        let secret_bytes = self.decrypt_secret_bytes()?;
+        let signing_key = SigningKey::try_from(secret_bytes.as_slice())
+            .map_err(|_| Error::KeyPairError("Cannot generate signing key".into()))?;
+        let secret_key = SecretKey::from(signing_key);
+        let der = secret_key
+            .to_pkcs8_der()
+            .map_err(|_| Error::KeyPairError("pkcs8 serialize error".into()))?;
+        Ok(der.as_bytes().to_vec())
+    }
+
+    fn from_secret_der(kp_type: super::KeyPairType, der: &[u8]) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        match kp_type {
+            KeyPairType::Secp256k1 => {
+                let secret_key = SecretKey::from_pkcs8_der(der)
+                    .map_err(|_| Error::KeyPairError("pkcs8 deserialize error".into()))?;
+                let signing_key = SigningKey::from(secret_key);
+                let public_key = VerifyingKey::from(&signing_key);
+                let mut kp = Secp256k1KeyPair {
+                    public_key,
+                    secret_key: None,
+                };
+                let _ = kp.encrypt_secret_bytes(&signing_key.to_bytes());
+                Ok(kp)
+            }
+            _ => Err(Error::KeyPairError("Key type not supported".into())),
+        }
+    }
 }
 
 impl DSA for Secp256k1KeyPair {
@@ -76,15 +118,18 @@ impl DSA for Secp256k1KeyPair {
             .secret_key
             .as_ref()
             .ok_or(Error::SignError("No secret key".into()))?;
-        let sk = encr.decrypt().map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
-        let signing_key = SigningKey::try_from(sk.as_ref()).map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
+        let sk = encr
+            .decrypt()
+            .map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
+        let signing_key = SigningKey::try_from(sk.as_ref())
+            .map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
 
         match payload {
             Payload::Buffer(payload) => {
                 let message = get_hash(&payload);
                 let signature: Signature = signing_key.sign(&message);
                 Ok(signature.to_bytes().to_vec())
-            },
+            }
             _ => Err(Error::SignError(
                 "Payload type not supported for this key".into(),
             )),
@@ -95,8 +140,7 @@ impl DSA for Secp256k1KeyPair {
         let verified = match payload {
             Payload::Buffer(payload) => {
                 let message = get_hash(&payload);
-                let signature =
-                    Signature::from_slice(signature).expect("Couldn't parse signature");
+                let signature = Signature::from_slice(signature).expect("Couldn't parse signature");
 
                 self.public_key.verify(&message, &signature).is_ok()
             }
@@ -134,7 +178,9 @@ impl<'de> Deserialize<'de> for Secp256k1KeyPair {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let bytes = general_purpose::URL_SAFE_NO_PAD.decode(&s).map_err(serde::de::Error::custom)?;
+        let bytes = general_purpose::URL_SAFE_NO_PAD
+            .decode(&s)
+            .map_err(serde::de::Error::custom)?;
 
         Ok(Secp256k1KeyPair::from_secret_key(
             &bytes[..SECRET_KEY_LENGTH],
@@ -143,7 +189,7 @@ impl<'de> Deserialize<'de> for Secp256k1KeyPair {
 }
 
 fn get_hash(payload: &[u8]) -> [u8; 32] {
-    let hash = Sha256::digest(&payload);
+    let hash = Sha256::digest(payload);
     let mut output = [0u8; 32];
     output.copy_from_slice(&hash[..32]);
     output
@@ -159,7 +205,7 @@ impl From<Secp256k1KeyPair> for KeyPair {
 mod tests {
 
     use super::Secp256k1KeyPair;
-    use crate::commons::crypto::{KeyGenerator, Payload, DSA};
+    use crate::commons::crypto::{KeyGenerator, KeyMaterial, KeyPairType, Payload, DSA};
 
     #[test]
     fn test_ser_des() {
@@ -175,4 +221,33 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[test]
+    fn test_sign_verify() {
+        let msg = b"message";
+        let kp = Secp256k1KeyPair::new();
+        let signature = kp.sign(Payload::Buffer(msg.to_vec())).unwrap();
+        let result = kp.verify(Payload::Buffer(msg.to_vec()), &signature);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sign_verify_fail() {
+        let msg = b"message";
+        let kp = Secp256k1KeyPair::new();
+        let signature = kp.sign(Payload::Buffer(msg.to_vec())).unwrap();
+        let result = kp.verify(Payload::Buffer(b"message2".to_vec()), &signature);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_der() {
+        let kp = Secp256k1KeyPair::new();
+        let der = kp.to_secret_der().unwrap();
+        //let pki = PrivateKeyInfo::try_from(der.as_slice()).unwrap();
+        //let secret = pki.encrypt(rand::rngs::OsRng, b"example").unwrap();
+        //let epki = EncryptedPrivateKeyInfo::try_from(secret.as_bytes()).unwrap();
+        //let der = epki.decrypt( b"example").unwrap();
+        let new_kp = Secp256k1KeyPair::from_secret_der(KeyPairType::Secp256k1, &der).unwrap();
+        assert_eq!(kp.public_key_bytes(), new_kp.public_key_bytes());
+    }
 }

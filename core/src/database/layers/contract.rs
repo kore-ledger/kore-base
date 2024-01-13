@@ -47,7 +47,9 @@ impl<C: DatabaseCollection> ContractDb<C> {
             Element::S(schema_id.to_string()),
         ];
         let key = get_key(key_elements)?;
-        let Ok(data) = serialize::<(Vec<u8>, DigestIdentifier, u64)>(&(contract, hash, gov_version)) else {
+        let Ok(data) =
+            serialize::<(Vec<u8>, DigestIdentifier, u64)>(&(contract, hash, gov_version))
+        else {
             return Err(DbError::SerializeError);
         };
         self.collection.put(&key, data)

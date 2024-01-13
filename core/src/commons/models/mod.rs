@@ -1,6 +1,6 @@
 use borsh::BorshSerialize;
 
-use crate::{DigestIdentifier, DigestDerivator};
+use crate::{DigestDerivator, DigestIdentifier};
 
 use super::errors::SubjectError;
 

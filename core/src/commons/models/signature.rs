@@ -91,7 +91,7 @@ impl Signature {
     pub fn new_from_pk_ed25519<T: HashId>(
         content: &T,
         private_key: String,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Result<Self, SubjectError> {
         let key_bytes = hex::decode(private_key)
             .map_err(|_| SubjectError::SignatureCreationFails("invalid private key".to_string()))?;
@@ -100,10 +100,10 @@ impl Signature {
         let timestamp = TimeStamp::now();
         // TODO: Analyze if we should remove HashId and change it for BorshSerialize
         // let content_hash = content.hash_id()?;
-        let signature_hash = DigestIdentifier::from_serializable_borsh((&content, &timestamp), derivator)
-            .map_err(|_| {
-                SubjectError::SignatureCreationFails("Signature hash fails".to_string())
-            })?;
+        let signature_hash =
+            DigestIdentifier::from_serializable_borsh((&content, &timestamp), derivator).map_err(
+                |_| SubjectError::SignatureCreationFails("Signature hash fails".to_string()),
+            )?;
         let signature = keys
             .sign(Payload::Buffer(signature_hash.derivative()))
             .map_err(|_| SubjectError::SignatureCreationFails("Keys sign fails".to_owned()))?;
@@ -122,7 +122,7 @@ impl Signature {
     pub fn new_from_pk_secp256k1<T: HashId>(
         content: &T,
         private_key: String,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Result<Self, SubjectError> {
         let key_bytes = hex::decode(private_key)
             .map_err(|_| SubjectError::SignatureCreationFails("invalid private key".to_string()))?;
@@ -135,9 +135,10 @@ impl Signature {
         let derivator = self.content_hash.derivator;
         // let content_hash = content.hash_id(derivator)?;
         let signature_hash =
-            DigestIdentifier::from_serializable_borsh((&content, &self.timestamp), derivator).map_err(
-                |_| SubjectError::SignatureCreationFails("Signature hash fails".to_string()),
-            )?;
+            DigestIdentifier::from_serializable_borsh((&content, &self.timestamp), derivator)
+                .map_err(|_| {
+                    SubjectError::SignatureCreationFails("Signature hash fails".to_string())
+                })?;
         self.signer
             .verify(&signature_hash.digest, &self.value)
             .map_err(|_| SubjectError::SignatureVerifyFails("Signature verify fails".to_owned()))

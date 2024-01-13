@@ -5,7 +5,7 @@ use crate::{
         identifier::{DigestIdentifier, KeyIdentifier},
     },
     signature::Signed,
-    Derivable, Event, DigestDerivator,
+    Derivable, DigestDerivator, Event,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use json_patch::{patch, Patch};
@@ -138,10 +138,11 @@ impl Subject {
         event: Signed<Event>,
         init_state: ValueWrapper,
         keys: Option<KeyPair>,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Result<Self, SubjectError> {
-        let EventRequest::Create(create_request) = event.content.event_request.content.clone() else {
-            return Err(SubjectError::NotCreateEvent)
+        let EventRequest::Create(create_request) = event.content.event_request.content.clone()
+        else {
+            return Err(SubjectError::NotCreateEvent);
         };
         let subject_id = generate_subject_id(
             &create_request.namespace,
@@ -149,7 +150,7 @@ impl Subject {
             create_request.public_key.to_str(),
             create_request.governance_id.to_str(),
             event.content.gov_version,
-            derivator
+            derivator,
         )?;
         Ok(Subject {
             keys,
@@ -174,11 +175,15 @@ impl Subject {
         new_sn: u64,
     ) -> Result<(), SubjectError> {
         let Ok(patch_json) = serde_json::from_value::<Patch>(json_patch.0) else {
-                    return Err(SubjectError::ErrorParsingJsonString("Json Patch conversion fails".to_owned()));
-                };
+            return Err(SubjectError::ErrorParsingJsonString(
+                "Json Patch conversion fails".to_owned(),
+            ));
+        };
         let Ok(()) = patch(&mut self.properties.0, &patch_json) else {
-                    return Err(SubjectError::ErrorApplyingPatch("Error Applying Patch".to_owned()));
-                };
+            return Err(SubjectError::ErrorApplyingPatch(
+                "Error Applying Patch".to_owned(),
+            ));
+        };
         self.sn = new_sn;
         Ok(())
     }
@@ -196,11 +201,18 @@ impl Subject {
         self.sn = sn;
     }
 
-    pub fn get_state_hash(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
+    pub fn get_state_hash(
+        &self,
+        derivator: DigestDerivator,
+    ) -> Result<DigestIdentifier, SubjectError> {
         Ok(
-            DigestIdentifier::from_serializable_borsh(&self.properties, derivator).map_err(|_| {
-                SubjectError::CryptoError(String::from("Error calculating the hash of the state"))
-            })?,
+            DigestIdentifier::from_serializable_borsh(&self.properties, derivator).map_err(
+                |_| {
+                    SubjectError::CryptoError(String::from(
+                        "Error calculating the hash of the state",
+                    ))
+                },
+            )?,
         )
     }
 
@@ -211,7 +223,7 @@ impl Subject {
     pub fn state_hash_after_apply(
         &self,
         json_patch: ValueWrapper,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Result<DigestIdentifier, SubjectError> {
         let mut subject_properties = self.properties.clone();
         let json_patch = serde_json::from_value::<Patch>(json_patch.0)
@@ -220,9 +232,13 @@ impl Subject {
             SubjectError::CryptoError(String::from("Error applying the json patch"))
         })?;
         Ok(
-            DigestIdentifier::from_serializable_borsh(&subject_properties, derivator).map_err(|_| {
-                SubjectError::CryptoError(String::from("Error calculating the hash of the state"))
-            })?,
+            DigestIdentifier::from_serializable_borsh(&subject_properties, derivator).map_err(
+                |_| {
+                    SubjectError::CryptoError(String::from(
+                        "Error calculating the hash of the state",
+                    ))
+                },
+            )?,
         )
     }
 }
@@ -233,15 +249,18 @@ pub fn generate_subject_id(
     public_key: String,
     governance_id: String,
     governance_version: u64,
-    derivator: DigestDerivator
+    derivator: DigestDerivator,
 ) -> Result<DigestIdentifier, SubjectError> {
-    let subject_id = DigestIdentifier::from_serializable_borsh((
-        namespace,
-        schema_id,
-        public_key,
-        governance_id,
-        governance_version,
-    ), derivator)
+    let subject_id = DigestIdentifier::from_serializable_borsh(
+        (
+            namespace,
+            schema_id,
+            public_key,
+            governance_id,
+            governance_version,
+        ),
+        derivator,
+    )
     .map_err(|_| SubjectError::ErrorCreatingSubjectId)?;
     Ok(subject_id)
 }

@@ -18,7 +18,7 @@ use crate::{
     governance::GovernanceInterface,
     DatabaseCollection,
 };
-use crate::{Metadata, Settings, DigestDerivator};
+use crate::{DigestDerivator, Metadata, Settings};
 
 use super::error::{DistributionErrorResponses, DistributionManagerError};
 use super::StartDistribution;
@@ -48,7 +48,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             signature_manager,
             timeout: settings.node.timeout,
             replication_factor: settings.node.replication_factor,
-            derivator
+            derivator,
         }
     }
 

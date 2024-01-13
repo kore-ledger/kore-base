@@ -1,6 +1,6 @@
 use crate::identifier::derive::{digest::DigestDerivator, Derivator};
-use base64::{Engine as _, engine::general_purpose};
-use borsh::{BorshDeserialize, BorshSerialize, to_vec};
+use base64::{engine::general_purpose, Engine as _};
+use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -24,7 +24,7 @@ impl DigestIdentifier {
 
     pub fn from_serializable_borsh<T: BorshSerialize>(
         serializable: T,
-        digest_derivator: DigestDerivator
+        digest_derivator: DigestDerivator,
     ) -> Result<Self, crate::commons::errors::Error> {
         let bytes = to_vec(&serializable)
             .map_err(|_| crate::commons::errors::Error::BorshSerializationFailed)?;
@@ -76,7 +76,8 @@ impl FromStr for DigestIdentifier {
         if s.len() == code.material_len() {
             Ok(Self::new(
                 code,
-                &general_purpose::URL_SAFE_NO_PAD.decode(&s[code.code_len()..code.material_len()])?,
+                &general_purpose::URL_SAFE_NO_PAD
+                    .decode(&s[code.code_len()..code.material_len()])?,
             ))
         } else {
             Err(Error::SemanticError(format!(

@@ -50,7 +50,7 @@ macro_rules! test_database_manager_trait {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
-            use borsh::{BorshDeserialize, BorshSerialize, to_vec};
+            use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 
             #[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
             struct Data {

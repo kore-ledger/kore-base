@@ -138,5 +138,5 @@ pub enum GovernanceStateError {
     #[error("ID specified for Role::Who does not exist")]
     IdWhoRoleNoExist,
     #[error("Name specified for Role::Who does not exist")]
-    NameWhoRoleNoExist
+    NameWhoRoleNoExist,
 }

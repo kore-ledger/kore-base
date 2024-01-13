@@ -1,7 +1,7 @@
 mod common;
 use common::{generate_mc, NodeBuilder};
-use serial_test::serial;
 use kore_base::DigestDerivator;
+use serial_test::serial;
 
 use crate::common::{check_subject, create_governance_request};
 
@@ -34,7 +34,9 @@ fn create_governance() {
             .expect("MC creation failed");
         let event_request = create_governance_request("", public_key, "");
         assert!(node_api
-            .external_request(mc_data_node1.sign_event_request(&event_request, DigestDerivator::Blake3_512))
+            .external_request(
+                mc_data_node1.sign_event_request(&event_request, DigestDerivator::Blake3_512)
+            )
             .await
             .is_ok());
         // Wait for the subject creation notification

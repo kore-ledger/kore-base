@@ -3,7 +3,7 @@
 
 //! # Codec
 //! This module contains the codec trait for encoding and decoding messages.
-//! 
+//!
 
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -37,5 +37,4 @@ pub trait Codec {
     ) -> io::Result<()>
     where
         T: AsyncWrite + Unpin + Send;
-
 }

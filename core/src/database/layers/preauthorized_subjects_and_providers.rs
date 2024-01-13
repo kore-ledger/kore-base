@@ -59,7 +59,10 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
             Element::S(subject_id.to_str()),
         ];
         let key = get_key(key_elements)?;
-        let Ok(data) = serialize::<(DigestIdentifier, HashSet<KeyIdentifier>)>(&(subject_id.clone(), providers)) else {
+        let Ok(data) = serialize::<(DigestIdentifier, HashSet<KeyIdentifier>)>(&(
+            subject_id.clone(),
+            providers,
+        )) else {
             return Err(DbError::SerializeError);
         };
         self.collection.put(&key, data)

@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -51,7 +51,8 @@ impl FromStr for SignatureIdentifier {
         if s.len() == code.material_len() {
             Ok(Self::new(
                 code,
-                &general_purpose::URL_SAFE_NO_PAD.decode(&s[code.code_len()..code.material_len()])?,
+                &general_purpose::URL_SAFE_NO_PAD
+                    .decode(&s[code.code_len()..code.material_len()])?,
             ))
         } else {
             Err(Error::SemanticError(format!(
@@ -89,7 +90,10 @@ mod tests {
 
     use super::{SignatureDerivator, SignatureIdentifier};
 
-    use crate::{identifier::{KeyIdentifier, derive::key}, crypto::{Secp256k1KeyPair, DSA, KeyGenerator, Payload, KeyMaterial}};
+    use crate::{
+        crypto::{KeyGenerator, KeyMaterial, Payload, Secp256k1KeyPair, DSA},
+        identifier::{derive::key, KeyIdentifier},
+    };
 
     #[test]
     fn test_to_from_string() {

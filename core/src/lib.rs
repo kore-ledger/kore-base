@@ -103,8 +103,6 @@ pub(crate) mod validation;
 pub(crate) mod event;
 pub(crate) mod protocol;
 
-
-
 mod node;
 pub use api::{Api, ApiError};
 pub use commons::crypto;

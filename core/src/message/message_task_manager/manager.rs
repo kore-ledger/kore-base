@@ -126,7 +126,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTask
 
     async fn cancel_task(&mut self, id: &String) -> Result<(), Error> {
         let Some((tokio_handler, abort_handler)) = self.list.remove(id) else {
-            return Ok(())
+            return Ok(());
         };
         abort_handler.abort();
         match tokio_handler.await {

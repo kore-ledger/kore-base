@@ -11,7 +11,7 @@ pub use digest_identifier::DigestIdentifier;
 pub use key_identifier::KeyIdentifier;
 pub use signature_identifier::SignatureIdentifier;
 
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 

@@ -2,7 +2,7 @@
 //
 
 //! # Definte protocol for tell
-//! 
+//!
 
 use futures::future::{ready, Ready};
 use libp2p::core::upgrade::{InboundUpgrade, OutboundUpgrade, UpgradeInfo};
@@ -39,9 +39,9 @@ impl ProtocolSupport {
 }
 
 /// A protocol for sending a message without waiting for a response.
-/// 
+///
 /// This is a simple protocol that only sends a message without waiting for a response.
-/// 
+///
 #[derive(Debug)]
 pub struct TellProtocol<P> {
     pub(crate) protocols: SmallVec<[P; 2]>,

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     commons::errors::SubjectError,
     signature::{Signature, Signed},
-    DigestIdentifier, KeyIdentifier, ValueWrapper, DigestDerivator,
+    DigestDerivator, DigestIdentifier, KeyIdentifier, ValueWrapper,
 };
 
 use super::HashId;

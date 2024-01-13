@@ -14,7 +14,7 @@ use identifier::error::Error;
 
 use memsecurity::EncryptedMem;
 
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 pub use ed25519::Ed25519KeyPair;
 #[cfg(feature = "secp256k1")]
 pub use secp256k1::Secp256k1KeyPair;
@@ -28,6 +28,13 @@ pub enum KeyPair {
     Ed25519(Ed25519KeyPair),
     #[cfg(feature = "secp256k1")]
     Secp256k1(Secp256k1KeyPair),
+}
+
+/// Key pair types.
+/// Used to derive key pair from hex string.
+pub enum KeyPairType {
+    Ed25519,
+    Secp256k1,
 }
 
 impl KeyPair {
@@ -68,9 +75,11 @@ impl<P> BaseKeyPair<P> {
     fn decrypt_secret_bytes(&self) -> Result<Vec<u8>, Error> {
         match &self.secret_key {
             Some(x) => {
-                let bytes = x.decrypt().map_err(|_| Error::KeyPairError("secret key decrypting".to_owned()))?;
+                let bytes = x
+                    .decrypt()
+                    .map_err(|_| Error::KeyPairError("secret key decrypting".to_owned()))?;
                 Ok(Vec::from(bytes.as_ref()))
-            },
+            }
             None => Err(Error::KeyPairError(
                 "secret key is not available".to_owned(),
             )),
@@ -84,7 +93,6 @@ impl<P> BaseKeyPair<P> {
             .map_err(|_| Error::KeyPairError("cannot encrypt the secret in memory".to_owned()))?;
         Ok(())
     }
-
 }
 
 /// Represents asymetric key pair for storage (deprecated: KeyPair is serializable)
@@ -104,6 +112,14 @@ pub trait KeyMaterial {
 
     /// Returns bytes from key pair
     fn to_bytes(&self) -> Vec<u8>;
+
+    /// Returns DER from secret key.
+    fn to_secret_der(&self) -> Result<Vec<u8>, Error>;
+
+    /// Returns key pair from secret key der.
+    fn from_secret_der(kp_type: KeyPairType, der: &[u8]) -> Result<Self, Error>
+    where
+        Self: Sized;
 
     /// Returns String from key pair encoded in base64
     fn to_str(&self) -> String {
@@ -194,6 +210,26 @@ impl KeyMaterial for KeyPair {
             KeyPair::Ed25519(x) => x.to_bytes(),
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(x) => x.to_bytes(),
+        }
+    }
+
+    fn to_secret_der(&self) -> Result<Vec<u8>, Error> {
+        match self {
+            KeyPair::Ed25519(x) => x.to_secret_der(),
+            #[cfg(feature = "secp256k1")]
+            KeyPair::Secp256k1(x) => x.to_secret_der(),
+        }
+    }
+
+    fn from_secret_der(kp_type: KeyPairType, der: &[u8]) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        match kp_type {
+            KeyPairType::Ed25519 => Ok(KeyPair::Ed25519(Ed25519KeyPair::from_secret_der(kp_type, der)?)),
+            KeyPairType::Secp256k1 => Ok(KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_der(
+                kp_type, der,
+            )?)),
         }
     }
 }
@@ -330,5 +366,4 @@ mod tests {
         let valid = key_pair.verify(Payload::Buffer(message.to_vec()), &signature);
         matches!(valid, Ok(()));
     }
-
 }

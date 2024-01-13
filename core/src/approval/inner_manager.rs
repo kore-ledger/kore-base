@@ -2,7 +2,7 @@ use crate::{
     commons::{
         models::{
             approval::{ApprovalEntity, ApprovalResponse, ApprovalState},
-            state::{generate_subject_id},
+            state::generate_subject_id,
         },
         self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
         settings::VotationType,
@@ -12,7 +12,7 @@ use crate::{
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     request::EventRequest,
     signature::Signed,
-    ApprovalRequest, DatabaseCollection, Notification, DigestDerivator,
+    ApprovalRequest, DatabaseCollection, DigestDerivator, Notification,
 };
 
 use super::error::{ApprovalErrorResponse, ApprovalManagerError};
@@ -57,7 +57,7 @@ pub struct InnerApprovalManager<G: GovernanceInterface, N: NotifierInterface, C:
     // Cola de 1 elemento por sujeto
     // subject_been_approved: HashMap<DigestIdentifier, DigestIdentifier>, // SubjectID -> ReqId
     pass_votation: VotationType,
-    derivator: DigestDerivator
+    derivator: DigestDerivator,
 }
 
 impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
@@ -69,7 +69,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         notifier: N,
         signature_manager: SelfSignatureManager,
         pass_votation: VotationType,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Self {
         Self {
             governance,
@@ -78,7 +78,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
             signature_manager,
             // subject_been_approved: HashMap::new(),
             pass_votation,
-            derivator
+            derivator,
         }
     }
 
@@ -150,7 +150,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
                         create_request.public_key.to_str(),
                         create_request.governance_id.to_str(),
                         approval_entity.request.content.gov_version,
-                        self.derivator
+                        self.derivator,
                     )
                     .map_err(|_| ApprovalManagerError::UnexpectedError)?,
                     _ => return Err(ApprovalManagerError::UnexpectedRequestType),
@@ -227,7 +227,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         let subject_id = subject_id_by_request(
             &approval_request.content.event_request.content,
             approval_request.content.gov_version,
-            self.derivator
+            self.derivator,
         )?;
         let request_queue = self
             .database
@@ -338,7 +338,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         let subject_id = subject_id_by_request(
             &data.request.content.event_request.content,
             data.request.content.gov_version,
-            self.derivator
+            self.derivator,
         )?;
         let signature = self
             .signature_manager
@@ -354,7 +354,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
             signature,
         });
         let Ok(_result) = self.database.set_approval(&request_id, data.clone()) else {
-            return Err(ApprovalManagerError::DatabaseError)
+            return Err(ApprovalManagerError::DatabaseError);
         };
         self.database
             .del_subject_approval_index(&subject_id, request_id)
@@ -370,7 +370,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
 fn subject_id_by_request(
     request: &EventRequest,
     gov_version: u64,
-    derivator: DigestDerivator
+    derivator: DigestDerivator,
 ) -> Result<DigestIdentifier, ApprovalManagerError> {
     let subject_id = match request {
         EventRequest::Fact(ref fact_request) => fact_request.subject_id.clone(),
@@ -380,7 +380,7 @@ fn subject_id_by_request(
             create_request.public_key.to_str(),
             create_request.governance_id.to_str(),
             gov_version,
-            derivator
+            derivator,
         )
         .map_err(|_| ApprovalManagerError::UnexpectedError)?,
         _ => return Err(ApprovalManagerError::UnexpectedRequestType),

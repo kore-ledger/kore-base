@@ -76,9 +76,8 @@ impl<C: DatabaseCollection, G: GovernanceInterface> Compiler<C, G> {
                 }
                 Err(error) => return Err(CompilerErrorResponses::DatabaseError(error.to_string())),
             };
-            let new_contract_hash =
-                DigestIdentifier::generate_with_blake3(&contract_info.raw)
-                    .map_err(|_| CompilerErrorResponses::BorshSerializeContractError)?;
+            let new_contract_hash = DigestIdentifier::generate_with_blake3(&contract_info.raw)
+                .map_err(|_| CompilerErrorResponses::BorshSerializeContractError)?;
             if let Some(contract_data) = contract_data {
                 if governance_version == contract_data.2 {
                     continue;

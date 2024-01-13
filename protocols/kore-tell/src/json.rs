@@ -3,9 +3,7 @@
 
 /// A "tell" behaviour using [`serde_json`] for serializing and deserializing the
 /// messages.
-/// 
-
-
+///
 
 mod codec {
     use async_trait::async_trait;
@@ -16,7 +14,7 @@ mod codec {
     use std::{io, marker::PhantomData};
 
     /// A codec for encoding and decoding messages using [`serde_json`].
-    /// 
+    ///
     pub struct Codec<M> {
         pub max_message_size: u64,
         pub _phantom: PhantomData<M>,
@@ -41,7 +39,7 @@ mod codec {
     }
 
     #[async_trait]
-    impl<M> crate::Codec for Codec<M> 
+    impl<M> crate::Codec for Codec<M>
     where
         M: Serialize + DeserializeOwned + Send,
     {
@@ -58,7 +56,7 @@ mod codec {
         {
             let mut vec = Vec::new();
             io.take(self.max_message_size).read_to_end(&mut vec).await?;
-            Ok(serde_json::from_slice(vec.as_slice())?)       
+            Ok(serde_json::from_slice(vec.as_slice())?)
         }
 
         async fn write_message<T>(
@@ -73,13 +71,13 @@ mod codec {
             let vec = serde_json::to_vec(&msg)?;
             io.write_all(vec.as_slice()).await?;
             Ok(())
-        }   
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    
+
     use crate::Codec;
     use futures::AsyncWriteExt;
     use futures_ringbuf::Endpoint;
@@ -97,8 +95,7 @@ mod test {
             payload: "test_payload".to_string(),
         };
         let protocol = StreamProtocol::new("/test_json/1");
-        let mut codec: super::codec::Codec<TestMessage> =
-            super::codec::Codec::default();
+        let mut codec: super::codec::Codec<TestMessage> = super::codec::Codec::default();
 
         let (mut a, mut b) = Endpoint::pair(124, 124);
         codec
@@ -115,5 +112,4 @@ mod test {
 
         assert_eq!(actual_message, expected_message);
     }
-
 }

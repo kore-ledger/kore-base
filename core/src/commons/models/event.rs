@@ -93,7 +93,7 @@ impl Signed<Event> {
         derivator: DigestDerivator,
     ) -> Result<Self, SubjectError> {
         let EventRequest::Create(start_request) = event_request.content.clone() else {
-            return Err(SubjectError::NotCreateEvent)
+            return Err(SubjectError::NotCreateEvent);
         };
         let json_patch = serde_json::to_value(diff(&json!({}), &init_state.0)).map_err(|_| {
             SubjectError::CryptoError(String::from("Error converting patch to value"))
@@ -108,7 +108,7 @@ impl Signed<Event> {
             public_key.to_str(),
             start_request.governance_id.to_str(),
             gov_version,
-            derivator
+            derivator,
         )?;
         let state_hash =
             DigestIdentifier::from_serializable_borsh(init_state, derivator).map_err(|_| {
