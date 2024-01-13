@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use borsh::{BorshSerialize, to_vec};
+use borsh::{to_vec, BorshSerialize};
 
 use crate::evaluator::errors::ExecutorErrorResponses;
 
@@ -43,7 +43,7 @@ impl MemoryManager {
 
     pub fn get_pointer_len(&self, ptr: usize) -> isize {
         let Some(result) = self.map.get(&ptr) else {
-            return -1
+            return -1;
         };
         *result as isize
     }

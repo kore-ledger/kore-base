@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     commons::errors::SubjectError,
     signature::{Signature, Signed},
-    DigestIdentifier, EventRequest, ValueWrapper, DigestDerivator,
+    DigestDerivator, DigestIdentifier, EventRequest, ValueWrapper,
 };
 
 use super::HashId;
@@ -52,12 +52,15 @@ pub struct EvaluationResponse {
 
 impl HashId for EvaluationResponse {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&(
-            &self.eval_req_hash,
-            &self.state_hash,
-            self.eval_success,
-            self.appr_required,
-        ), derivator)
+        DigestIdentifier::from_serializable_borsh(
+            &(
+                &self.eval_req_hash,
+                &self.state_hash,
+                self.eval_success,
+                self.appr_required,
+            ),
+            derivator,
+        )
         .map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for EvaluationResponse Fails".to_string())
         })

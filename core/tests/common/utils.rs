@@ -1,11 +1,11 @@
-use libp2p::identity::ed25519::Keypair as EdKeyPair;
-use libp2p::PeerId;
 use kore_base::{
     crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair},
     request::StartRequest,
     signature::{Signature, Signed},
-    Api, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData, DigestDerivator,
+    Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData,
 };
+use libp2p::identity::ed25519::Keypair as EdKeyPair;
+use libp2p::PeerId;
 
 pub async fn check_subject(
     node_api: &Api,
@@ -42,7 +42,11 @@ impl McNodeData {
         self.peer_id.clone()
     }
 
-    pub fn sign_event_request(&self, content: &EventRequest, derivator: DigestDerivator) -> Signed<EventRequest> {
+    pub fn sign_event_request(
+        &self,
+        content: &EventRequest,
+        derivator: DigestDerivator,
+    ) -> Signed<EventRequest> {
         Signed {
             content: content.clone(),
             signature: Signature::new(content, &self.keys, derivator).unwrap(),

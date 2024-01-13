@@ -141,8 +141,8 @@ impl<'a> Iterator for MemoryIterator<'a> {
         };
 
         let Some(item) = iter.next() else {
-                return None;
-            };
+            return None;
+        };
         let key = {
             let value = item.0.clone();
             if !value.starts_with(&self.table_name) {
@@ -188,8 +188,8 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
             &mut self.current.as_mut().unwrap().1
         };
         let Some(item) = iter.next() else {
-                return None;
-            };
+            return None;
+        };
         let key = {
             let value = item.0.clone();
             if !value.starts_with(&self.table_name) {

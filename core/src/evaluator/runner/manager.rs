@@ -12,7 +12,7 @@ use crate::{
     governance::GovernanceInterface,
     identifier::DigestIdentifier,
     request::FactRequest,
-    DatabaseCollection, Derivable, EvaluationResponse, EventRequest, ValueWrapper, DigestDerivator,
+    DatabaseCollection, Derivable, DigestDerivator, EvaluationResponse, EventRequest, ValueWrapper,
 };
 
 use super::executor::{Contract, ContractExecutor, ContractResult};
@@ -21,16 +21,16 @@ pub struct TapleRunner<C: DatabaseCollection, G: GovernanceInterface> {
     database: DB<C>,
     executor: ContractExecutor,
     gov_api: G,
-    derivator: DigestDerivator
+    derivator: DigestDerivator,
 }
 
 impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
-    pub fn new(database: DB<C>, engine: Engine, gov_api: G, derivator: DigestDerivator,) -> Self {
+    pub fn new(database: DB<C>, engine: Engine, gov_api: G, derivator: DigestDerivator) -> Self {
         Self {
             database,
             executor: ContractExecutor::new(engine),
             gov_api,
-            derivator
+            derivator,
         }
     }
 
@@ -137,7 +137,7 @@ impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
                             })?),
                             state_hash: DigestIdentifier::from_serializable_borsh(
                                 &execute_contract.context.state,
-                                self.derivator
+                                self.derivator,
                             )
                             .map_err(|_| ExecutorErrorResponses::StateHashGenerationFailed)?,
                             eval_req_hash: context_hash,
@@ -178,8 +178,11 @@ impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
                     }
                     _ => (
                         generate_json_patch(&previous_state.0, &contract_result.final_state.0)?,
-                        DigestIdentifier::from_serializable_borsh(&contract_result.final_state, self.derivator)
-                            .map_err(|_| ExecutorErrorResponses::StateHashGenerationFailed)?,
+                        DigestIdentifier::from_serializable_borsh(
+                            &contract_result.final_state,
+                            self.derivator,
+                        )
+                        .map_err(|_| ExecutorErrorResponses::StateHashGenerationFailed)?,
                     ),
                 }
             }

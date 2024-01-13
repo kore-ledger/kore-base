@@ -1,6 +1,6 @@
 //! KeyIdentifier module
 
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -86,7 +86,8 @@ impl FromStr for KeyIdentifier {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let code = KeyDerivator::from_str(s)?;
         if s.len() == code.material_len() {
-            let k_vec = general_purpose::URL_SAFE_NO_PAD.decode(&s[code.code_len()..code.material_len()])?;
+            let k_vec = general_purpose::URL_SAFE_NO_PAD
+                .decode(&s[code.code_len()..code.material_len()])?;
             Ok(Self {
                 derivator: code,
                 public_key: k_vec,

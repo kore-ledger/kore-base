@@ -64,7 +64,8 @@ impl<C: DatabaseCollection> InnerApi<C> {
         &self,
         request: Signed<EventRequest>,
     ) -> Result<ApiResponses, APIInternalError> {
-        let EventResponse::Event(response) = self.event_api.send_event_request(request).await else {
+        let EventResponse::Event(response) = self.event_api.send_event_request(request).await
+        else {
             return Err(APIInternalError::UnexpectedManagerResponse);
         };
         match response {

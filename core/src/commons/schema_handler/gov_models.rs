@@ -53,7 +53,7 @@ impl<'de> Deserialize<'de> for Quorum {
             {
                 // Solo deberían tener una entrada
                 let Some(key) = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::missing_field("FIXED or PERCENTAGE"))
+                    return Err(serde::de::Error::missing_field("FIXED or PERCENTAGE"));
                 };
                 let result = match key.as_str() {
                     "FIXED" => {
@@ -76,7 +76,9 @@ impl<'de> Deserialize<'de> for Quorum {
                     }
                 };
                 let None = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::custom("Input data is not valid. The data contains unkown entries"));
+                    return Err(serde::de::Error::custom(
+                        "Input data is not valid. The data contains unkown entries",
+                    ));
                 };
                 Ok(result)
             }
@@ -154,7 +156,7 @@ impl<'de> Deserialize<'de> for Who {
             {
                 // Solo deberían tener una entrada
                 let Some(key) = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::missing_field("ID or NAME"))
+                    return Err(serde::de::Error::missing_field("ID or NAME"));
                 };
                 let result = match key.as_str() {
                     "ID" => {
@@ -168,7 +170,9 @@ impl<'de> Deserialize<'de> for Who {
                     _ => return Err(serde::de::Error::unknown_field(&key, &["ID", "NAME"])),
                 };
                 let None = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::custom("Input data is not valid. The data contains unkown entries"));
+                    return Err(serde::de::Error::custom(
+                        "Input data is not valid. The data contains unkown entries",
+                    ));
                 };
                 Ok(result)
             }
@@ -248,7 +252,7 @@ impl<'de> Deserialize<'de> for SchemaEnum {
             {
                 // Solo deberían tener una entrada
                 let Some(key) = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::missing_field("ID"))
+                    return Err(serde::de::Error::missing_field("ID"));
                 };
                 let result = match key.as_str() {
                     "ID" => {
@@ -258,7 +262,9 @@ impl<'de> Deserialize<'de> for SchemaEnum {
                     _ => return Err(serde::de::Error::unknown_field(&key, &["ID", "NAME"])),
                 };
                 let None = map.next_key::<String>()? else {
-                    return Err(serde::de::Error::custom("Input data is not valid. The data contains unkown entries"));
+                    return Err(serde::de::Error::custom(
+                        "Input data is not valid. The data contains unkown entries",
+                    ));
                 };
                 Ok(result)
             }

@@ -6,7 +6,6 @@ use super::{
 use crate::database::{DatabaseCollection, DB};
 use crate::message::MessageTaskCommand;
 use crate::protocol::protocol_message_manager::TapleMessages;
-use crate::{Notification, DigestDerivator};
 use crate::{
     commons::{
         channel::{ChannelData, MpscChannel, SenderEnd},
@@ -14,6 +13,7 @@ use crate::{
     },
     governance::GovernanceAPI,
 };
+use crate::{DigestDerivator, Notification};
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -55,7 +55,7 @@ impl<C: DatabaseCollection> ValidationManager<C> {
                 database,
                 signature_manager,
                 message_channel,
-                derivator
+                derivator,
             ),
             token,
             notification_tx,

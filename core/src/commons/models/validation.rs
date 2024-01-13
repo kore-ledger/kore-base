@@ -3,7 +3,8 @@ use crate::{
     commons::{errors::SubjectError, models::event::Metadata},
     identifier::{DigestIdentifier, KeyIdentifier},
     request::StartRequest,
-    signature::Signature, DigestDerivator,
+    signature::Signature,
+    DigestDerivator,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,7 @@ pub struct ValidationProof {
 }
 
 impl HashId for ValidationProof {
-    fn hash_id(&self,derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
+    fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
         DigestIdentifier::from_serializable_borsh(&self, derivator)
             .map_err(|_| SubjectError::CryptoError("Hashing error in ValidationProof".to_string()))
     }

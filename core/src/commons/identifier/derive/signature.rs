@@ -9,7 +9,9 @@ use super::Derivator;
 use crate::identifier::{error::Error, signature_identifier::SignatureIdentifier};
 
 /// Enumeration with signature derivator types
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord)]
+#[derive(
+    Debug, PartialEq, Clone, Copy, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord,
+)]
 pub enum SignatureDerivator {
     Ed25519Sha512,
     ECDSAsecp256k1,

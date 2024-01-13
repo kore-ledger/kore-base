@@ -10,13 +10,13 @@ use crate::identifier::KeyIdentifier;
 use crate::ledger::{LedgerCommand, LedgerResponse};
 use crate::protocol::protocol_message_manager::TapleMessages;
 use crate::signature::Signed;
-use crate::{EventRequest, DigestDerivator};
 use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     governance::GovernanceAPI,
     message::MessageTaskCommand,
     Notification,
 };
+use crate::{DigestDerivator, EventRequest};
 
 #[derive(Clone, Debug)]
 pub struct EventAPI {
@@ -78,7 +78,7 @@ impl<C: DatabaseCollection> EventManager<C> {
                 ledger_sender,
                 own_identifier,
                 signature_manager,
-                derivator
+                derivator,
             ),
             token,
             notification_tx,

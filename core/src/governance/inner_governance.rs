@@ -574,10 +574,14 @@ fn get_members_from_governance(
             InternalError::InvalidGovernancePayload("12: Invalid Keyidentifier in member".into())
         })?;
         let true = member_ids_names.0.insert(member_id.clone()) else {
-            return Err(InternalError::InvalidGovernancePayload("13: Repeated Id in members".into()));
+            return Err(InternalError::InvalidGovernancePayload(
+                "13: Repeated Id in members".into(),
+            ));
         };
         let None = member_ids_names.1.insert(member_name, member_id) else {
-            return Err(InternalError::InvalidGovernancePayload("14: Repeated Name in members".into()));
+            return Err(InternalError::InvalidGovernancePayload(
+                "14: Repeated Name in members".into(),
+            ));
         };
     }
     Ok(member_ids_names)

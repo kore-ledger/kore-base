@@ -18,7 +18,7 @@ use crate::protocol::protocol_message_manager::TapleMessages;
 use crate::request::EventRequest;
 use crate::signature::Signed;
 use crate::utils::message::event::create_evaluator_response;
-use crate::{EvaluationResponse, Notification, DigestDerivator};
+use crate::{DigestDerivator, EvaluationResponse, Notification};
 
 pub struct EvaluatorManager<
     M: DatabaseManager<C>,
@@ -71,14 +71,19 @@ impl<
         });
         Self {
             input_channel,
-            runner: TapleRunner::new(DB::new(database.clone()), engine, gov_api, derivator.clone()),
+            runner: TapleRunner::new(
+                DB::new(database.clone()),
+                engine,
+                gov_api,
+                derivator.clone(),
+            ),
             signature_manager,
             token,
             _notification_tx: notification_tx,
             messenger_channel,
             _m: PhantomData::default(),
             _g: PhantomData::default(),
-            derivator
+            derivator,
         }
     }
 
@@ -129,8 +134,11 @@ impl<
                     evaluation_request,
                     sender,
                 } => {
-                    let EventRequest::Fact(state_data) = &evaluation_request.event_request.content else {
-                        break 'response EvaluatorResponse::AskForEvaluation(Err(super::errors::EvaluatorErrorResponses::CreateRequestNotAllowed));
+                    let EventRequest::Fact(state_data) = &evaluation_request.event_request.content
+                    else {
+                        break 'response EvaluatorResponse::AskForEvaluation(Err(
+                            super::errors::EvaluatorErrorResponses::CreateRequestNotAllowed,
+                        ));
                     };
                     let result = self
                         .runner
@@ -609,7 +617,7 @@ mod test {
             governance,
             SC_DIR.to_string(),
             msg_sx,
-            crate::DigestDerivator::Blake3_256
+            crate::DigestDerivator::Blake3_256,
         );
         (manager, sx, sx_compiler, signature_manager, msg_rx)
     }
@@ -648,7 +656,9 @@ mod test {
                 .unwrap(),
             payload: ValueWrapper(json),
         });
-        let signature = signature_manager.sign(&request, crate::DigestDerivator::Blake3_256).unwrap();
+        let signature = signature_manager
+            .sign(&request, crate::DigestDerivator::Blake3_256)
+            .unwrap();
         let event_request = Signed::<EventRequest> {
             content: request,
             signature,

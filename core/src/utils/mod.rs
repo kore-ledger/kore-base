@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize, to_vec, from_slice};
+use borsh::{from_slice, to_vec, BorshDeserialize, BorshSerialize};
 
 use crate::Error;
 pub mod message;

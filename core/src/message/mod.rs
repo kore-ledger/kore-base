@@ -12,7 +12,7 @@ use crate::{
         self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
     },
     signature::Signed,
-    DigestIdentifier, DigestDerivator,
+    DigestDerivator, DigestIdentifier,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 pub use command::*;

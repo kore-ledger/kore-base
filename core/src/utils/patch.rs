@@ -1,4 +1,4 @@
-use json_patch::{Patch, patch};
+use json_patch::{patch, Patch};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -11,14 +11,15 @@ pub enum PatchErrors {
     #[error("Error generating the Patch: {0}")]
     PatchGenerationError(String),
     #[error("Error expressing patch as JSON")]
-    PatchToJsonFailed
+    PatchToJsonFailed,
 }
 
 pub fn apply_patch<State: for<'a> Deserialize<'a> + Serialize>(
-  patch_arg: Value,
-  mut state: Value,
+    patch_arg: Value,
+    mut state: Value,
 ) -> Result<State, PatchErrors> {
-  let patch_data: Patch = serde_json::from_value(patch_arg).map_err(|_| PatchErrors::JsonIsNotPatch)?;
-  patch(&mut state, &patch_data).map_err(|e| PatchErrors::PatchGenerationError(e.to_string()))?;
-  Ok(serde_json::from_value(state).map_err(|_| PatchErrors::PatchToJsonFailed)?)
+    let patch_data: Patch =
+        serde_json::from_value(patch_arg).map_err(|_| PatchErrors::JsonIsNotPatch)?;
+    patch(&mut state, &patch_data).map_err(|e| PatchErrors::PatchGenerationError(e.to_string()))?;
+    Ok(serde_json::from_value(state).map_err(|_| PatchErrors::PatchToJsonFailed)?)
 }

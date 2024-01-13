@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 
-use crate::{commons::errors::SubjectError, DigestIdentifier, DigestDerivator};
+use crate::{commons::errors::SubjectError, DigestDerivator, DigestIdentifier};
 
 use super::HashId;
 

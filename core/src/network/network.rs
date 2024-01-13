@@ -261,8 +261,8 @@ impl NetworkProcessor {
         }
         for (_peer_id, addr) in self.bootstrap_nodes.iter() {
             let Ok(()) = self.swarm.dial(addr.to_owned()) else {
-                    panic!("Conection with bootstrap failed");
-                };
+                panic!("Conection with bootstrap failed");
+            };
         }
         loop {
             tokio::select! {

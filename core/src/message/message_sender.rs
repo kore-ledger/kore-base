@@ -1,8 +1,8 @@
-use crate::DigestDerivator;
 use crate::commons::identifier::KeyIdentifier;
 use crate::commons::self_signature_manager::SelfSignatureManager;
 use crate::identifier::derive::Derivator;
 use crate::signature::Signed;
+use crate::DigestDerivator;
 use log::debug;
 use rmp_serde;
 use tokio::sync::mpsc::{self, error::SendError};
@@ -35,7 +35,7 @@ impl MessageSender {
             sender,
             controller_id,
             signature_manager,
-            derivator
+            derivator,
         }
     }
 
@@ -51,7 +51,7 @@ impl MessageSender {
             target.clone(),
             message,
             &self.signature_manager,
-            self.derivator
+            self.derivator,
         )?;
         let bytes = rmp_serde::to_vec(&complete_message).unwrap();
         self.sender

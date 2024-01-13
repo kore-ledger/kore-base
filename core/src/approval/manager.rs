@@ -14,7 +14,7 @@ use crate::{
     protocol::protocol_message_manager::TapleMessages,
     signature::Signed,
     utils::message::event::create_approver_response,
-    ApprovalRequest, DatabaseCollection, Notification, Settings, DigestDerivator,
+    ApprovalRequest, DatabaseCollection, DigestDerivator, Notification, Settings,
 };
 
 use super::{
@@ -143,7 +143,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                 RequestNotifier::new(notification_tx),
                 signature_manager,
                 passvotation,
-                derivator
+                derivator,
             ),
         }
     }

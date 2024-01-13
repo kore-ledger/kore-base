@@ -69,7 +69,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             distribution_channel,
             our_id,
             notification_sender,
-            derivator
+            derivator,
         }
     }
 
@@ -187,8 +187,9 @@ impl<C: DatabaseCollection> Ledger<C> {
         let request_id = DigestIdentifier::generate_with_blake3(&event.content.event_request)
             .map_err(|_| LedgerError::CryptoError("Error generating request hash".to_owned()))?;
         // Add to subject_is_gov if it is a governance and it is not
-        let EventRequest::Create(create_request) = event.content.event_request.content.clone() else {
-            return Err(LedgerError::StateInGenesis)
+        let EventRequest::Create(create_request) = event.content.event_request.content.clone()
+        else {
+            return Err(LedgerError::StateInGenesis);
         };
         let governance_version = if create_request.schema_id == "governance"
             && create_request.governance_id.digest.is_empty()
@@ -2738,7 +2739,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-                event.content.hash_prev_event.derivator.clone()
+            event.content.hash_prev_event.derivator.clone(),
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits
@@ -2807,7 +2808,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-                event.content.hash_prev_event.derivator.clone()
+            event.content.hash_prev_event.derivator.clone(),
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits
@@ -2849,7 +2850,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-                event.content.hash_prev_event.derivator.clone()
+            event.content.hash_prev_event.derivator.clone(),
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits

@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::context::MemoryManager;
-use borsh::{BorshDeserialize, BorshSerialize, to_vec};
+use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use wasmtime::{Caller, Engine, Linker, Module, Store};
 
@@ -58,7 +58,7 @@ impl ContractExecutor {
         event: &ValueWrapper,
     ) -> Result<ContractResult, ExecutorErrorResponses> {
         let Ok(event) = serde_json::from_value::<GovernanceEvent>(event.0.clone()) else {
-            return Ok(ContractResult::error())
+            return Ok(ContractResult::error());
         };
         match &event {
             GovernanceEvent::Patch { data } => {
@@ -90,9 +90,7 @@ impl ContractExecutor {
         is_owner: bool,
     ) -> Result<ContractResult, ExecutorErrorResponses> {
         let Contract::CompiledContract(contract_bytes) = compiled_contract else {
-            return self.execute_gov_contract(
-                state, event
-            ).await;
+            return self.execute_gov_contract(state, event).await;
         };
         // Cargar wasm
         let module = unsafe { Module::deserialize(&self.engine, contract_bytes).unwrap() };
@@ -126,11 +124,11 @@ impl ContractExecutor {
         event: &ValueWrapper,
     ) -> Result<(MemoryManager, u32, u32), ExecutorErrorResponses> {
         let mut context = MemoryManager::new();
-        let state_bytes = to_vec(&state)
-            .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
+        let state_bytes =
+            to_vec(&state).map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
         let state_ptr = context.add_data_raw(&state_bytes);
-        let event_bytes = to_vec(&event)
-            .map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
+        let event_bytes =
+            to_vec(&event).map_err(|_| ExecutorErrorResponses::BorshSerializationError)?;
         let event_ptr = context.add_data_raw(&event_bytes);
         Ok((context, state_ptr as u32, event_ptr as u32))
     }
