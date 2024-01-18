@@ -2,7 +2,7 @@ use crate::commons::crypto::KeyGenerator;
 use crate::commons::models::approval::ApprovalState;
 use crate::commons::models::state::generate_subject_id;
 use crate::crypto::Secp256k1KeyPair;
-use crate::request::{RequestState, TapleRequest};
+use crate::request::{KoreRequest, RequestState};
 use crate::signature::Signed;
 use crate::{
     commons::{
@@ -168,7 +168,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         subject_id: DigestIdentifier,
         success: bool,
     ) -> Result<(), LedgerError> {
-        let mut taple_request: TapleRequest = event_request.clone().try_into()?;
+        let mut taple_request: KoreRequest = event_request.clone().try_into()?;
         taple_request.sn = Some(sn);
         taple_request.subject_id = Some(subject_id.clone());
         taple_request.state = RequestState::Finished;

@@ -45,7 +45,7 @@ impl<C: DatabaseCollection> LceValidationProofs<C> {
         let Ok(data) = serialize::<ValidationProof>(&lce_validation_proof) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn del_lce_validation_proof(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {

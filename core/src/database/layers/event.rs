@@ -70,7 +70,7 @@ impl<C: DatabaseCollection> EventDb<C> {
         let Ok(data) = serialize::<Signed<Event>>(&event) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn del_event(&self, subject_id: &DigestIdentifier, sn: u64) -> Result<(), DbError> {

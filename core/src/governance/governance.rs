@@ -23,7 +23,8 @@ use super::{
 pub struct Governance<M: DatabaseManager<C>, C: DatabaseCollection> {
     input: MpscChannel<GovernanceMessage, GovernanceResponse>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: What do we do with this?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     inner_governance: InnerGovernance<C>,
     _m: PhantomData<M>,
 }
@@ -39,7 +40,7 @@ impl<M: DatabaseManager<C>, C: DatabaseCollection> Governance<M, C> {
         Self {
             input,
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
             inner_governance: InnerGovernance::new(
                 repo_access,
                 get_governance_schema(),

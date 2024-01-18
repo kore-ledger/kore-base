@@ -41,10 +41,11 @@ impl<C: DatabaseCollection> SubjectDb<C> {
         let Ok(data) = serialize::<Subject>(&subject) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
-    pub fn del_subject(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {
+    // TODO: What we do with this function?
+    pub fn _del_subject(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
             Element::S(subject_id.to_str()),
@@ -69,7 +70,7 @@ impl<C: DatabaseCollection> SubjectDb<C> {
         let mut result = Vec::new();
         for (_, subject) in self
             .collection
-            .iter(false, format!("{}{}", self.prefix, char::MAX))
+            .iter(false, format!("{}{}", self.prefix, char::MAX).as_str())
         {
             let subject = deserialize::<Subject>(&subject).unwrap();
             result.push(subject);

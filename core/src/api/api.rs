@@ -8,7 +8,7 @@ use super::{
 use super::{GetEvents, GetGovernanceSubjects};
 #[cfg(feature = "approval")]
 use crate::approval::manager::ApprovalAPI;
-use crate::commons::models::request::TapleRequest;
+use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::SubjectData;
 use crate::event::manager::EventAPI;
 use crate::ledger::manager::EventManagerAPI;
@@ -67,10 +67,7 @@ impl Api {
         &self.public_key
     }
 
-    pub async fn get_request(
-        &self,
-        request_id: DigestIdentifier,
-    ) -> Result<TapleRequest, ApiError> {
+    pub async fn get_request(&self, request_id: DigestIdentifier) -> Result<KoreRequest, ApiError> {
         let response = self.sender.ask(APICommands::GetRequest(request_id)).await;
         if response.is_err() {
             log::debug!(

@@ -102,9 +102,9 @@ pub enum RequestState {
     Processing,
 }
 
-/// A struct representing a TAPLE request.
+/// A struct representing a Kore Ledger request.
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
-pub struct TapleRequest {
+pub struct KoreRequest {
     /// The identifier of the request.
     pub id: DigestIdentifier,
     /// The identifier of the subject associated with the request, if any.
@@ -119,7 +119,7 @@ pub struct TapleRequest {
     pub success: Option<bool>,
 }
 
-impl TryFrom<Signed<EventRequest>> for TapleRequest {
+impl TryFrom<Signed<EventRequest>> for KoreRequest {
     type Error = SubjectError;
 
     fn try_from(event_request: Signed<EventRequest>) -> Result<Self, Self::Error> {
@@ -139,5 +139,26 @@ impl TryFrom<Signed<EventRequest>> for TapleRequest {
             state: RequestState::Processing,
             success: None,
         })
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+    use crate::commons::models::signature::tests::get_signature_eol_request;
+
+    /// Get EOL request
+    pub fn get_eol_request() -> EventRequest {
+        EventRequest::EOL(EOLRequest {
+            subject_id: DigestIdentifier::generate_with_blake3(&"subject_id".to_string()).unwrap(),
+        })
+    }
+
+    /// Get signed EOL request
+    pub fn get_signed_eol_request() -> Signed<EventRequest> {
+        let eol_request = get_eol_request();
+        let signature = get_signature_eol_request();
+        Signed::<EventRequest>::new(eol_request, signature)
     }
 }

@@ -45,7 +45,7 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
         let Ok(data) = serialize::<Signed<Event>>(&event) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn del_prevalidated_event(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {

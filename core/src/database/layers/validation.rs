@@ -45,6 +45,6 @@ impl<C: DatabaseCollection> ValidationDb<C> {
         let Ok(data) = serialize::<ValidationProof>(validation_proof) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 }

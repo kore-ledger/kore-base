@@ -51,9 +51,9 @@ pub(crate) fn get_by_range<C: DatabaseCollection>(
         Some(key) => {
             // Find the key
             let iter = if quantity >= 0 {
-                collection.iter(false, format!("{}{}", prefix, char::MAX))
+                collection.iter(false, prefix)
             } else {
-                collection.iter(true, format!("{}{}", prefix, char::MAX))
+                collection.iter(true, format!("{}{}", prefix, char::MAX).as_str())
             };
             let mut iter = iter.peekable();
             loop {
@@ -70,9 +70,9 @@ pub(crate) fn get_by_range<C: DatabaseCollection>(
         }
         None => {
             if quantity >= 0 {
-                (collection.iter(false, prefix.to_string()), quantity)
+                (collection.iter(false, prefix), quantity)
             } else {
-                (collection.iter(true, prefix.to_string()), quantity.abs())
+                (collection.iter(true, prefix), quantity.abs())
             }
         }
     };

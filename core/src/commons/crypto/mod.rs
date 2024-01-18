@@ -226,7 +226,9 @@ impl KeyMaterial for KeyPair {
         Self: Sized,
     {
         match kp_type {
-            KeyPairType::Ed25519 => Ok(KeyPair::Ed25519(Ed25519KeyPair::from_secret_der(kp_type, der)?)),
+            KeyPairType::Ed25519 => Ok(KeyPair::Ed25519(Ed25519KeyPair::from_secret_der(
+                kp_type, der,
+            )?)),
             KeyPairType::Secp256k1 => Ok(KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_der(
                 kp_type, der,
             )?)),

@@ -41,7 +41,7 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
     ) -> Result<Vec<(DigestIdentifier, u64, HashSet<Signature>)>, DbError> {
         let iter = self
             .collection
-            .iter(false, format!("{}{}", self.prefix, char::MAX));
+            .iter(false, format!("{}{}", self.prefix, char::MAX).as_str());
         Ok(iter
             .map(|ws| {
                 let ws_1 = deserialize::<(u64, HashSet<Signature>)>(&ws.1).unwrap();
@@ -74,7 +74,7 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
         let Ok(data) = serialize::<(u64, HashSet<Signature>)>(&(sn, total_signatures)) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn del_witness_signatures(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {

@@ -27,11 +27,11 @@ impl DataStore {
 }
 
 impl DataStore {
-    fn iter(&self, prefix: String) -> MemoryIterator {
+    fn iter(&self, prefix: &str) -> MemoryIterator {
         MemoryIterator::new(&self, prefix)
     }
 
-    fn rev_iter(&self, prefix: String) -> RevMemoryIterator {
+    fn rev_iter(&self, prefix: &str) -> RevMemoryIterator {
         RevMemoryIterator::new(&self, prefix)
     }
 }
@@ -84,9 +84,9 @@ impl DatabaseCollection for MemoryCollection {
         Ok(data.clone())
     }
 
-    fn put(&self, key: &str, data: Vec<u8>) -> Result<(), Error> {
+    fn put(&self, key: &str, data: &[u8]) -> Result<(), Error> {
         let mut lock = self.data._get_inner_write_lock();
-        lock.insert(key.to_string(), data);
+        lock.insert(key.to_string(), data.to_owned());
         Ok(())
     }
 
@@ -99,7 +99,7 @@ impl DatabaseCollection for MemoryCollection {
     fn iter<'a>(
         &'a self,
         reverse: bool,
-        prefix: String,
+        prefix: &str,
     ) -> Box<dyn Iterator<Item = (String, Vec<u8>)> + 'a> {
         if reverse {
             Box::new(self.data.rev_iter(prefix))
@@ -118,11 +118,11 @@ pub struct MemoryIterator<'a> {
 }
 
 impl<'a> MemoryIterator<'a> {
-    fn new(map: &'a DataStore, table_name: String) -> Self {
+    fn new(map: &'a DataStore, table_name: &str) -> Self {
         Self {
             map,
             current: None,
-            table_name,
+            table_name: table_name.to_owned(),
         }
     }
 }
@@ -139,8 +139,18 @@ impl<'a> Iterator for MemoryIterator<'a> {
             self.current = Some((Arc::new(guard), iter));
             &mut self.current.as_mut().unwrap().1
         };
-
-        let Some(item) = iter.next() else {
+        while let Some(item) = iter.next() {
+            let key = {
+                let value = item.0.clone();
+                if !value.starts_with(&self.table_name) {
+                    continue;
+                }
+                value.replace(&self.table_name, "")
+            };
+            return Some((key, item.1.clone()));
+        }
+        None
+        /*let Some(item) = iter.next() else {
             return None;
         };
         let key = {
@@ -150,7 +160,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
             }
             value.replace(&self.table_name, "")
         };
-        return Some((key, item.1.clone()));
+        return Some((key, item.1.clone()));*/
     }
 }
 
@@ -166,11 +176,11 @@ pub struct RevMemoryIterator<'a> {
 }
 
 impl<'a> RevMemoryIterator<'a> {
-    fn new(map: &'a DataStore, table_name: String) -> Self {
+    fn new(map: &'a DataStore, table_name: &str) -> Self {
         Self {
             map,
             current: None,
-            table_name,
+            table_name: table_name.to_owned(),
         }
     }
 }
@@ -187,7 +197,17 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
             self.current = Some((Arc::new(guard), iter));
             &mut self.current.as_mut().unwrap().1
         };
-        let Some(item) = iter.next() else {
+        while let Some(item) = iter.next() {
+            let key = {
+                let value = item.0.clone();
+                if !value.starts_with(&self.table_name) {
+                    continue;
+                }
+                value.replace(&self.table_name, "")
+            };
+            return Some((key, item.1.clone()));
+        }
+        /*let Some(item) = iter.next() else {
             return None;
         };
         let key = {
@@ -196,8 +216,8 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
                 return None;
             }
             value.replace(&self.table_name, "")
-        };
-        return Some((key, item.1.clone()));
+        };*/
+        None
     }
 }
 

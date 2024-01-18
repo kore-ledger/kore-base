@@ -17,6 +17,7 @@ use crate::{
     ValueWrapper,
 };
 use serde_json::Value;
+use base64::prelude::*;
 
 use super::{
     error::{InternalError, RequestError},
@@ -410,7 +411,7 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
                 .map_err(|_| InternalError::InvalidGovernancePayload("5".into()))?;
 
             let decoded_bytes =
-                base64::decode(contract.raw).map_err(|_| InternalError::Base64DecodingError)?;
+                BASE64_STANDARD.decode(contract.raw).map_err(|_| InternalError::Base64DecodingError)?;
             contract.raw =
                 String::from_utf8(decoded_bytes).map_err(|_| InternalError::Base64DecodingError)?;
 
