@@ -41,7 +41,12 @@ impl HashId for ApprovalRequest {
 }
 
 impl Signed<ApprovalRequest> {
-    pub fn varify(&self) -> Result<(), SubjectError> {
+
+    pub fn new(content: ApprovalRequest, signature: Signature) -> Self {
+        Self { content, signature }
+    }
+
+    pub fn verify(&self) -> Result<(), SubjectError> {
         self.signature.verify(&self.content)
     }
 }
@@ -135,6 +140,39 @@ pub struct ApprovalEntity {
     pub response: Option<Signed<ApprovalResponse>>,
     /// The state of the approval entity.
     pub state: ApprovalState,
-    /// The state of the approval entity.
+    /// The sender of the approval request.
     pub sender: KeyIdentifier,
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+
+    use crate::commons::models::{
+        request::tests::get_signed_eol_request, 
+        signature::tests::get_signature_approval_request};
+    use serde_json::Value;
+
+    /// Returns an approval approval reguest for testing.
+    pub fn get_approval_request() -> ApprovalRequest {
+        let signed_eol_request = get_signed_eol_request();
+        ApprovalRequest {
+            event_request: signed_eol_request.clone(),
+            sn: 0,
+            gov_version: 0,
+            patch: ValueWrapper(Value::String("value".to_string())),
+            state_hash: DigestIdentifier::new(DigestDerivator::Blake3_256, "state_hash".as_bytes()),
+            hash_prev_event: DigestIdentifier::new(DigestDerivator::Blake3_256, "hash_prev_event".as_bytes()),
+            gov_id: DigestIdentifier::new(DigestDerivator::Blake3_256, "gov_id".as_bytes()),
+        }
+    }
+
+    /// Returns a signed approval request for testing.
+    pub fn get_signed_approval_request() -> Signed<ApprovalRequest> {
+        let approval_request = get_approval_request();
+        let signature = get_signature_approval_request();
+        Signed::<ApprovalRequest>::new(approval_request, signature)
+    }
+    
 }

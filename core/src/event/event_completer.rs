@@ -23,8 +23,8 @@ use crate::{
     ledger::{LedgerCommand, LedgerResponse},
     message::{MessageConfig, MessageTaskCommand},
     protocol::protocol_message_manager::TapleMessages,
+    request::KoreRequest,
     request::StartRequest,
-    request::TapleRequest,
     signature::{Signature, Signed, UniqueSignature},
     utils::message::{
         approval::create_approval_request, evaluator::create_evaluator_request,
@@ -794,7 +794,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             .entry(subject.governance_id.clone())
             .or_insert_with(HashSet::new)
             .insert(subject.governance_id);
-        let mut request_data: TapleRequest = event_request.clone().try_into()?;
+        let mut request_data: KoreRequest = event_request.clone().try_into()?;
         request_data.sn = Some(subject.sn + 1);
         request_data.subject_id = Some(subject.subject_id.clone());
         self.database

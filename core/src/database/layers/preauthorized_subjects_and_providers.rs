@@ -65,6 +65,6 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
         )) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 }

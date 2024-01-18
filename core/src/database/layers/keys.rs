@@ -38,7 +38,7 @@ impl<C: DatabaseCollection> KeysDb<C> {
         let Ok(data) = serialize::<KeyPair>(&keypair) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn del_keys(&self, public_key: &KeyIdentifier) -> Result<(), DbError> {
@@ -50,10 +50,11 @@ impl<C: DatabaseCollection> KeysDb<C> {
         self.collection.del(&key)
     }
 
-    pub fn get_all_keys(&self) -> Result<Vec<KeyPair>, DbError> {
+    // TODO: What we do with this function?
+    pub fn _get_all_keys(&self) -> Result<Vec<KeyPair>, DbError> {
         let key_elements: Vec<Element> = vec![Element::S(self.prefix.clone())];
         let key = get_key(key_elements)?;
-        let iter = self.collection.iter(false, key);
+        let iter = self.collection.iter(false, &key);
         let mut result = Vec::new();
         for (_, bytes) in iter {
             let subject = deserialize::<KeyPair>(&bytes).map_err(|_| DbError::DeserializeError)?;

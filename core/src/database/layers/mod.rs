@@ -14,4 +14,4 @@ pub(crate) mod subject_by_governance;
 pub(crate) mod validation;
 pub(crate) mod witness_signatures;
 
-mod utils;
+pub(crate) mod utils;

@@ -64,7 +64,7 @@ impl<C: DatabaseCollection> SignatureDb<C> {
         };
         let total_signatures = serialize(&(total_signatures, validation_proof))
             .map_err(|_| DbError::SerializeError)?;
-        self.collection.put(&key, total_signatures)
+        self.collection.put(&key, &total_signatures)
     }
 
     pub fn del_signatures(&self, subject_id: &DigestIdentifier, sn: u64) -> Result<(), DbError> {
@@ -86,7 +86,9 @@ impl<C: DatabaseCollection> SignatureDb<C> {
             Element::S(subject_id.to_str()),
         ];
         let key = get_key(key_elements)?;
-        let mut iter = self.collection.iter(false, format!("{}{}", key, char::MAX));
+        let mut iter = self
+            .collection
+            .iter(false, format!("{}{}", key, char::MAX).as_str());
         if let Some(vproof) = iter.next() {
             let vproof = deserialize::<(HashSet<Signature>, ValidationProof)>(&vproof.1)
                 .map_err(|_| DbError::DeserializeError)?;

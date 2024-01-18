@@ -28,6 +28,16 @@ impl SignatureIdentifier {
     }
 }
 
+/// SignagtureIdentifier for tests
+impl Default for SignatureIdentifier {
+    fn default() -> Self {
+        Self {
+            derivator: SignatureDerivator::Ed25519Sha512,
+            signature: vec![0; 64],
+        }
+    }
+}
+
 impl Derivable for SignatureIdentifier {
     fn derivative(&self) -> Vec<u8> {
         self.signature.to_owned()
@@ -90,10 +100,7 @@ mod tests {
 
     use super::{SignatureDerivator, SignatureIdentifier};
 
-    use crate::{
-        crypto::{KeyGenerator, KeyMaterial, Payload, Secp256k1KeyPair, DSA},
-        identifier::{derive::key, KeyIdentifier},
-    };
+    use crate::identifier::KeyIdentifier;
 
     #[test]
     fn test_to_from_string() {

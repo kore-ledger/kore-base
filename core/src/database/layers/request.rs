@@ -1,5 +1,5 @@
 use super::utils::{get_key, Element};
-use crate::commons::models::request::TapleRequest;
+use crate::commons::models::request::KoreRequest;
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
 use crate::{DatabaseCollection, DatabaseManager, Derivable, DigestIdentifier};
@@ -18,23 +18,24 @@ impl<C: DatabaseCollection> RequestDb<C> {
         }
     }
 
-    pub fn get_request(&self, request_id: &DigestIdentifier) -> Result<TapleRequest, DbError> {
+    pub fn get_request(&self, request_id: &DigestIdentifier) -> Result<KoreRequest, DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
             Element::S(request_id.to_str()),
         ];
         let key = get_key(key_elements)?;
         let request = self.collection.get(&key)?;
-        Ok(deserialize::<TapleRequest>(&request).map_err(|_| DbError::DeserializeError)?)
+        Ok(deserialize::<KoreRequest>(&request).map_err(|_| DbError::DeserializeError)?)
     }
 
-    pub fn get_all_request(&self) -> Vec<TapleRequest> {
+    // TODO: What we do with this function?
+    pub fn _get_all_request(&self) -> Vec<KoreRequest> {
         let mut result = Vec::new();
         for (_, request) in self
             .collection
-            .iter(false, format!("{}{}", self.prefix, char::MAX))
+            .iter(false, format!("{}{}", self.prefix, char::MAX).as_str())
         {
-            let request = deserialize::<TapleRequest>(&request).unwrap();
+            let request = deserialize::<KoreRequest>(&request).unwrap();
             result.push(request);
         }
         result
@@ -43,20 +44,21 @@ impl<C: DatabaseCollection> RequestDb<C> {
     pub fn set_request(
         &self,
         request_id: &DigestIdentifier,
-        request: &TapleRequest,
+        request: &KoreRequest,
     ) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
             Element::S(request_id.to_str()),
         ];
         let key = get_key(key_elements)?;
-        let Ok(data) = serialize::<TapleRequest>(request) else {
+        let Ok(data) = serialize::<KoreRequest>(request) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
-    pub fn del_request(&self, request_id: &DigestIdentifier) -> Result<(), DbError> {
+    // TODO: What we do with this function?
+    pub fn _del_request(&self, request_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
             Element::S(request_id.to_str()),

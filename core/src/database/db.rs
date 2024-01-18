@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::commons::models::approval::ApprovalEntity;
-use crate::commons::models::request::TapleRequest;
+use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::Subject;
 use crate::commons::models::validation::ValidationProof;
 use crate::crypto::KeyPair;
@@ -146,8 +146,9 @@ impl<C: DatabaseCollection> DB<C> {
         self.subject_db.get_subjects(from, quantity)
     }
 
-    pub fn del_subject(&self, subject_id: &DigestIdentifier) -> Result<(), Error> {
-        self.subject_db.del_subject(subject_id)
+    // TODO: What we do with this function?
+    pub fn _del_subject(&self, subject_id: &DigestIdentifier) -> Result<(), Error> {
+        self.subject_db._del_subject(subject_id)
     }
 
     pub fn get_all_subjects(&self) -> Vec<Subject> {
@@ -213,7 +214,8 @@ impl<C: DatabaseCollection> DB<C> {
         self.event_request_db.get_request(subject_id)
     }
 
-    pub fn get_all_request(&self) -> Vec<Signed<EventRequest>> {
+    // TODO: What we do with this function?
+    pub fn _get_all_request(&self) -> Vec<Signed<EventRequest>> {
         self.event_request_db.get_all_request()
     }
 
@@ -229,24 +231,26 @@ impl<C: DatabaseCollection> DB<C> {
         self.event_request_db.del_request(subject_id)
     }
 
-    pub fn get_taple_request(&self, request_id: &DigestIdentifier) -> Result<TapleRequest, Error> {
+    pub fn get_taple_request(&self, request_id: &DigestIdentifier) -> Result<KoreRequest, Error> {
         self.request_db.get_request(request_id)
     }
 
-    pub fn get_taple_all_request(&self) -> Vec<TapleRequest> {
-        self.request_db.get_all_request()
+    // TODO: What we do with this function?
+    pub fn _get_kore_all_request(&self) -> Vec<KoreRequest> {
+        self.request_db._get_all_request()
     }
 
     pub fn set_taple_request(
         &self,
         request_id: &DigestIdentifier,
-        request: &TapleRequest,
+        request: &KoreRequest,
     ) -> Result<(), Error> {
         self.request_db.set_request(request_id, request)
     }
 
-    pub fn del_taple_request(&self, request_id: &DigestIdentifier) -> Result<(), Error> {
-        self.request_db.del_request(request_id)
+    // TODO: What we do with this function?
+    pub fn _del_kore_request(&self, request_id: &DigestIdentifier) -> Result<(), Error> {
+        self.request_db._del_request(request_id)
     }
 
     pub fn get_controller_id(&self) -> Result<String, Error> {
@@ -362,8 +366,9 @@ impl<C: DatabaseCollection> DB<C> {
         self.keys_db.get_keys(public_key)
     }
 
-    pub fn get_all_keys(&self) -> Result<Vec<KeyPair>, Error> {
-        self.keys_db.get_all_keys()
+    // TODO: What we do with this function?
+    pub fn _get_all_keys(&self) -> Result<Vec<KeyPair>, Error> {
+        self.keys_db._get_all_keys()
     }
 
     pub fn set_keys(&self, public_key: &KeyIdentifier, keypair: KeyPair) -> Result<(), Error> {

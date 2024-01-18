@@ -22,7 +22,8 @@ pub struct DistributionManager<C: DatabaseCollection> {
     governance_update_input: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     input_channel: MpscChannel<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: What we do with this?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     inner_manager: InnerDistributionManager<GovernanceAPI, C>,
 }
 
@@ -43,7 +44,7 @@ impl<C: DatabaseCollection> DistributionManager<C> {
             input_channel,
             governance_update_input,
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
             inner_manager: InnerDistributionManager::new(
                 gov_api,
                 db,

@@ -14,8 +14,9 @@ pub enum LedgerError {
     UnexpectedTransfer,
     #[error("Error parsing json string: \"{0}\"")]
     ErrorParsingJsonString(String),
-    #[error("Error applying patch: \"{0}\"")]
-    ErrorApplyingPatch(String),
+    // TODO: Remove this error
+    //#[error("Error applying patch: \"{0}\"")]
+    //ErrorApplyingPatch(String),
     #[error("State Event entered as Genesis")]
     StateInGenesis,
     #[error("Channel unnavaible")]
@@ -52,8 +53,9 @@ pub enum LedgerError {
     EventDoesNotFitHash,
     #[error("We are not witnesses: {0}")]
     WeAreNotWitnesses(String),
-    #[error("Invalid LCE After Genesis: {0}")]
-    InvalidLCEAfterGenesis(String),
+    // TODO: Remove this error
+    //#[error("Invalid LCE After Genesis: {0}")]
+    //InvalidLCEAfterGenesis(String),
     #[error("Governance Not Preauthorized: {0}")]
     GovernanceNotPreauthorized(String),
     #[error("Governance LCE: {0}")]
@@ -62,8 +64,9 @@ pub enum LedgerError {
     EvaluationInTransferEvent,
     #[error("Approval found in transfer event")]
     ApprovalInTransferEvent,
-    #[error("State event with an SN of 0 detected")]
-    StateEventWithZeroSNDetected,
+    // TODO: Remove this error
+    //#[error("State event with an SN of 0 detected")]
+    //StateEventWithZeroSNDetected,
     #[error("Unexpected create event")]
     UnexpectedCreateEvent,
     #[error("Validation Proof Error: {0}")]

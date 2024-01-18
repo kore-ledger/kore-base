@@ -50,7 +50,7 @@ pub struct LedgerManager<C: DatabaseCollection> {
     input_channel: MpscChannel<LedgerCommand, LedgerResponse>,
     inner_ledger: Ledger<C>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> LedgerManager<C> {
@@ -80,7 +80,7 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                 derivator,
             ),
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
         }
     }
 

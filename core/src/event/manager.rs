@@ -50,7 +50,8 @@ pub struct EventManager<C: DatabaseCollection> {
     input_channel_updated_gov: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     event_completer: EventCompleter<C>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: What we do with this?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> EventManager<C> {
@@ -81,7 +82,7 @@ impl<C: DatabaseCollection> EventManager<C> {
                 derivator,
             ),
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
         }
     }
 

@@ -32,7 +32,7 @@ impl<C: DatabaseCollection> SubjectByGovernanceDb<C> {
         let Ok(data) = serialize::<DigestIdentifier>(subject_id) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, data)
+        self.collection.put(&key, &data)
     }
 
     pub fn get_subjects_by_governance(
@@ -45,7 +45,10 @@ impl<C: DatabaseCollection> SubjectByGovernanceDb<C> {
         ];
         let key = get_key(key_elements)?;
         let mut result = Vec::new();
-        for (_, data) in self.collection.iter(false, format!("{}{}", key, char::MAX)) {
+        for (_, data) in self
+            .collection
+            .iter(false, format!("{}{}", key, char::MAX).as_str())
+        {
             let request =
                 deserialize::<DigestIdentifier>(&data).map_err(|_| DbError::DeserializeError)?;
             result.push(request);

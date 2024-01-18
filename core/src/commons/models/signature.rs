@@ -1,7 +1,7 @@
 //! Define the data structures related to signatures
 use crate::{
     commons::errors::SubjectError,
-    crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Payload, Secp256k1KeyPair, DSA},
+    crypto::{KeyMaterial, KeyPair, Payload, DSA},
     identifier::{DigestIdentifier, KeyIdentifier, SignatureIdentifier},
     Derivable, DigestDerivator,
 };
@@ -84,52 +84,6 @@ impl Signature {
         })
     }
 
-    /// It allows the creation of a new signature using private key of ed25519
-    /// # Arguments
-    /// - content: The content to sign
-    /// - private_key: The [String] to use to generate the key pair
-    pub fn new_from_pk_ed25519<T: HashId>(
-        content: &T,
-        private_key: String,
-        derivator: DigestDerivator,
-    ) -> Result<Self, SubjectError> {
-        let key_bytes = hex::decode(private_key)
-            .map_err(|_| SubjectError::SignatureCreationFails("invalid private key".to_string()))?;
-        let keys = KeyPair::Ed25519(Ed25519KeyPair::from_secret_key(&key_bytes));
-        let signer = KeyIdentifier::new(keys.get_key_derivator(), &keys.public_key_bytes());
-        let timestamp = TimeStamp::now();
-        // TODO: Analyze if we should remove HashId and change it for BorshSerialize
-        // let content_hash = content.hash_id()?;
-        let signature_hash =
-            DigestIdentifier::from_serializable_borsh((&content, &timestamp), derivator).map_err(
-                |_| SubjectError::SignatureCreationFails("Signature hash fails".to_string()),
-            )?;
-        let signature = keys
-            .sign(Payload::Buffer(signature_hash.derivative()))
-            .map_err(|_| SubjectError::SignatureCreationFails("Keys sign fails".to_owned()))?;
-        Ok(Signature {
-            signer: signer.clone(),
-            timestamp,
-            content_hash: signature_hash,
-            value: SignatureIdentifier::new(signer.to_signature_derivator(), &signature),
-        })
-    }
-
-    /// It allows the creation of a new signature using private key of ed25519
-    /// # Arguments
-    /// - content: The content to sign
-    /// - private_key: The [String] to use to generate the key pair
-    pub fn new_from_pk_secp256k1<T: HashId>(
-        content: &T,
-        private_key: String,
-        derivator: DigestDerivator,
-    ) -> Result<Self, SubjectError> {
-        let key_bytes = hex::decode(private_key)
-            .map_err(|_| SubjectError::SignatureCreationFails("invalid private key".to_string()))?;
-        let keys = KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_key(&key_bytes));
-        Self::new(content, &keys, derivator)
-    }
-
     /// It allow verify the signature. It checks if the content and the signer are correct
     pub fn verify<T: HashId>(&self, content: &T) -> Result<(), SubjectError> {
         let derivator = self.content_hash.derivator;
@@ -183,4 +137,30 @@ pub struct Signed<T: BorshSerialize + BorshDeserialize + Clone> {
     pub content: T,
     /// The signature accompanying the data
     pub signature: Signature,
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::commons::models::{
+        request::tests::get_eol_request,
+        approval::tests::get_approval_request,
+    };
+    use crate::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
+
+    /// get signature eol request for tests
+    pub fn get_signature_eol_request() -> Signature {
+        let keypair = KeyPair::Ed25519(Ed25519KeyPair::new());
+        let derivator = DigestDerivator::Blake3_256;
+        let signature = Signature::new(&get_eol_request(), &keypair, derivator).unwrap();
+        signature
+    }
+
+    /// get signature approval request for tests
+    pub fn get_signature_approval_request() -> Signature {
+        let keypair = KeyPair::Ed25519(Ed25519KeyPair::new());
+        let derivator = DigestDerivator::Blake3_256;
+        let signature = Signature::new(&get_approval_request(), &keypair, derivator).unwrap();
+        signature
+    }
 }

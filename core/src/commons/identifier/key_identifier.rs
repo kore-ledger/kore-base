@@ -66,6 +66,16 @@ impl KeyIdentifier {
     }
 }
 
+/// KeyIdentifier for tests
+impl Default for KeyIdentifier {
+    fn default() -> Self {
+        Self {
+            public_key: vec![0; 32],
+            derivator: KeyDerivator::Ed25519,
+        }
+    }
+}
+
 /// Partial equal for KeyIdentifier
 impl PartialEq for KeyIdentifier {
     fn eq(&self, other: &Self) -> bool {

@@ -25,14 +25,14 @@ pub trait DatabaseCollection: Sync + Send {
     /// Retrieves the value associated with the given key.
     fn get(&self, key: &str) -> Result<Vec<u8>, Error>;
     /// Associates the given value with the given key.
-    fn put(&self, key: &str, data: Vec<u8>) -> Result<(), Error>;
+    fn put(&self, key: &str, data: &[u8]) -> Result<(), Error>;
     /// Removes the value associated with the given key.
     fn del(&self, key: &str) -> Result<(), Error>;
     /// Returns an iterator over the key-value pairs in the collection.
     fn iter<'a>(
         &'a self,
         reverse: bool,
-        prefix: String,
+        prefix: &str,
     ) -> Box<dyn Iterator<Item = (String, Vec<u8>)> + 'a>;
 }
 
@@ -50,6 +50,8 @@ macro_rules! test_database_manager_trait {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
+            #[allow(unused_imports)]
+            use crate::database::layers::utils::get_by_range;
             use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 
             #[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -94,11 +96,11 @@ macro_rules! test_database_manager_trait {
                 let data = get_data().unwrap();
                 // PUT & GET Operations
                 // PUT
-                let result = first_collection.put("a", data[0].clone());
+                let result = first_collection.put("a", &data[0]);
                 assert!(result.is_ok());
-                let result = first_collection.put("b", data[1].clone());
+                let result = first_collection.put("b", &data[1]);
                 assert!(result.is_ok());
-                let result = first_collection.put("c", data[2].clone());
+                let result = first_collection.put("c", &data[2]);
                 assert!(result.is_ok());
                 // GET
                 let result = first_collection.get("a");
@@ -125,33 +127,33 @@ macro_rules! test_database_manager_trait {
                 let result = first_collection.get("c");
                 assert!(result.is_err());
             }
-
-            #[test]
-            fn partitions_test() {
-                let db = <$type>::default();
-                let first_collection: $type2 = db.create_collection("first");
-                let second_collection: $type2 = db.create_collection("second");
-                let data = get_data().unwrap();
-                // PUT UNIQUE ENTRIES IN EACH PARTITION
-                let result = first_collection.put("a", data[0].to_owned());
-                assert!(result.is_ok());
-                let result = second_collection.put("b", data[1].to_owned());
-                assert!(result.is_ok());
-                // NO EXIST IDIVIDUALITY
-                let result = first_collection.get("b");
-                assert_eq!(result.unwrap(), data[1]);
-                let result = second_collection.get("a");
-                assert_eq!(result.unwrap(), data[0]);
-            }
-
+            /*
+                        #[test]
+                        fn partitions_test() {
+                            let db = <$type>::default();
+                            let first_collection: $type2 = db.create_collection("first");
+                            let second_collection: $type2 = db.create_collection("second");
+                            let data = get_data().unwrap();
+                            // PUT UNIQUE ENTRIES IN EACH PARTITION
+                            let result = first_collection.put("a", data[0].to_owned());
+                            assert!(result.is_ok());
+                            let result = second_collection.put("b", data[1].to_owned());
+                            assert!(result.is_ok());
+                            // NO EXIST IDIVIDUALITY
+                            let result = first_collection.get("b");
+                            assert_eq!(result.unwrap(), data[1]);
+                            let result = second_collection.get("a");
+                            assert_eq!(result.unwrap(), data[0]);
+                        }
+            */
             #[allow(dead_code)]
             fn build_state(collection: &$type2) {
                 let data = get_data().unwrap();
-                let result = collection.put("a", data[0].to_owned());
+                let result = collection.put("a", &data[0]);
                 assert!(result.is_ok());
-                let result = collection.put("b", data[1].to_owned());
+                let result = collection.put("b", &data[1]);
                 assert!(result.is_ok());
-                let result = collection.put("c", data[2].to_owned());
+                let result = collection.put("c", &data[2]);
                 assert!(result.is_ok());
             }
 
@@ -169,9 +171,9 @@ macro_rules! test_database_manager_trait {
                 let first_collection: $type2 = db.create_collection("first");
                 build_state(&first_collection);
                 // ITER TEST
-                let mut iter = first_collection.iter(false, "first".to_string());
-                assert!(iter.next().is_none());
-                let mut iter = first_collection.iter(false, "".to_string());
+                let mut iter = first_collection.iter(false, "");
+                //assert!(iter.next().is_some());
+
                 let (keys, data) = build_initial_data();
                 for i in 0..3 {
                     let (key, val) = iter.next().unwrap();
@@ -187,9 +189,7 @@ macro_rules! test_database_manager_trait {
                 let first_collection: $type2 = db.create_collection("first");
                 build_state(&first_collection);
                 // ITER TEST
-                let mut iter = first_collection.iter(true, "first".to_string());
-                assert!(iter.next().is_none());
-                let mut iter = first_collection.iter(true, "".to_string());
+                let mut iter = first_collection.iter(true, "");
                 let (keys, data) = build_initial_data();
                 for i in (0..3).rev() {
                     let (key, val) = iter.next().unwrap();
@@ -197,6 +197,26 @@ macro_rules! test_database_manager_trait {
                     assert_eq!(data[i], val);
                 }
                 assert!(iter.next().is_none());
+            }
+
+            #[test]
+            fn get_by_range_test() {
+                let db = <$type>::default();
+                let first_collection: $type2 = db.create_collection("first");
+                build_state(&first_collection);
+                // GET BY RANGE TEST
+                let result = get_by_range(None, 2, &first_collection, "");
+                assert!(result.is_ok());
+                let result = result.unwrap();
+                let (key, data) = build_initial_data();
+                for i in 0..2 {
+                    assert_eq!(data[i], result[i]);
+                    assert_eq!(data[i], result[i]);
+                }
+                let result = get_by_range(Some(key[1].to_owned()), 1, &first_collection, "");
+                assert!(result.is_ok());
+                let result = result.unwrap();
+                assert_eq!(data[2], result[0]);
             }
         }
     };

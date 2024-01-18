@@ -86,7 +86,8 @@ pub enum GovernanceResponse {
     GetContracts(Result<Vec<(Contract, String)>, RequestError>),
     GetGovernanceVersion(Result<u64, RequestError>),
     IsGovernance(Result<bool, RequestError>),
-    NoResponse,
+    // TODO: Remove this message
+    //NoResponse,
 }
 
 #[derive(Debug, Clone)]

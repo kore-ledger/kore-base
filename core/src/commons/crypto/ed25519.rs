@@ -6,8 +6,7 @@ use ed25519_dalek::pkcs8::EncodePrivateKey;
 use identifier::error::Error;
 
 use ed25519_dalek::{
-    Signature, Signer, SigningKey, Verifier, VerifyingKey,
-    KEYPAIR_LENGTH, SECRET_KEY_LENGTH,
+    Signature, Signer, SigningKey, Verifier, VerifyingKey, KEYPAIR_LENGTH, SECRET_KEY_LENGTH,
 };
 
 use base64::{engine::general_purpose, Engine as _};
@@ -208,7 +207,5 @@ mod tests {
         let der = kp.to_secret_der().unwrap();
         let new_kp = Ed25519KeyPair::from_secret_der(KeyPairType::Ed25519, &der).unwrap();
         assert_eq!(kp.public_key_bytes(), new_kp.public_key_bytes());
-        
     }
-
 }
