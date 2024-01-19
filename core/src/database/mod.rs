@@ -34,6 +34,60 @@ pub trait DatabaseCollection: Sync + Send {
         reverse: bool,
         prefix: &str,
     ) -> Box<dyn Iterator<Item = (String, Vec<u8>)> + 'a>;
+
+    /// Returns a vector of values in the collection that are in the given range.
+    fn get_by_range(
+        &self,
+        from: Option<String>,
+        quantity: isize,
+        prefix: &str,
+    ) -> Result<Vec<Vec<u8>>, Error> {
+        fn convert<'a>(
+            iter: impl Iterator<Item = (String, Vec<u8>)> + 'a,
+        ) -> Box<dyn Iterator<Item = (String, Vec<u8>)> + 'a> {
+            Box::new(iter)
+        }
+        let (mut iter, quantity) = match from {
+            Some(key) => {
+                // Find the key
+                let iter = if quantity >= 0 {
+                    self.iter(false, prefix)
+                } else {
+                    self.iter(true, format!("{}{}", prefix, char::MAX).as_str())
+                };
+                let mut iter = iter.peekable();
+                loop {
+                    let Some((current_key, _)) = iter.peek() else {
+                        return Err(Error::EntryNotFound);
+                    };
+                    if current_key == &key {
+                        break;
+                    }
+                    iter.next();
+                }
+                iter.next(); // Exclusive From
+                (convert(iter), quantity.abs())
+            }
+            None => {
+                if quantity >= 0 {
+                    (self.iter(false, prefix), quantity)
+                } else {
+                    (self.iter(true, prefix), quantity.abs())
+                }
+            }
+        };
+        let mut result = Vec::new();
+        let mut counter = 0;
+        while counter < quantity {
+            let Some((_, event)) = iter.next() else {
+                break;
+            };
+            result.push(event);
+            counter += 1;
+        }
+        Ok(result)
+    }
+    
 }
 
 /// Allows a TAPLE database implementation to be subjected to a battery of tests.
@@ -51,7 +105,6 @@ macro_rules! test_database_manager_trait {
             #[allow(unused_imports)]
             use super::*;
             #[allow(unused_imports)]
-            use crate::database::layers::utils::get_by_range;
             use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 
             #[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -205,7 +258,7 @@ macro_rules! test_database_manager_trait {
                 let first_collection: $type2 = db.create_collection("first");
                 build_state(&first_collection);
                 // GET BY RANGE TEST
-                let result = get_by_range(None, 2, &first_collection, "");
+                let result = first_collection.get_by_range(None, 2, "");
                 assert!(result.is_ok());
                 let result = result.unwrap();
                 let (key, data) = build_initial_data();
@@ -213,7 +266,7 @@ macro_rules! test_database_manager_trait {
                     assert_eq!(data[i], result[i]);
                     assert_eq!(data[i], result[i]);
                 }
-                let result = get_by_range(Some(key[1].to_owned()), 1, &first_collection, "");
+                let result = first_collection.get_by_range(Some(key[1].to_owned()), 1, "");
                 assert!(result.is_ok());
                 let result = result.unwrap();
                 assert_eq!(data[2], result[0]);

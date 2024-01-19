@@ -1,4 +1,5 @@
-use crate::DatabaseCollection;
+//
+
 use crate::DbError;
 
 const MAX_U64: usize = 17; // Max size u64
@@ -36,7 +37,7 @@ pub(crate) fn get_key(key_elements: Vec<Element>) -> Result<String, DbError> {
     }
 }
 
-pub(crate) fn get_by_range<C: DatabaseCollection>(
+/*pub(crate) fn get_by_range<C: DatabaseCollection>(
     from: Option<String>,
     quantity: isize,
     collection: &C,
@@ -86,4 +87,4 @@ pub(crate) fn get_by_range<C: DatabaseCollection>(
         counter += 1;
     }
     Ok(result)
-}
+}*/

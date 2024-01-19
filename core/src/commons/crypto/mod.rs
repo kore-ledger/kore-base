@@ -95,6 +95,7 @@ impl<P> BaseKeyPair<P> {
     }
 }
 
+// TODO: remove this
 /// Represents asymetric key pair for storage (deprecated: KeyPair is serializable)
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CryptoBox {

@@ -50,6 +50,7 @@ pub struct LedgerManager<C: DatabaseCollection> {
     input_channel: MpscChannel<LedgerCommand, LedgerResponse>,
     inner_ledger: Ledger<C>,
     token: CancellationToken,
+    // TODO: What do we do with the notification?
     _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 

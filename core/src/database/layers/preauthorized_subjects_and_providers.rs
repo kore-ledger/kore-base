@@ -1,4 +1,4 @@
-use super::utils::{get_by_range, get_key, Element};
+use super::utils::{get_key, Element};
 use crate::utils::{deserialize, serialize};
 use crate::{DatabaseCollection, DatabaseManager, Derivable, DigestIdentifier};
 use crate::{DbError, KeyIdentifier};
@@ -38,7 +38,7 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
         from: Option<String>,
         quantity: isize,
     ) -> Result<Vec<(DigestIdentifier, HashSet<KeyIdentifier>)>, DbError> {
-        let result = get_by_range(from, quantity, &self.collection, &self.prefix)?;
+        let result = self.collection.get_by_range(from, quantity,&self.prefix)?;
         let mut vec_result = vec![];
         for value in result {
             vec_result.push(

@@ -1,4 +1,4 @@
-use super::utils::{get_by_range, get_key, Element};
+use super::utils::{get_key, Element};
 use crate::signature::Signed;
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
@@ -48,7 +48,7 @@ impl<C: DatabaseCollection> EventDb<C> {
             Some(from) => Some(from.to_string()),
             None => None,
         };
-        let events_by_subject = get_by_range(from, quantity, &self.collection, &key)?;
+        let events_by_subject = self.collection.get_by_range(from, quantity, &key)?;
         Ok(events_by_subject
             .iter()
             .map(|event| deserialize::<Signed<Event>>(event).unwrap())

@@ -1,4 +1,4 @@
-use super::utils::{get_by_range, get_key, Element};
+use super::utils::{get_key, Element};
 use crate::commons::models::state::Subject;
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
@@ -59,7 +59,7 @@ impl<C: DatabaseCollection> SubjectDb<C> {
         from: Option<String>,
         quantity: isize,
     ) -> Result<Vec<Subject>, DbError> {
-        let subjects = get_by_range(from, quantity, &self.collection, &self.prefix.clone())?;
+        let subjects = self.collection.get_by_range(from, quantity, &self.prefix.clone())?;
         Ok(subjects
             .iter()
             .map(|subject| deserialize::<Subject>(subject).unwrap())
