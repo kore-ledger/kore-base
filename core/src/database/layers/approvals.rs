@@ -1,4 +1,4 @@
-use super::utils::{get_by_range, get_key, Element};
+use super::utils::{get_key, Element};
 use crate::commons::models::approval::{ApprovalEntity, ApprovalState};
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
@@ -275,10 +275,9 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
         let mut continue_while: bool = true;
         if let Some(ApprovalState::Pending) = status {
             while quantity != 0 && continue_while {
-                let approvals = get_by_range(
+                let approvals = self.pending_collection.get_by_range(
                     from.clone(),
                     quantity,
-                    &self.pending_collection,
                     &self.pending_prefix,
                 )?;
                 if approvals.len() < quantity.abs() as usize {
@@ -319,7 +318,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
                 }
             }
         } else {
-            let approvals = get_by_range(from, quantity, &self.collection, &self.prefix)?;
+            let approvals = self.collection.get_by_range(from, quantity, &self.prefix)?;
             for approval in approvals.iter() {
                 let approval = deserialize::<ApprovalEntity>(&approval).unwrap();
                 if status.is_some() {
