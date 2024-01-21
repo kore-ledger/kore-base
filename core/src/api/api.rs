@@ -173,6 +173,10 @@ impl Api {
         }
     }
 
+    /// Allows to obtain all the subjects that model existing governance in the node.
+    /// Paging can be performed by means of the optional arguments `from` and `quantity`.
+    /// Regarding the former, it should be noted that negative values are allowed, in which case
+    /// the paging is performed in the opposite direction starting from the end.
     pub async fn get_subjects_by_governance(
         &self,
         governance_id: DigestIdentifier,
@@ -447,7 +451,7 @@ pub struct ApiManager<C: DatabaseCollection> {
     input: MpscChannel<APICommands, ApiResponses>,
     inner_api: InnerApi<C>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> ApiManager<C> {
@@ -472,7 +476,7 @@ impl<C: DatabaseCollection> ApiManager<C> {
                 ledger_api,
             ),
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
         }
     }
 
