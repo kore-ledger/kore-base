@@ -5,7 +5,7 @@ use kore_base::{
     Settings,
 };
 
-use kore_base::Node;
+use kore_base::{Node, crypto::KeyPair};
 use tokio::time::{sleep, Duration};
 
 use super::error::NotifierError;
@@ -14,23 +14,22 @@ pub struct NodeBuilder {
     p2p_port: Option<u32>,
     access_points: Vec<String>,
     pass_votation: Option<u8>,
-    secret_key: String,
+    key_pair: KeyPair,
 }
 
 #[allow(dead_code)]
 impl NodeBuilder {
-    pub fn new(private_key: String) -> Self {
+    pub fn new(kp: KeyPair) -> Self {
         Self {
             p2p_port: None,
             access_points: Vec::new(),
             pass_votation: None,
-            secret_key: private_key,
+            key_pair: kp,
         }
     }
 
     pub fn build(self) -> Result<OnMemoryNode, Error> {
         let mut settings = Settings::default();
-        settings.node.secret_key = self.secret_key;
         settings.network.listen_addr = vec![ListenAddr::Memory {
             port: self.p2p_port,
         }];
@@ -40,7 +39,7 @@ impl NodeBuilder {
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
         let database = MemoryManager::new();
-        let (node, api) = Node::build(settings, database)?;
+        let (node, api) = Node::build(settings, self.key_pair, database)?;
         Ok(OnMemoryNode::new(node, api))
     }
 
@@ -98,7 +97,8 @@ impl OnMemoryNode {
             .expect("Invalid conversion to digest identifier"))
     }
 
-    pub async fn wait_for_new_event(&mut self) -> Result<(u64, DigestIdentifier), NotifierError> {
+    // TODO: This method is not used, but it could be useful in the future
+    pub async fn _wait_for_new_event(&mut self) -> Result<(u64, DigestIdentifier), NotifierError> {
         let (sn, subject_id) = self
             .wait_for_notification(|data| {
                 if let Notification::NewEvent { sn, subject_id } = data {
