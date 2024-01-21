@@ -1,6 +1,10 @@
 mod common;
 use common::{generate_mc, NodeBuilder};
-use kore_base::DigestDerivator;
+use kore_base::{
+    DigestDerivator,
+    crypto::{KeyPair, KeyGenerator, Ed25519KeyPair},
+};
+
 use serial_test::serial;
 
 use crate::common::{check_subject, create_governance_request};
@@ -11,8 +15,8 @@ fn init_node() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         std::env::set_var("RUST_LOG", "info");
-        let mc_data_node1 = generate_mc();
-        let result = NodeBuilder::new(mc_data_node1.get_private_key()).build();
+        let kp = KeyPair::Ed25519(Ed25519KeyPair::new());
+        let result = NodeBuilder::new(kp).build();
         assert!(result.is_ok());
         result.unwrap().shutdown().await;
     });
@@ -23,8 +27,9 @@ fn init_node() {
 fn create_governance() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let mc_data_node1 = generate_mc();
-        let result = NodeBuilder::new(mc_data_node1.get_private_key()).build();
+        let kp = KeyPair::Ed25519(Ed25519KeyPair::new());
+        let mc_data_node1 = generate_mc(kp.clone());
+        let result = NodeBuilder::new(kp).build();
         assert!(result.is_ok());
         let mut node = result.unwrap();
         let node_api = node.get_api();

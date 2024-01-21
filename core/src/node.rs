@@ -6,7 +6,6 @@ use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjec
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
 use crate::commons::crypto::{KeyMaterial, KeyPair};
-use crate::commons::identifier::derive::KeyDerivator;
 use crate::commons::identifier::{Derivable, KeyIdentifier};
 use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
@@ -61,14 +60,14 @@ pub struct Node<M: DatabaseManager<C>, C: DatabaseCollection> {
 }
 
 impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C> {
-    /// This method creates and initializes a TAPLE node.
+    /// This method creates and initializes a Kore base node.
     /// # Possible results
     /// If the process is successful, the method will return `Ok(())`.
     /// An error will be returned only if it has not been possible to generate the necessary data
     /// for the initialization of the components, mainly due to problems in the initial [configuration](Settings).
     /// # Panics
     /// This method panics if it has not been possible to generate the network layer.
-    pub fn build(settings: Settings, database: M) -> Result<(Self, Api), Error> {
+    pub fn build(settings: Settings, key_pair: KeyPair, database: M) -> Result<(Self, Api), Error> {
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
         let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
@@ -114,13 +113,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let database = Arc::new(database);
 
-        let kp = Self::register_node_key(
-            &settings.node.key_derivator,
-            &settings.node.secret_key,
+        let controller_id = Self::register_node_key(
+            key_pair.clone(),
             DB::new(database.clone()),
         )?;
-
-        let controller_id = KeyIdentifier::new(kp.get_key_derivator(), &kp.public_key_bytes());
         info!("Controller ID: {}", &controller_id);
 
         let token = CancellationToken::new();
@@ -129,7 +125,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             settings.network.listen_addr.clone(),
             network_access_points(&settings.network.known_nodes)?,
             network_tx,
-            kp.clone(),
+            key_pair.clone(),
             token.clone(),
             notification_tx.clone(),
             external_addresses(&settings.network.external_address)?,
@@ -137,7 +133,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         .expect("Network created");
 
         //TODO: change name. It's not a task
-        let signature_manager = SelfSignatureManager::new(kp.clone(), &settings);
+        let signature_manager = SelfSignatureManager::new(key_pair.clone(), &settings);
 
         //TODO: change name. It's a task
         let network_rx = MessageReceiver::new(
@@ -291,7 +287,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let api = Api::new(
             network_manager.local_peer_id().to_owned(),
             controller_id.to_str(),
-            kp.public_key_bytes(),
+            key_pair.public_key_bytes(),
             api_tx,
         );
 
@@ -415,16 +411,28 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         self.drop_notifications().await;
     }
 
+    /// Register the node key. If the key is already registered, it will be checked that it is the same.
+    /// If the key is not registered, it will be registered.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `key_pair` - Key pair to register.
+    /// * `db` - Database to use.
+    /// 
+    /// # Errors
+    /// 
+    /// If the key is not registered and it is not possible to register it, an error will be returned.
+    /// 
+    /// # Returns
+    /// 
+    /// Nothing.
+    /// 
     fn register_node_key(
-        key_derivator: &KeyDerivator,
-        secret_key: &str,
+        key_pair: KeyPair,
         db: DB<C>,
-    ) -> Result<KeyPair, Error> {
-        let key = KeyPair::from_hex(key_derivator, secret_key)
-            .map_err(|_| Error::InvalidHexString)
-            .unwrap();
-        let identifier =
-            KeyIdentifier::new(key.get_key_derivator(), &key.public_key_bytes()).to_str();
+    ) -> Result<KeyIdentifier, Error> {
+        let key_identifier = KeyIdentifier::new(key_pair.get_key_derivator(), &key_pair.public_key_bytes());
+        let identifier = key_identifier.to_str();
         let stored_identifier = db.get_controller_id().ok();
         if let Some(stored_identifier) = stored_identifier {
             if identifier != stored_identifier {
@@ -435,7 +443,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             db.set_controller_id(identifier)
                 .map_err(|e| Error::DatabaseError(e.to_string()))?;
         }
-        Ok(key)
+        Ok(key_identifier)
     }
 }
 

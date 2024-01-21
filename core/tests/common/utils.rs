@@ -1,5 +1,5 @@
 use kore_base::{
-    crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair},
+    crypto::{KeyMaterial, KeyPair},
     request::StartRequest,
     signature::{Signature, Signed},
     Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData,
@@ -28,15 +28,13 @@ pub struct McNodeData {
 }
 
 impl McNodeData {
-    pub fn get_private_key(&self) -> String {
-        let private_key = self.keys.secret_key_bytes();
-        hex::encode(private_key)
-    }
-
+    // TODO: remove this function
+    #[allow(dead_code)]
     pub fn get_controller_id(&self) -> KeyIdentifier {
         KeyIdentifier::new(self.keys.get_key_derivator(), &self.keys.public_key_bytes())
     }
 
+    // TODO: remove this function
     #[allow(dead_code)]
     pub fn get_peer_id(&self) -> PeerId {
         self.peer_id.clone()
@@ -54,15 +52,13 @@ impl McNodeData {
     }
 }
 
-pub fn generate_mc() -> McNodeData {
-    let keys = Ed25519KeyPair::from_seed(&[]);
+pub fn generate_mc(keys: KeyPair) -> McNodeData {
     let peer_id = PeerId::from_public_key(
         &libp2p::identity::Keypair::Ed25519(
             EdKeyPair::decode(&mut keys.to_bytes()).expect("Decode of Ed25519 possible"),
         )
         .public(),
     );
-    let keys = KeyPair::Ed25519(keys);
     McNodeData { keys, peer_id }
 }
 
