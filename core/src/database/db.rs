@@ -366,11 +366,6 @@ impl<C: DatabaseCollection> DB<C> {
         self.keys_db.get_keys(public_key)
     }
 
-    // TODO: What we do with this function?
-    pub fn _get_all_keys(&self) -> Result<Vec<KeyPair>, Error> {
-        self.keys_db._get_all_keys()
-    }
-
     pub fn set_keys(&self, public_key: &KeyIdentifier, keypair: KeyPair) -> Result<(), Error> {
         self.keys_db.set_keys(public_key, keypair)
     }
