@@ -53,7 +53,7 @@ pub struct EvaluationResponse {
 impl HashId for EvaluationResponse {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
         DigestIdentifier::from_serializable_borsh(
-            &(
+            (
                 &self.eval_req_hash,
                 &self.state_hash,
                 self.eval_success,
@@ -69,7 +69,7 @@ impl HashId for EvaluationResponse {
 
 impl HashId for EvaluationRequest {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator).map_err(|_| {
+        DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for EvaluationRequest Fails".to_string())
         })
     }

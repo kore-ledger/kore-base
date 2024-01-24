@@ -32,14 +32,14 @@ impl SelfSignatureManager {
         Self {
             keys,
             identifier,
-            digest_derivator: settings.node.digest_derivator.clone(),
+            digest_derivator: settings.node.digest_derivator,
         }
     }
 }
 
 impl SelfSignatureInterface for SelfSignatureManager {
     fn change_settings(&mut self, settings: &Settings) {
-        self.digest_derivator = settings.node.digest_derivator.clone();
+        self.digest_derivator = settings.node.digest_derivator;
     }
 
     fn get_own_identifier(&self) -> KeyIdentifier {
@@ -51,8 +51,8 @@ impl SelfSignatureInterface for SelfSignatureManager {
         content: &T,
         derivator: DigestDerivator,
     ) -> Result<Signature, ProtocolErrors> {
-        Ok(Signature::new(content, &self.keys, derivator)
-            .map_err(|_| ProtocolErrors::SignatureError)?)
+        Signature::new(content, &self.keys, derivator)
+            .map_err(|_| ProtocolErrors::SignatureError)
     }
 
     fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool {

@@ -36,7 +36,7 @@ impl Algorithm {
                     sender
                         .send_message(target, request.clone())
                         .await
-                        .map_err(|_| Error::SenderChannelError)?;
+                        .map_err(|_| Error::SenderChannel)?;
                 }
             }
         }
@@ -54,7 +54,7 @@ impl Algorithm {
             let targets_selected = Algorithm::get_targets(targets, config.replication_factor());
             for target in targets_selected {
                 let result_sending = sender.send_message(target, request.clone()).await;
-                result_sending.map_err(|_| Error::SenderChannelError)?;
+                result_sending.map_err(|_| Error::SenderChannel)?;
             }
             Ok(())
         }

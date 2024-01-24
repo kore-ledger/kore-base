@@ -46,7 +46,7 @@ use libp2p::kad::{record::Key, QueryId, Quorum, Record};
 const LOG_TARGET: &str = "TAPLE_NETWORT::Network";
 const RETRY_TIMEOUT: u64 = 30000;
 
-type TapleSwarmEvent = SwarmEvent<
+type KoreSwarmEvent = SwarmEvent<
     NetworkComposedEvent,
     EitherError<
         EitherError<std::io::Error, std::io::Error>,
@@ -62,7 +62,7 @@ pub enum SendMode {
 
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "NetworkComposedEvent")]
-pub struct TapleNetworkBehavior {
+pub struct KoreNetworkBehavior {
     routing: RoutingBehaviour,
     tell: TellBehaviour,
 }
@@ -87,11 +87,11 @@ impl From<RoutingComposedEvent> for NetworkComposedEvent {
     }
 }
 
-impl TapleNetworkBehavior {
+impl KoreNetworkBehavior {
     pub fn new(local_key: Keypair, bootstrap_nodes: Vec<(PeerId, Multiaddr)>) -> Self {
         let routing = RoutingBehaviour::new(local_key, bootstrap_nodes);
         let tell = TellBehaviour::new(100000, Duration::from_secs(10), Duration::from_secs(10));
-        TapleNetworkBehavior { routing, tell }
+        KoreNetworkBehavior { routing, tell }
     }
 
     #[cfg(test)]
@@ -140,23 +140,24 @@ fn check_listen_addr_integrity(addrs: &Vec<ListenAddr>) -> Result<ListenProtocol
         return Err(NetworkErrors::ProtocolConflict);
     }
     if has_ip {
-        return Ok(ListenProtocols::IP);
+        Ok(ListenProtocols::IP)
     } else {
-        return Ok(ListenProtocols::Memory);
+        Ok(ListenProtocols::Memory)
     }
 }
 
 /// Network Structure for connect message-sender, message-receiver and LibP2P network stack
 pub struct NetworkProcessor {
     addr: Vec<ListenAddr>,
-    swarm: Swarm<TapleNetworkBehavior>,
+    swarm: Swarm<KoreNetworkBehavior>,
     command_sender: mpsc::Sender<Command>,
     command_receiver: mpsc::Receiver<Command>,
     event_sender: mpsc::Sender<NetworkEvent>,
     pendings: HashMap<PeerId, VecDeque<Vec<u8>>>,
     active_get_querys: HashSet<PeerId>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: Could be removed?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     bootstrap_nodes: Vec<(PeerId, Multiaddr)>,
     pending_bootstrap_nodes: HashMap<PeerId, Multiaddr>,
     bootstrap_retries_steam:
@@ -199,7 +200,7 @@ impl NetworkProcessor {
         // Swarm creation
         let swarm = SwarmBuilder::new(
             transport,
-            TapleNetworkBehavior::new(local_key, bootstrap_nodes.clone()),
+            KoreNetworkBehavior::new(local_key, bootstrap_nodes.clone()),
             peer_id,
         )
         .executor(Box::new(|fut| {
@@ -226,7 +227,8 @@ impl NetworkProcessor {
             // peer_to_controller,
             active_get_querys,
             token,
-            notification_tx,
+            // TODO: Could be removed?
+            _notification_tx: notification_tx,
             bootstrap_nodes,
             pending_bootstrap_nodes: HashMap::new(),
             bootstrap_retries_steam: futures::stream::futures_unordered::FuturesUnordered::new(),
@@ -247,7 +249,7 @@ impl NetworkProcessor {
                 .add_external_address(external_address, AddressScore::Infinite);
         }
         for addr in self.addr.iter() {
-            if let Some(_) = addr.get_port() {
+            if addr.get_port().is_some() {
                 let multiadd: Multiaddr = addr
                     .to_string()
                     .unwrap()
@@ -295,7 +297,7 @@ impl NetworkProcessor {
         }
     }
 
-    async fn handle_event(&mut self, event: TapleSwarmEvent) {
+    async fn handle_event(&mut self, event: KoreSwarmEvent) {
         match event {
             SwarmEvent::Dialing(peer_id) => {
                 debug!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
@@ -359,7 +361,7 @@ impl NetworkProcessor {
                         self.pending_bootstrap_nodes
                             .insert(*id, multiaddr.to_owned());
                         // Insert new timer if there was not any before
-                        if self.bootstrap_retries_steam.len() == 0 {
+                        if self.bootstrap_retries_steam.is_empty() {
                             self.bootstrap_retries_steam
                                 .push(tokio::time::sleep(Duration::from_millis(RETRY_TIMEOUT)));
                         }
@@ -374,18 +376,18 @@ impl NetworkProcessor {
             }
             SwarmEvent::Behaviour(behaviour_event) => match behaviour_event {
                 NetworkComposedEvent::TellBehaviourEvent(ev) => match ev {
-                    TellBehaviourEvent::RequestSent { peer_id } => {
+                    TellBehaviourEvent::Sent { peer_id } => {
                         debug!("{}: Request sent to: {}", LOG_TARGET, peer_id);
                         // TODO: Thinking about whether to delete here the pending list for a controller
                     }
-                    TellBehaviourEvent::RequestReceived { data, peer_id } => {
+                    TellBehaviourEvent::Received { data, peer_id } => {
                         debug!("{}: Request received from: {}", LOG_TARGET, peer_id);
                         self.event_sender
                             .send(NetworkEvent::MessageReceived { message: data })
                             .await
                             .expect("Event receiver not to be dropped.");
                     }
-                    TellBehaviourEvent::RequestFailed { peer_id } => {
+                    TellBehaviourEvent::Failed { peer_id } => {
                         debug!("{}: Request failed to send to: {}", LOG_TARGET, peer_id);
                         // Delete cache peer id and address for that controller
                         // match self.peer_to_controller.remove(&peer_id) {
@@ -610,14 +612,14 @@ impl NetworkProcessor {
                 }
 
                 // Check if we are not already making the same query in the DHT
-                if let None = self.active_get_querys.get(&peer_id) {
+                if self.active_get_querys.get(&peer_id).is_none() {
                     // Make petition if we dont have it's PeerId to store it
-                    self.active_get_querys.insert(peer_id.clone());
+                    self.active_get_querys.insert(peer_id);
                     let query_id = self
                         .swarm
                         .behaviour_mut()
                         .routing
-                        .get_closest_peers(peer_id.clone());
+                        .get_closest_peers(peer_id);
                     debug!(
                         "Query get_record {:?} para mandar request a {:?}",
                         query_id, peer_id
@@ -653,7 +655,7 @@ impl NetworkProcessor {
                 self.swarm
                     .behaviour_mut()
                     .tell
-                    .send_message(&peer_id, &message);
+                    .send_message(peer_id, &message);
             }
         }
     }

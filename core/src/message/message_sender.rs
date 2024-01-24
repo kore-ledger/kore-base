@@ -1,6 +1,5 @@
 use crate::commons::identifier::KeyIdentifier;
 use crate::commons::self_signature_manager::SelfSignatureManager;
-use crate::identifier::derive::Derivator;
 use crate::signature::Signed;
 use crate::DigestDerivator;
 use log::debug;

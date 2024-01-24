@@ -16,7 +16,7 @@ mod manager;
 #[cfg(feature = "evaluation")]
 pub use manager::EvaluatorManager;
 #[cfg(feature = "evaluation")]
-mod runner;
+pub mod runner;
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub enum EvaluatorMessage {

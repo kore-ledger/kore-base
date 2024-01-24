@@ -5,31 +5,31 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Errors that can never happen")]
-    InfalibleError {
+    Infalible {
         #[from]
         source: Infallible,
     },
 
     #[error("Unknown error: `{0}`")]
-    UnknownError(String),
+    Unknown(String),
 
     #[error("Verification error: {0}")]
-    VerificationError(String),
+    Verification(String),
 
     #[error("`{0}`")]
-    PayloadError(String),
+    Payload(String),
 
     #[error("Deserialization error")]
-    DeserializationError,
+    Deserialization,
 
     #[error("Base58 Decoding error")]
-    Base64DecodingError {
+    Base64Decoding {
         #[from]
         source: base64::DecodeError,
     },
 
     #[error("Ed25519 error")]
-    Ed25519Error {
+    Ed25519 {
         #[from]
         source: ed25519::Error,
     },
@@ -53,31 +53,31 @@ pub enum Error {
     },
 
     #[error("Event error: {0}")]
-    EventError(String),
+    Event(String),
 
     #[error("Seed error: {0}")]
     SeedError(String),
 
     #[error("Semantic error: {0}")]
-    SemanticError(String),
+    Semantic(String),
 
     #[error("Invalid identifier: {0}")]
     InvalidIdentifier(String),
 
     #[error("Sign error: {0}")]
-    SignError(String),
+    Sign(String),
 
     #[error("No signature error: {0}")]
-    NoSignatureError(String),
+    NoSignature(String),
 
     #[error("Key pair error: {0}")]
-    KeyPairError(String),
+    KeyPair(String),
 
-    #[error("TAPLE error: {0}")]
-    TapleError(String),
+    #[error("Kore error: {0}")]
+    Kore(String),
 
     #[error("Store error: {0}")]
-    StoreError(String),
+    Store(String),
 
     #[error("Duplicate Event")]
     DuplicateEvent,
@@ -86,8 +86,8 @@ pub enum Error {
     OutOfOrder,
 
     #[error("Schema not found")]
-    SchemaNotFoundError,
+    SchemaNotFound,
 
     #[error("Subject not found")]
-    SubjectNotFoundError,
+    SubjectNotFound,
 }

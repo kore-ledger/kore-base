@@ -5,16 +5,14 @@ use crate::{
     commons::{
         channel::{ChannelData, MpscChannel, SenderEnd},
         models::approval::ApprovalEntity,
-        self_signature_manager::SelfSignatureManager,
     },
-    database::DB,
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
     identifier::DigestIdentifier,
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::KoreMessages,
     signature::Signed,
     utils::message::event::create_approver_response,
-    ApprovalRequest, DatabaseCollection, DigestDerivator, Notification, Settings,
+    ApprovalRequest, DatabaseCollection,
 };
 
 use super::{
@@ -26,9 +24,8 @@ use super::{
 pub struct ApprovalManager<C: DatabaseCollection> {
     input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
     governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     inner_manager: InnerApprovalManager<GovernanceAPI, RequestNotifier, C>,
 }
 
@@ -119,32 +116,18 @@ impl ApprovalAPIInterface for ApprovalAPI {
 
 impl<C: DatabaseCollection> ApprovalManager<C> {
     pub fn new(
-        gov_api: GovernanceAPI,
         input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
         token: CancellationToken,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
-        signature_manager: SelfSignatureManager,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        settings: Settings,
-        database: DB<C>,
-        derivator: DigestDerivator,
+        inner_manager: InnerApprovalManager<GovernanceAPI, RequestNotifier, C>,
     ) -> Self {
-        let passvotation = settings.node.passvotation.into();
         Self {
             input_channel,
             token,
-            notification_tx: notification_tx.clone(),
             messenger_channel,
             governance_update_channel,
-            inner_manager: InnerApprovalManager::new(
-                gov_api,
-                database,
-                RequestNotifier::new(notification_tx),
-                signature_manager,
-                passvotation,
-                derivator,
-            ),
+            inner_manager,
         }
     }
 
@@ -242,7 +225,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                             .messenger_channel
                             .tell(MessageTaskCommand::Request(
                                 None,
-                                TapleMessages::LedgerMessages(
+                                KoreMessages::LedgerMessages(
                                     crate::ledger::LedgerCommand::GetLCE {
                                         who_asked: our_id,
                                         subject_id: gov_id,
@@ -261,7 +244,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                             .messenger_channel
                             .tell(MessageTaskCommand::Request(
                                 None,
-                                TapleMessages::EventMessage(
+                                KoreMessages::EventMessage(
                                     crate::event::EventCommand::HigherGovernanceExpected {
                                         governance_id: gov_id,
                                         who_asked: our_id,

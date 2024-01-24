@@ -17,6 +17,8 @@ use crate::{
 
 use super::error::{ApprovalErrorResponse, ApprovalManagerError};
 
+
+
 pub trait NotifierInterface {
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64);
     fn request_obsolete(&self, id: String, subject_id: String, sn: u64);
@@ -33,7 +35,9 @@ impl RequestNotifier {
 }
 
 impl NotifierInterface for RequestNotifier {
+
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64) {
+        #[allow(clippy::let_underscore_future)]
         let _ = self.sender.send(Notification::ApprovalReceived {
             id: id.to_owned(),
             subject_id: subject_id.to_owned(),
@@ -42,6 +46,7 @@ impl NotifierInterface for RequestNotifier {
     }
 
     fn request_obsolete(&self, id: String, subject_id: String, sn: u64) {
+        #[allow(clippy::let_underscore_future)]
         let _ = self
             .sender
             .send(Notification::ObsoletedApproval { id, subject_id, sn });
@@ -165,7 +170,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
                 .del_approval(&request)
                 .map_err(|_| ApprovalManagerError::DatabaseError)?;
             self.database
-                .del_governance_approval_index(&governance_id, &request)
+                .del_governance_approval_index(governance_id, &request)
                 .map_err(|_| ApprovalManagerError::DatabaseError)?;
             self.database
                 .del_subject_approval_index(&subject_id, &request)
@@ -238,7 +243,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
             if approval_request.content.sn <= data.request.content.sn {
                 return Ok(Err(ApprovalErrorResponse::PreviousEventDetected));
             }
-        } else if request_queue.len() != 0 {
+        } else if !request_queue.is_empty() {
             return Err(ApprovalManagerError::MoreRequestThanMaxAllowed);
         }
 
@@ -253,20 +258,24 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
 
         let request_gov_version = approval_request.content.gov_version;
 
-        if version > request_gov_version {
-            // Nuestra gov es mayor: mandamos mensaje para que actualice el emisor
-            return Ok(Err(ApprovalErrorResponse::OurGovIsHigher {
-                our_id: self.signature_manager.get_own_identifier(),
-                sender,
-                gov_id: approval_request.content.gov_id.clone(),
-            }));
-        } else if version < request_gov_version {
-            // Nuestra gov es menor: no podemos hacer nada. Pedimos LCE al que nos lo envió
-            return Ok(Err(ApprovalErrorResponse::OurGovIsLower {
-                our_id: self.signature_manager.get_own_identifier(),
-                sender,
-                gov_id: approval_request.content.gov_id.clone(),
-            }));
+        match version.cmp(&request_gov_version) {
+            std::cmp::Ordering::Less => {
+                // Nuestra gov es menor: no podemos hacer nada. Pedimos LCE al que nos lo envió
+                return Ok(Err(ApprovalErrorResponse::OurGovIsLower {
+                    our_id: self.signature_manager.get_own_identifier(),
+                    sender,
+                    gov_id: approval_request.content.gov_id.clone(),
+                }));
+            }
+            std::cmp::Ordering::Greater => {
+                // Nuestra gov es mayor: mandamos mensaje para que actualice el emisor
+                return Ok(Err(ApprovalErrorResponse::OurGovIsHigher {
+                    our_id: self.signature_manager.get_own_identifier(),
+                    sender,
+                    gov_id: approval_request.content.gov_id.clone(),
+                }));
+            }
+            std::cmp::Ordering::Equal => {}
         }
 
         // The EventRequest is correct. We can move on to save it in the system if applicable.
@@ -298,20 +307,20 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
             .request_reached(&id.to_str(), &subject_id.to_str(), sn);
 
         match self.pass_votation {
-            VotationType::Normal => return Ok(Ok(None)),
+            VotationType::Normal => Ok(Ok(None)),
             VotationType::AlwaysAccept => {
                 let (vote, sender) = self
                     .generate_vote(&id, true)
                     .await?
                     .expect("Request should be in data structure");
-                return Ok(Ok(Some((vote.response.unwrap(), sender))));
+                Ok(Ok(Some((vote.response.unwrap(), sender))))
             }
             VotationType::AlwaysReject => {
                 let (vote, sender) = self
                     .generate_vote(&id, false)
                     .await?
                     .expect("Request should be in data structure");
-                return Ok(Ok(Some((vote.response.unwrap(), sender))));
+                Ok(Ok(Some((vote.response.unwrap(), sender))))
             }
         }
     }
@@ -323,7 +332,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
     ) -> Result<Result<(ApprovalEntity, KeyIdentifier), ApprovalErrorResponse>, ApprovalManagerError>
     {
         // Obtenemos la petición
-        let Ok(mut data) = self.get_single_request(&request_id) else {
+        let Ok(mut data) = self.get_single_request(                  request_id) else {
             return Ok(Err(ApprovalErrorResponse::RequestNotFound));
         };
         if let ApprovalState::RespondedAccepted = data.state {
@@ -353,7 +362,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
             content: response,
             signature,
         });
-        let Ok(_result) = self.database.set_approval(&request_id, data.clone()) else {
+        let Ok(_result) = self.database.set_approval(request_id, data.clone()) else {
             return Err(ApprovalManagerError::DatabaseError);
         };
         self.database

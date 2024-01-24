@@ -14,11 +14,11 @@ fn get_u64_as_hexadecimal(value: u64) -> String {
 }
 
 pub(crate) fn get_key(key_elements: Vec<Element>) -> Result<String, DbError> {
-    if key_elements.len() > 0 {
+    if !key_elements.is_empty() {
         let mut key: String = String::from("");
-        for i in 0..(key_elements.len() - 1) {
+        for key_element in key_elements.iter().take(key_elements.len() - 1) {
             key.push_str(&{
-                match &key_elements[i] {
+                match key_element {
                     Element::N(n) => get_u64_as_hexadecimal(*n),
                     Element::S(s) => s.to_string(),
                 }
@@ -31,7 +31,7 @@ pub(crate) fn get_key(key_elements: Vec<Element>) -> Result<String, DbError> {
                 Element::S(s) => s.to_string(),
             }
         });
-        Ok(format!("{}", key))
+        Ok(key.to_owned())
     } else {
         Err(DbError::KeyElementsError)
     }

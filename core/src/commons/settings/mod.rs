@@ -69,9 +69,9 @@ impl ListenAddr {
     /// Allows to obtain the port of the listening address
     pub fn get_port(&self) -> Option<u32> {
         match self {
-            Self::IP4 { port, .. } => port.clone(),
-            Self::IP6 { port, .. } => port.clone(),
-            Self::Memory { port } => port.clone(),
+            Self::IP4 { port, .. } => *port,
+            Self::IP6 { port, .. } => *port,
+            Self::Memory { port } => *port,
         }
     }
 
@@ -88,29 +88,29 @@ impl ListenAddr {
     pub fn to_string(&self) -> Result<String, ListenAddrErrors> {
         let result = match self {
             ListenAddr::Memory { port } => {
-                let mut result = format!("/memory");
+                let mut result = "/memory".to_owned();
                 if let Some(port) = port {
                     result.push_str(&format!("/{}", port));
                 }
                 result
             }
             ListenAddr::IP4 { addr, port } => {
-                let mut result = format!("/ip4");
+                let mut result = "/ip4".to_owned();
                 if let Some(ip) = addr {
                     result.push_str(&format!(
                         "/{}/tcp/{}",
-                        ip.to_string(),
+                        ip,
                         port.ok_or(ListenAddrErrors::InvalidCombination)?
                     ));
                 }
                 result
             }
             ListenAddr::IP6 { addr, port } => {
-                let mut result = format!("/ip6");
+                let mut result = "/ip6".to_string();
                 if let Some(ip) = addr {
                     result.push_str(&format!(
                         "/{}/tcp/{}",
-                        ip.to_string(),
+                        ip,
                         port.ok_or(ListenAddrErrors::InvalidCombination)?
                     ));
                 }
@@ -124,7 +124,7 @@ impl ListenAddr {
 impl TryFrom<String> for ListenAddr {
     type Error = ListenAddrErrors;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut sections = value.split("/");
+        let mut sections = value.split('/');
         // Addr must start with "/"
         let Some(data) = sections.next() else {
             return Err(ListenAddrErrors::InvalidListenAddr);
@@ -154,21 +154,21 @@ impl TryFrom<String> for ListenAddr {
                         let port = port
                             .parse::<u32>()
                             .map_err(|_| ListenAddrErrors::NoU32Port)?;
-                        return Ok(ListenAddr::IP4 {
+                        Ok(ListenAddr::IP4 {
                             addr: Some(ip),
                             port: Some(port),
-                        });
+                        })
                     } else {
-                        return Ok(ListenAddr::IP4 {
+                        Ok(ListenAddr::IP4 {
                             addr: Some(ip),
                             port: None,
-                        });
+                        })
                     }
                 } else {
-                    return Ok(ListenAddr::IP4 {
+                    Ok(ListenAddr::IP4 {
                         addr: None,
                         port: None,
-                    });
+                    })
                 }
             }
             "ip6" => {
@@ -188,21 +188,21 @@ impl TryFrom<String> for ListenAddr {
                         let port = port
                             .parse::<u32>()
                             .map_err(|_| ListenAddrErrors::NoU32Port)?;
-                        return Ok(ListenAddr::IP6 {
+                        Ok(ListenAddr::IP6 {
                             addr: Some(ip),
                             port: Some(port),
-                        });
+                        })
                     } else {
-                        return Ok(ListenAddr::IP6 {
+                        Ok(ListenAddr::IP6 {
                             addr: Some(ip),
                             port: None,
-                        });
+                        })
                     }
                 } else {
-                    return Ok(ListenAddr::IP6 {
+                    Ok(ListenAddr::IP6 {
                         addr: None,
                         port: None,
-                    });
+                    })
                 }
             }
             "memory" => {
@@ -212,9 +212,9 @@ impl TryFrom<String> for ListenAddr {
                     let port = port
                         .parse::<u32>()
                         .map_err(|_| ListenAddrErrors::NoU32Port)?;
-                    return Ok(ListenAddr::Memory { port: Some(port) });
+                    Ok(ListenAddr::Memory { port: Some(port) })
                 } else {
-                    return Ok(ListenAddr::Memory { port: None });
+                    Ok(ListenAddr::Memory { port: None })
                 }
             }
             _ => Err(ListenAddrErrors::InvalidProtocolSpecified),

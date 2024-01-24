@@ -30,7 +30,7 @@ impl<C: DatabaseCollection> EventDb<C> {
         ];
         let key = get_key(key_elements)?;
         let event = self.collection.get(&key)?;
-        Ok(deserialize::<Signed<Event>>(&event).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<Signed<Event>>(&event).map_err(|_| DbError::DeserializeError)
     }
 
     pub fn get_events_by_range(
@@ -44,10 +44,7 @@ impl<C: DatabaseCollection> EventDb<C> {
             Element::S(subject_id.to_str()),
         ];
         let key = get_key(key_elements)?;
-        let from = match from {
-            Some(from) => Some(from.to_string()),
-            None => None,
-        };
+        let from = from.map(|from| from.to_string());
         let events_by_subject = self.collection.get_by_range(from, quantity, &key)?;
         Ok(events_by_subject
             .iter()

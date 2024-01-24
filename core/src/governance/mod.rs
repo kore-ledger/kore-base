@@ -9,11 +9,11 @@ use crate::{
     ValueWrapper,
 };
 pub mod error;
-pub mod governance;
+pub mod main_governance;
 pub mod inner_governance;
 pub mod stage;
 
-pub use governance::{GovernanceAPI, GovernanceInterface};
+pub use main_governance::{GovernanceAPI, GovernanceInterface};
 
 use error::RequestError;
 

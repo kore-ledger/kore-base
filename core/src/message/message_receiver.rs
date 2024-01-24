@@ -22,7 +22,8 @@ where
     receiver: ReceiverStream<NetworkEvent>,
     sender: SenderEnd<Signed<MessageContent<T>>, ()>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: Could be removed?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     own_id: KeyIdentifier,
 }
 
@@ -39,7 +40,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
             receiver,
             sender,
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
             own_id,
         }
     }
@@ -47,25 +48,21 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                event = self.receiver.next() => match event {
-                    Some(NetworkEvent::MessageReceived { message }) => {
-                        // The message will be a string for now
-                        // Deserialize the message
-                        let cur = Cursor::new(message);
-                        let mut de = Deserializer::new(cur);
-                        let message: Signed<MessageContent<T>> = Deserialize::deserialize(&mut de).expect("Fallo de deserialización");
-                        // Check message signature
-                        if message.verify().is_err() || message.content.sender_id != message.signature.signer {
-                            log::error!("Invalid signature in message");
-                        } else if message.content.receiver != self.own_id {
-                            log::error!("Message not for me");
-                        } else {
-                            self.sender.tell(message).await.expect("Channel Error");
-                        }
-                    },
-                    None => {}
-                },
-                _ = self.token.cancelled() => {
+                event = self.receiver.next() => if let Some(NetworkEvent::MessageReceived { message }) = event {
+                    // The message will be a string for now
+                    // Deserialize the message
+                    let cur = Cursor::new(message);
+                    let mut de = Deserializer::new(cur);
+                    let message: Signed<MessageContent<T>> = Deserialize::deserialize(&mut de).expect("Fallo de deserialización");
+                    // Check message signature
+                    if message.verify().is_err() || message.content.sender_id != message.signature.signer {
+                        log::error!("Invalid signature in message");
+                    } else if message.content.receiver != self.own_id {
+                        log::error!("Message not for me");
+                    } else {
+                        self.sender.tell(message).await.expect("Channel Error");
+                    }
+                } else {
                     log::debug!("Shutdown received");
                     break;
                 }

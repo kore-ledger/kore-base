@@ -25,7 +25,7 @@ impl<C: DatabaseCollection> SubjectDb<C> {
         ];
         let key = get_key(key_elements)?;
         let subject = self.collection.get(&key)?;
-        Ok(deserialize::<Subject>(&subject).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<Subject>(&subject).map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_subject(

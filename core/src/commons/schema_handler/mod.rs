@@ -19,10 +19,10 @@ impl Schema {
     pub fn compile(schema: &Value) -> Result<Self, Error> {
         match JSONSchema::options()
             .with_format("keyidentifier", validate_gov_keyidentifiers)
-            .compile(&schema)
+            .compile(schema)
         {
             Ok(json_schema) => Ok(Schema { json_schema }),
-            Err(_) => Err(Error::SchemaCreationError),
+            Err(_) => Err(Error::SchemaCreation),
         }
     }
 
@@ -40,10 +40,7 @@ impl Schema {
 }
 
 fn validate_gov_keyidentifiers(key: &str) -> bool {
-    match KeyIdentifier::from_str(key) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    KeyIdentifier::from_str(key).is_ok()
 }
 
 pub fn get_governance_schema() -> Value {

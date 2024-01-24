@@ -41,7 +41,7 @@ impl<C: DatabaseCollection> EventRequestDb<C> {
         ];
         let key = get_key(key_elements)?;
         let request = self.collection.get(&key)?;
-        Ok(deserialize::<Signed<EventRequest>>(&request).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<Signed<EventRequest>>(&request).map_err(|_| DbError::DeserializeError)
     }
 
     #[allow(dead_code)] // TODO: remove

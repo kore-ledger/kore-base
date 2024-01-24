@@ -25,7 +25,7 @@ impl<C: DatabaseCollection> RequestDb<C> {
         ];
         let key = get_key(key_elements)?;
         let request = self.collection.get(&key)?;
-        Ok(deserialize::<KoreRequest>(&request).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<KoreRequest>(&request).map_err(|_| DbError::DeserializeError)
     }
 
     // TODO: What we do with this function?

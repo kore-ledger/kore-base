@@ -46,8 +46,8 @@ impl<C: DatabaseCollection> ContractDb<C> {
         ];
         let key = get_key(key_elements)?;
         let contract = self.collection.get(&key)?;
-        Ok(deserialize::<(Vec<u8>, DigestIdentifier, u64)>(&contract)
-            .map_err(|_| DbError::DeserializeError)?)
+        deserialize::<(Vec<u8>, DigestIdentifier, u64)>(&contract)
+            .map_err(|_| DbError::DeserializeError)
     }
 
     /// Put a contract for a given governance and schema.

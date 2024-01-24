@@ -1,3 +1,6 @@
+/// Copyright 2024 Antonio Estévez
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 use std::collections::HashSet;
 
 use super::{
@@ -6,24 +9,17 @@ use super::{
     APICommands, ApiResponses, GetAllowedSubjects,
 };
 use super::{GetEvents, GetGovernanceSubjects};
-#[cfg(feature = "approval")]
-use crate::approval::manager::ApprovalAPI;
 use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::SubjectData;
-use crate::event::manager::EventAPI;
-use crate::ledger::manager::EventManagerAPI;
 use crate::signature::Signature;
 #[cfg(feature = "approval")]
 use crate::ApprovalEntity;
 use crate::ValidationProof;
 use crate::{
-    authorized_subjecs::manager::AuthorizedSubjectsAPI, signature::Signed, Event, EventRequest,
+    signature::Signed, Event, EventRequest,
 };
-use crate::{
-    commons::channel::{ChannelData, MpscChannel, SenderEnd},
-    Notification,
-};
-use crate::{identifier::DigestIdentifier, DatabaseCollection, DB};
+use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
+use crate::{identifier::DigestIdentifier, DatabaseCollection};
 use crate::{KeyDerivator, KeyIdentifier};
 use libp2p::PeerId;
 use log::{error, info};
@@ -451,32 +447,20 @@ pub struct ApiManager<C: DatabaseCollection> {
     input: MpscChannel<APICommands, ApiResponses>,
     inner_api: InnerApi<C>,
     token: CancellationToken,
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    //_notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> ApiManager<C> {
     pub fn new(
         input: MpscChannel<APICommands, ApiResponses>,
-        event_api: EventAPI,
-        #[cfg(feature = "approval")] approval_api: ApprovalAPI,
-        authorized_subjects_api: AuthorizedSubjectsAPI,
-        ledger_api: EventManagerAPI,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        db: DB<C>,
+        inner_api: InnerApi<C>,
     ) -> Self {
         Self {
             input,
-            inner_api: InnerApi::new(
-                event_api,
-                authorized_subjects_api,
-                db,
-                #[cfg(feature = "approval")]
-                approval_api,
-                ledger_api,
-            ),
+            inner_api,
             token,
-            _notification_tx: notification_tx,
+            //_notification_tx: notification_tx,
         }
     }
 

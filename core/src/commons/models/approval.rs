@@ -34,7 +34,7 @@ pub struct ApprovalRequest {
 
 impl HashId for ApprovalRequest {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator).map_err(|_| {
+        DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for ApprovalRequest Fails".to_string())
         })
     }
@@ -73,7 +73,7 @@ pub struct ApprovalResponse {
 
 impl HashId for ApprovalResponse {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator).map_err(|_| {
+        DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for ApprovalResponse Fails".to_string())
         })
     }

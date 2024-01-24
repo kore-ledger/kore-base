@@ -77,10 +77,10 @@ impl<P> BaseKeyPair<P> {
             Some(x) => {
                 let bytes = x
                     .decrypt()
-                    .map_err(|_| Error::KeyPairError("secret key decrypting".to_owned()))?;
+                    .map_err(|_| Error::KeyPair("secret key decrypting".to_owned()))?;
                 Ok(Vec::from(bytes.as_ref()))
             }
-            None => Err(Error::KeyPairError(
+            None => Err(Error::KeyPair(
                 "secret key is not available".to_owned(),
             )),
         }
@@ -90,7 +90,7 @@ impl<P> BaseKeyPair<P> {
     fn encrypt_secret_bytes(&mut self, secret_key: &[u8]) -> Result<(), Error> {
         let encr = self.secret_key.get_or_insert(EncryptedMem::new());
         encr.encrypt(&secret_key.to_vec())
-            .map_err(|_| Error::KeyPairError("cannot encrypt the secret in memory".to_owned()))?;
+            .map_err(|_| Error::KeyPair("cannot encrypt the secret in memory".to_owned()))?;
         Ok(())
     }
 }

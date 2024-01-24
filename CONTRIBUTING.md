@@ -1,6 +1,6 @@
 # Contributing
 
-This article explains how to contribute to TAPLE. Please read through the following guidelines.
+This article explains how to contribute to Kore Base. Please read through the following guidelines.
 
 > **Important**: before participating in our community, please read our [code of conduct](./CODE_OF_CONDUCT.md). By interacting with this repository, organization, or community you agree to abide by its terms.
 
@@ -16,4 +16,4 @@ This article explains how to contribute to TAPLE. Please read through the follow
 
 ## Submitting a pull request
 
-TAPLE is in early development and the code is constantly changing. Until version 1.0 is released, we will not accept pull requests, therefore any pull requests will be automatically closed. 
+Kore Base is in early development and the code is constantly changing. Until version 1.0 is released, we will not accept pull requests, therefore any pull requests will be automatically closed.

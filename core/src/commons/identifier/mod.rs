@@ -53,7 +53,7 @@ pub trait Derivable: FromStr<Err = Error> {
             0 => "".to_string(),
             _ => [
                 self.derivation_code(),
-                general_purpose::URL_SAFE_NO_PAD.encode(&self.derivative()),
+                general_purpose::URL_SAFE_NO_PAD.encode(self.derivative()),
             ]
             .join(""),
         }
@@ -71,7 +71,7 @@ impl FromStr for Identifier {
         } else if let Ok(id) = SignatureIdentifier::from_str(s) {
             Ok(Identifier::Sign(id))
         } else {
-            Err(Error::SemanticError(format!("Incorrect Identifier: {}", s)))
+            Err(Error::Semantic(format!("Incorrect Identifier: {}", s)))
         }
     }
 }

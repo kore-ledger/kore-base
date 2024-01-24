@@ -1,3 +1,6 @@
+/// Copyright 2024 Antonio Estévez
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -82,7 +85,7 @@ impl<C: DatabaseCollection> DB<C> {
             subject_db,
             event_db,
             prevalidated_event_db,
-            event_request_db: event_request_db,
+            event_request_db,
             request_db,
             controller_id_db,
             validation_db,

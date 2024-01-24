@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    cmp::Ordering,
+};
 
 use crate::commons::channel::SenderEnd;
 use crate::commons::models::state::Subject;
@@ -7,7 +10,7 @@ use crate::distribution::{AskForSignatures, SignaturesReceived};
 use crate::governance::stage::ValidationStage;
 use crate::identifier::{Derivable, DigestIdentifier, KeyIdentifier};
 use crate::message::{MessageConfig, MessageTaskCommand};
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::KoreMessages;
 use crate::signature::Signature;
 use crate::utils::message::distribution::{
     create_distribution_request, create_distribution_response,
@@ -20,12 +23,16 @@ use crate::{
 };
 use crate::{DigestDerivator, Metadata, Settings};
 
-use super::error::{DistributionErrorResponses, DistributionManagerError};
+use super::error::DistributionManagerError;
 use super::StartDistribution;
+
+type GovernacesStillWitness = HashMap<
+    (DigestIdentifier, String, String),(bool, Option<HashSet<KeyIdentifier>>)>;
+
 pub struct InnerDistributionManager<G: GovernanceInterface, C: DatabaseCollection> {
     governance: G,
     db: DB<C>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     signature_manager: SelfSignatureManager,
     timeout: u32,
     replication_factor: f64,
@@ -36,7 +43,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     pub fn new(
         governance: G,
         db: DB<C>,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         signature_manager: SelfSignatureManager,
         settings: Settings,
         derivator: DigestDerivator,
@@ -105,7 +112,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         witnesses: &HashSet<KeyIdentifier>,
     ) -> Result<(), DistributionManagerError> {
         let remaining_signatures = self.get_remaining_signers(signatures, witnesses);
-        if remaining_signatures.len() > 0 {
+        if remaining_signatures.is_empty() {
             self.send_signature_request(
                 &subject.subject_id,
                 subject.sn,
@@ -133,10 +140,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             .map_err(|error| DistributionManagerError::DatabaseError(error.to_string()))?;
         // We have the SubjectID, but we need the governance of each one of them, as well as the sn
         // Each subject must be requested separately.
-        let mut governances_still_witness_flags: HashMap<
-            (DigestIdentifier, String, String),
-            (bool, Option<HashSet<KeyIdentifier>>),
-        > = HashMap::new();
+        let mut governances_still_witness_flags: GovernacesStillWitness = HashMap::new();
         for (subject_id, sn, signatures) in signatures.iter() {
             let subject = match self.db.get_subject(subject_id) {
                 Ok(subject) => subject,
@@ -179,7 +183,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                     // In principle, we already have our signature.
                     // It is possible that the witnesses have changed and some signatures are no longer correct. However,
                     // this is not a problem. Having extra signatures is irrelevant for protocol purposes.
-                    self.restart_distribution(&subject, &signatures, witnesses.as_ref().unwrap())
+                    self.restart_distribution(&subject, signatures, witnesses.as_ref().unwrap())
                         .await?;
                     continue;
                 }
@@ -222,7 +226,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                 // We continue to be witnesses
                 witnesses.insert(subject.owner.clone());
                 witnesses.remove(&self.signature_manager.get_own_identifier());
-                self.restart_distribution(&subject, &signatures, &witnesses)
+                self.restart_distribution(&subject, signatures, &witnesses)
                     .await?;
                 governances_still_witness_flags.insert(
                     (governance_id, schema_id, namespace),
@@ -245,7 +249,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     pub async fn start_distribution(
         &self,
         msg: StartDistribution,
-    ) -> Result<Result<(), DistributionErrorResponses>, DistributionManagerError> {
+    ) -> Result<Result<(), DistributionManagerError>, DistributionManagerError> {
         // The ledger has asked us to start the distribution process.
         // First we should start by generating the signature of the event to be distributed.
         let event = match self.db.get_event(&msg.subject_id, msg.sn) {
@@ -253,7 +257,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             Err(error) => match error {
                 DbError::EntryNotFound => {
                     // We do not know the event we are receiving signatures from. We are not going to ask for anything
-                    return Ok(Err(DistributionErrorResponses::EventNotFound(
+                    return Ok(Err(DistributionManagerError::EventNotFound(
                         msg.sn,
                         msg.subject_id.to_str(),
                     )));
@@ -357,58 +361,62 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     pub async fn provide_signatures(
         &self,
         msg: &AskForSignatures,
-    ) -> Result<Result<(), DistributionErrorResponses>, DistributionManagerError> {
+    ) -> Result<Result<(), DistributionManagerError>, DistributionManagerError> {
         // Signatures are requested
         // We check if we have them
         match self.db.get_witness_signatures(&msg.subject_id) {
             Ok((sn, signatures)) => {
                 // We check SN
-                if sn == msg.sn {
-                    // We give the signatures
-                    let requested = &msg.signatures_requested;
-                    let result = signatures
-                        .iter()
-                        .filter(|s| requested.contains(&s.signer))
-                        .cloned()
-                        .collect();
-                    let response = create_distribution_response(msg.subject_id.clone(), sn, result);
-                    self.messenger_channel
-                        .tell(MessageTaskCommand::Request(
-                            None,
-                            response,
-                            vec![msg.sender_id.clone()],
-                            MessageConfig::direct_response(),
-                        ))
-                        .await
-                        .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
-                } else if msg.sn > sn {
-                    // I don't see the need for a message for MSG.SN = SN + 1.
-                    let request = if self
-                        .governance
-                        .is_governance(msg.subject_id.clone())
-                        .await
-                        .map_err(|_| DistributionManagerError::GovernanceChannelNotAvailable)?
-                    {
-                        request_gov_event(
-                            self.signature_manager.get_own_identifier(),
-                            msg.subject_id.clone(),
-                            sn + 1,
-                        )
-                    } else {
-                        request_lce(
-                            self.signature_manager.get_own_identifier(),
-                            msg.subject_id.clone(),
-                        )
-                    };
-                    self.messenger_channel
-                        .tell(MessageTaskCommand::Request(
-                            None,
-                            request,
-                            vec![msg.sender_id.clone()],
-                            MessageConfig::direct_response(),
-                        ))
-                        .await
-                        .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+                match sn.cmp(&msg.sn) {
+                    Ordering::Equal => {
+                        // We give the signatures
+                        let requested = &msg.signatures_requested;
+                        let result = signatures
+                            .iter()
+                            .filter(|s| requested.contains(&s.signer))
+                            .cloned()
+                            .collect();
+                        let response = create_distribution_response(msg.subject_id.clone(), sn, result);
+                        self.messenger_channel
+                            .tell(MessageTaskCommand::Request(
+                                None,
+                                response,
+                                vec![msg.sender_id.clone()],
+                                MessageConfig::direct_response(),
+                            ))
+                            .await
+                            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+                    },
+                    Ordering::Greater => {
+                       // I don't see the need for a message for MSG.SN = SN + 1.
+                       let request = if self
+                            .governance
+                            .is_governance(msg.subject_id.clone())
+                            .await
+                            .map_err(|_| DistributionManagerError::GovernanceChannelNotAvailable)?
+                        {
+                            request_gov_event(
+                                self.signature_manager.get_own_identifier(),
+                                msg.subject_id.clone(),
+                                sn + 1,
+                            )
+                        } else {
+                            request_lce(
+                                self.signature_manager.get_own_identifier(),
+                                msg.subject_id.clone(),
+                            )
+                        };
+                        self.messenger_channel
+                            .tell(MessageTaskCommand::Request(
+                                None,
+                                request,
+                                vec![msg.sender_id.clone()],
+                                MessageConfig::direct_response(),
+                            ))
+                            .await
+                            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+                    }
+                    Ordering::Less => {}
                 }
             }
             Err(DbError::EntryNotFound) => {
@@ -431,7 +439,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                 return Err(DistributionManagerError::DatabaseError(error.to_string()));
             }
         }
-        return Ok(Ok(()));
+        Ok(Ok(()))
     }
 
     fn get_remaining_signers(
@@ -441,7 +449,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     ) -> HashSet<KeyIdentifier> {
         let current_signers: HashSet<&KeyIdentifier> =
             current_signatures.iter().map(|s| &s.signer).collect();
-        let targets_ref: HashSet<&KeyIdentifier> = targets.iter().map(|s| s).collect();
+        let targets_ref: HashSet<&KeyIdentifier> = targets.iter().collect();
         targets_ref
             .difference(&current_signers)
             .map(|&s| s.clone())
@@ -451,7 +459,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
     pub async fn signatures_received(
         &self,
         msg: SignaturesReceived,
-    ) -> Result<Result<(), DistributionErrorResponses>, DistributionManagerError> {
+    ) -> Result<Result<(), DistributionManagerError>, DistributionManagerError> {
         // We receive witness signatures
         // We check the validity of the signatures and save them, and update the task.
         // We check if we have the subject and event to which the signatures belong.
@@ -459,7 +467,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         match self.db.get_witness_signatures(&msg.subject_id) {
             Ok((sn, current_signatures)) => {
                 if msg.sn != sn {
-                    return Ok(Err(DistributionErrorResponses::SignaturesNotFound));
+                    return Ok(Err(DistributionManagerError::SignaturesNotFound));
                 }
                 // We check the signatures
                 let event = match self.db.get_event(&msg.subject_id, msg.sn) {
@@ -467,7 +475,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                     Err(error) => match error {
                         DbError::EntryNotFound => {
                             // We do not know the event we are receiving signatures from. We are not going to ask for anything
-                            return Ok(Err(DistributionErrorResponses::EventNotFound(
+                            return Ok(Err(DistributionManagerError::EventNotFound(
                                 msg.sn,
                                 msg.subject_id.to_str(),
                             )));
@@ -497,11 +505,11 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                 for signature in msg.signatures.iter() {
                     // We check signer
                     if !targets.contains(&signature.signer) {
-                        return Ok(Err(DistributionErrorResponses::InvalidSigner));
+                        return Ok(Err(DistributionManagerError::InvalidSigner));
                     }
                     // We check signature
                     if let Err(_error) = signature.verify(&event) {
-                        return Ok(Err(DistributionErrorResponses::InvalidSignature));
+                        return Ok(Err(DistributionManagerError::InvalidSignature));
                     }
                 }
                 // The signatures are correct
@@ -514,7 +522,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                 self.db
                     .set_witness_signatures(&msg.subject_id, msg.sn, current_signatures)
                     .map_err(|error| DistributionManagerError::DatabaseError(error.to_string()))?;
-                if remaining_signatures.len() == 0 {
+                if remaining_signatures.is_empty() {
                     self.cancel_signature_request(&subject.subject_id).await?;
                 } else {
                     targets.insert(owner);
@@ -530,9 +538,9 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             }
             Err(DbError::EntryNotFound) => {
                 // We do not know the event we are receiving signatures from. We are not going to ask for anything
-                return Ok(Ok(()));
+                Ok(Ok(()))
             }
-            Err(error) => return Err(DistributionManagerError::DatabaseError(error.to_string())),
+            Err(error) => Err(DistributionManagerError::DatabaseError(error.to_string())),
         }
     }
 }
@@ -542,7 +550,7 @@ fn build_metadata(subject: &Subject, governance_version: u64) -> Metadata {
         namespace: subject.namespace.clone(),
         subject_id: subject.subject_id.clone(),
         governance_id: subject.governance_id.clone(),
-        governance_version: governance_version,
+        governance_version,
         schema_id: subject.schema_id.clone(),
     }
 }

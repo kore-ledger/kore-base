@@ -12,7 +12,7 @@ pub enum DistributionManagerError {
     #[error("Database error: {0}")]
     DatabaseError(String),
     #[error("Unexpected error")]
-    UnexpectedError,
+    UnexpectedFail,
     #[error("Hash generation failed")]
     HashGenerationFailed,
     #[error("Sign generation failed")]
@@ -20,13 +20,22 @@ pub enum DistributionManagerError {
     #[error("Message sender channel not available")]
     MessageChannelNotAvailable,
     #[error("Subject creation error")]
-    SubjectCreationError,
+    SubjectCreation,
     #[error("Response channel not available")]
     ResponseChannelNotAvailable,
+    #[error("Invalid signature")]
+    InvalidSignature,
+    #[error("Invalid signer")]
+    InvalidSigner,
+    #[error("Event {0} of subject {1} not found")]
+    EventNotFound(u64, String),
+    #[error("Signatures not found")]
+    SignaturesNotFound,
 }
 
+/* 
 #[derive(Error, Debug, Clone)]
-pub enum DistributionErrorResponses {
+pub enum DistributionManagerError {
     #[error("The node is not a witness of subject")]
     NoValidWitness,
     #[error("Channel not available")]
@@ -78,3 +87,4 @@ pub enum DistributionErrorResponses {
     #[error("Invalid DigestIdentifier")]
     InvalidDigestIdentifier,
 }
+*/

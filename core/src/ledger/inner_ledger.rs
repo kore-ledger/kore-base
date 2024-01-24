@@ -11,11 +11,11 @@ use crate::{
     },
     crypto::{Ed25519KeyPair, KeyMaterial, KeyPair},
     database::{Error as DbError, DB},
-    distribution::{error::DistributionErrorResponses, DistributionMessagesNew},
+    distribution::{error::DistributionManagerError, DistributionMessagesNew},
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::KoreMessages,
     request::EventRequest,
     signature::Signature,
     utils::message::ledger::{request_event, request_gov_event},
@@ -39,9 +39,9 @@ pub struct Ledger<C: DatabaseCollection> {
     database: DB<C>,
     subject_is_gov: HashMap<DigestIdentifier, bool>,
     ledger_state: HashMap<DigestIdentifier, LedgerState>,
-    message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     distribution_channel:
-        SenderEnd<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
+        SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     our_id: KeyIdentifier,
     notification_sender: tokio::sync::mpsc::Sender<Notification>,
     derivator: DigestDerivator,
@@ -51,10 +51,10 @@ impl<C: DatabaseCollection> Ledger<C> {
     pub fn new(
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         distribution_channel: SenderEnd<
             DistributionMessagesNew,
-            Result<(), DistributionErrorResponses>,
+            Result<(), DistributionManagerError>,
         >,
         our_id: KeyIdentifier,
         notification_sender: tokio::sync::mpsc::Sender<Notification>,
@@ -174,7 +174,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         taple_request.state = RequestState::Finished;
         taple_request.success = Some(success);
         self.database
-            .set_taple_request(&request_id, &taple_request)?;
+            .set_taple_request(request_id, &taple_request)?;
         Ok(())
     }
 
@@ -534,7 +534,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             Entry::Occupied(mut ledger_state) => {
                 let ledger_state = ledger_state.get_mut();
                 let current_sn = ledger_state.current_sn.as_mut().unwrap();
-                *current_sn = *current_sn + 1;
+                *current_sn += 1;
             }
             Entry::Vacant(entry) => {
                 entry.insert(LedgerState {
@@ -563,7 +563,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             .map_err(|_| LedgerError::CryptoError("Error generating request hash".to_owned()))?;
         let event_hash = DigestIdentifier::from_serializable_borsh(
             &event.content,
-            validation_proof.event_hash.derivator.clone(),
+            validation_proof.event_hash.derivator,
         )
         .map_err(|_| LedgerError::CryptoError("Error generating event hash".to_owned()))?;
         match self.database.get_taple_request(&request_id) {
@@ -1058,7 +1058,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     create_request.public_key.to_str(),
                     create_request.governance_id.to_str(),
                     event.content.gov_version,
-                    validation_proof.event_hash.derivator.clone(),
+                    validation_proof.event_hash.derivator,
                 )?;
                 match self.database.get_subject(&subject_id) {
                     Ok(_) => {
@@ -1109,7 +1109,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     self.check_genesis(
                         event,
                         subject_id.clone(),
-                        validation_proof.event_hash.derivator.clone(),
+                        validation_proof.event_hash.derivator,
                     )
                     .await?;
                     self.gov_api
@@ -1139,7 +1139,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     self.check_genesis(
                         event,
                         subject_id.clone(),
-                        validation_proof.event_hash.derivator.clone(),
+                        validation_proof.event_hash.derivator,
                     )
                     .await?;
                     self.subject_is_gov.insert(subject_id.clone(), false);
@@ -1508,11 +1508,11 @@ impl<C: DatabaseCollection> Ledger<C> {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
                         }
-                        match self.database.get_approval(&approval_request_hash) {
+                        match self.database.get_approval(approval_request_hash) {
                             Ok(mut data) => {
                                 if let ApprovalState::Pending = data.state {
                                     data.state = ApprovalState::Obsolete;
-                                    self.database.set_approval(&approval_request_hash, data)?;
+                                    self.database.set_approval(approval_request_hash, data)?;
                                     let _ = self
                                         .notification_sender
                                         .send(Notification::ObsoletedApproval {
@@ -2110,7 +2110,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     create_request.public_key.to_str(),
                     create_request.governance_id.to_str(),
                     event.content.gov_version,
-                    event.content.subject_id.derivator.clone(),
+                    event.content.subject_id.derivator,
                 )?
             }
             EventRequest::Fact(state_request) => state_request.subject_id.clone(),
@@ -2200,12 +2200,12 @@ impl<C: DatabaseCollection> Ledger<C> {
                                                 "Error generating approval request hash".to_owned(),
                                             )
                                         })?;
-                                    match self.database.get_approval(&approval_request_hash) {
+                                    match self.database.get_approval(approval_request_hash) {
                                         Ok(mut data) => {
                                             if let ApprovalState::Pending = data.state {
                                                 data.state = ApprovalState::Obsolete;
                                                 self.database
-                                                    .set_approval(&approval_request_hash, data)?;
+                                                    .set_approval(approval_request_hash, data)?;
                                                 let _ = self
                                                     .notification_sender
                                                     .send(Notification::ObsoletedApproval {
@@ -2250,7 +2250,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         };
                                         let event_hash = DigestIdentifier::from_serializable_borsh(
                                             &head_event.content,
-                                            validation_proof.event_hash.derivator.clone(),
+                                            validation_proof.event_hash.derivator,
                                         )
                                         .map_err(|_| {
                                             LedgerError::CryptoError(
@@ -2325,7 +2325,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         .check_genesis(
                                             event.clone(),
                                             subject_id.clone(),
-                                            event.content.subject_id.derivator.clone(),
+                                            event.content.subject_id.derivator,
                                         )
                                         .await?;
                                     // Check LCE validity. Ya no hace falta porque lo hacemos con la prueba de validación.
@@ -2367,7 +2367,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         };
                                         let event_hash = DigestIdentifier::from_serializable_borsh(
                                             &head_event.content,
-                                            validation_proof.event_hash.derivator.clone(),
+                                            validation_proof.event_hash.derivator,
                                         )
                                         .map_err(|_| {
                                             LedgerError::CryptoError(
@@ -2446,7 +2446,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
                     event: event.clone(),
                 }),
                 vec![who_asked],
@@ -2470,7 +2470,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
                     sender: self.our_id.clone(),
                     event: event.clone(),
                     signatures: signatures.clone(),
@@ -2499,7 +2499,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         self.message_channel
             .tell(MessageTaskCommand::Request(
                 None,
-                TapleMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
                     sender: self.our_id.clone(),
                     event: event.clone(),
                     signatures: signatures.clone(),
@@ -2547,7 +2547,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         let hash_prev_event = match self.database.get_event(&subject.subject_id, subject.sn) {
             Ok(event) => DigestIdentifier::from_serializable_borsh(
                 &event.content,
-                validation_proof.prev_event_hash.derivator.clone(),
+                validation_proof.prev_event_hash.derivator,
             )
             .map_err(|_| {
                 LedgerError::ValidationProofError("Error parsing prev event content".to_string())
@@ -2642,7 +2642,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             .get_init_state(
                 metadata.governance_id.clone(),
                 metadata.schema_id.clone(),
-                metadata.governance_version.clone(),
+                metadata.governance_version,
             )
             .await?;
         let subject = Subject::from_genesis_event(event.clone(), init_state, None, derivator)?;
@@ -2699,7 +2699,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-            event.content.hash_prev_event.derivator.clone(),
+            event.content.hash_prev_event.derivator,
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits
@@ -2739,7 +2739,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-            event.content.hash_prev_event.derivator.clone(),
+            event.content.hash_prev_event.derivator,
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits
@@ -2808,7 +2808,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-            event.content.hash_prev_event.derivator.clone(),
+            event.content.hash_prev_event.derivator,
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits
@@ -2850,7 +2850,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                     _ => LedgerError::DatabaseError(error),
                 })?
                 .content,
-            event.content.hash_prev_event.derivator.clone(),
+            event.content.hash_prev_event.derivator,
         )
         .map_err(|_| LedgerError::CryptoError("Error generating hash".to_owned()))?;
         // Check previous event fits

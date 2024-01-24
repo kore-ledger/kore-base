@@ -9,7 +9,7 @@ use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     database::DB,
     message::MessageTaskCommand,
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::KoreMessages,
     DatabaseCollection, DigestIdentifier, KeyIdentifier,
 };
 
@@ -49,7 +49,8 @@ pub struct AuthorizedSubjectsManager<C: DatabaseCollection> {
     input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
     inner_authorized_subjects: AuthorizedSubjects<C>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: What we do with this?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
@@ -57,7 +58,7 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
     pub fn new(
         input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         our_id: KeyIdentifier,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
@@ -66,7 +67,8 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
             input_channel,
             inner_authorized_subjects: AuthorizedSubjects::new(database, message_channel, our_id),
             token,
-            notification_tx,
+            // TODO: What we do with this?
+            _notification_tx: notification_tx,
         }
     }
 
@@ -162,8 +164,8 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
                 }
             }
         };
-        if sender.is_some() {
-            sender.unwrap().send(response).expect("Sender Dropped");
+        if let Some(sender) = sender {
+            sender.send(response).expect("Sender Dropped");
         }
         Ok(())
     }

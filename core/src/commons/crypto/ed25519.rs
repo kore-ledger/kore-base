@@ -71,7 +71,7 @@ impl KeyMaterial for Ed25519KeyPair {
         let secret_key = SigningKey::try_from(secet_bytes.as_slice())?;
         let der = secret_key
             .to_pkcs8_der()
-            .map_err(|_| Error::KeyPairError("Cannot generate pkcs8 der".into()))?;
+            .map_err(|_| Error::KeyPair("Cannot generate pkcs8 der".into()))?;
         Ok(der.as_bytes().to_vec())
     }
 
@@ -82,7 +82,7 @@ impl KeyMaterial for Ed25519KeyPair {
         match kp_type {
             super::KeyPairType::Ed25519 => {
                 let secret_key = SigningKey::from_pkcs8_der(der)
-                    .map_err(|_| Error::KeyPairError("Invalid pkcs8 der".into()))?;
+                    .map_err(|_| Error::KeyPair("Invalid pkcs8 der".into()))?;
                 let public_key = VerifyingKey::from(&secret_key);
                 let mut kp = Ed25519KeyPair {
                     public_key,
@@ -91,7 +91,7 @@ impl KeyMaterial for Ed25519KeyPair {
                 let _ = kp.encrypt_secret_bytes(secret_key.as_bytes());
                 Ok(kp)
             }
-            _ => Err(Error::KeyPairError("Invalid key pair type".into())),
+            _ => Err(Error::KeyPair("Invalid key pair type".into())),
         }
     }
 }
@@ -101,15 +101,15 @@ impl DSA for Ed25519KeyPair {
         let encr = self
             .secret_key
             .as_ref()
-            .ok_or(Error::SignError("No secret key".into()))?;
+            .ok_or(Error::Sign("No secret key".into()))?;
         let sk = encr
             .decrypt()
-            .map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
+            .map_err(|_| Error::Sign("Cannot decrypt secret key".into()))?;
         let signig_key = SigningKey::try_from(sk.as_ref())
-            .map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
+            .map_err(|_| Error::Sign("Cannot generate signing key".into()))?;
         match payload {
             Payload::Buffer(msg) => Ok(signig_key.sign(msg.as_slice()).to_bytes().to_vec()),
-            _ => Err(Error::SignError(
+            _ => Err(Error::Sign(
                 "Payload type not supported for this key".into(),
             )),
         }
@@ -117,13 +117,13 @@ impl DSA for Ed25519KeyPair {
 
     fn verify(&self, payload: Payload, signature: &[u8]) -> Result<(), Error> {
         let sig = Signature::try_from(signature)
-            .map_err(|_| Error::SignError("Invalid signature data".into()))?;
+            .map_err(|_| Error::Sign("Invalid signature data".into()))?;
         match payload {
             Payload::Buffer(payload) => match self.public_key.verify(payload.as_slice(), &sig) {
                 Ok(_) => Ok(()),
-                _ => Err(Error::SignError("Signature verify failed".into())),
+                _ => Err(Error::Sign("Signature verify failed".into())),
             },
-            _ => Err(Error::SignError(
+            _ => Err(Error::Sign(
                 "Payload type not supported for this key".into(),
             )),
         }
@@ -160,7 +160,7 @@ impl<'de> Deserialize<'de> for Ed25519KeyPair {
     {
         let s = String::deserialize(deserializer)?;
         let bytes = general_purpose::URL_SAFE_NO_PAD
-            .decode(&s)
+            .decode(s)
             .map_err(serde::de::Error::custom)?;
         Ok(Ed25519KeyPair::from_secret_key(&bytes[..SECRET_KEY_LENGTH]))
     }

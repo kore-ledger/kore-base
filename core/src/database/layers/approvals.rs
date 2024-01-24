@@ -246,7 +246,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
         ];
         let key = get_key(key_elements)?;
         let approval = self.collection.get(&key)?;
-        Ok(deserialize::<ApprovalEntity>(&approval).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<ApprovalEntity>(&approval).map_err(|_| DbError::DeserializeError)
     }
 
     /// Gets approvals.
@@ -280,11 +280,11 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
                     quantity,
                     &self.pending_prefix,
                 )?;
-                if approvals.len() < quantity.abs() as usize {
+                if approvals.len() < quantity.unsigned_abs() {
                     continue_while = false;
                 }
                 for approval_id in approvals.iter() {
-                    let approval_id = deserialize::<DigestIdentifier>(&approval_id)
+                    let approval_id = deserialize::<DigestIdentifier>(approval_id)
                         .map_err(|_| DbError::DeserializeError)?;
                     let key_elements: Vec<Element> = vec![
                         Element::S(self.prefix.clone()),
@@ -320,9 +320,9 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
         } else {
             let approvals = self.collection.get_by_range(from, quantity, &self.prefix)?;
             for approval in approvals.iter() {
-                let approval = deserialize::<ApprovalEntity>(&approval).unwrap();
-                if status.is_some() {
-                    if status.as_ref().unwrap() == &approval.state {
+                let approval = deserialize::<ApprovalEntity>(approval).unwrap();
+                if let Some(status) = &status {
+                    if status == &approval.state {
                         result.push(approval);
                     }
                 } else {
@@ -330,7 +330,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
                 }
             }
         }
-        return Ok(result);
+        Ok(result)
     }
 
     /// Sets approval.
@@ -371,7 +371,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
         let key2 = get_key(index_key_elements)?;
         // If it is a pending status request, it is first saved in the index and then in the supper collection.
         if approval.state == ApprovalState::Pending {
-            let Ok(data2) = serialize::<DigestIdentifier>(&request_id) else {
+            let Ok(data2) = serialize::<DigestIdentifier>(request_id) else {
                 return Err(DbError::SerializeError);
             };
             self.pending_collection.put(&key2, &data2)?;
