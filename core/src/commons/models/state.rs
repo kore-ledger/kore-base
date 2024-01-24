@@ -205,13 +205,9 @@ impl Subject {
         &self,
         derivator: DigestDerivator,
     ) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self.properties, derivator).map_err(
-            |_| {
-                SubjectError::CryptoError(String::from(
-                    "Error calculating the hash of the state",
-                ))
-            },
-        )
+        DigestIdentifier::from_serializable_borsh(&self.properties, derivator).map_err(|_| {
+            SubjectError::CryptoError(String::from("Error calculating the hash of the state"))
+        })
     }
 
     pub fn eol_event(&mut self) {
@@ -229,13 +225,9 @@ impl Subject {
         patch(&mut subject_properties.0, &json_patch).map_err(|_| {
             SubjectError::CryptoError(String::from("Error applying the json patch"))
         })?;
-        DigestIdentifier::from_serializable_borsh(&subject_properties, derivator).map_err(
-            |_| {
-                SubjectError::CryptoError(String::from(
-                    "Error calculating the hash of the state",
-                ))
-            },
-        )
+        DigestIdentifier::from_serializable_borsh(&subject_properties, derivator).map_err(|_| {
+            SubjectError::CryptoError(String::from("Error calculating the hash of the state"))
+        })
     }
 }
 

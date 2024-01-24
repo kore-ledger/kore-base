@@ -28,8 +28,7 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
         ];
         let key = get_key(key_elements)?;
         let prevalidated_event = self.collection.get(&key)?;
-        deserialize::<Signed<Event>>(&prevalidated_event)
-            .map_err(|_| DbError::DeserializeError)
+        deserialize::<Signed<Event>>(&prevalidated_event).map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_prevalidated_event(

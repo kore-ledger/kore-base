@@ -1,6 +1,5 @@
 /// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 use std::marker::PhantomData;
 
 use tokio_util::sync::CancellationToken;
@@ -53,7 +52,6 @@ impl<
         messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
     ) -> Self {
-
         // spawn compiler
         tokio::spawn(async move {
             compiler.start().await;
@@ -337,7 +335,7 @@ mod test {
             r#"
         #[no_mangle]
         pub unsafe fn main_function(state_ptr: i32, event_ptr: i32, is_owner: i32) {
-            
+
         }
         "#,
         )
@@ -359,9 +357,9 @@ mod test {
             r#"
             use taple_sc_rust as sdk;
             use serde::{Deserialize, Serialize};
-            
+
             // Intento de simulación de cómo podría ser un contrato
-            
+
             // Subject State
             #[derive(Serialize, Deserialize, Clone)]
             pub struct Data {
@@ -369,7 +367,7 @@ mod test {
                 pub two: u32,
                 pub three: u32,
             }
-            
+
             // Event Family
             #[derive(Serialize, Deserialize, Debug)]
             pub enum EventType {
@@ -379,18 +377,18 @@ mod test {
                 ModThree { data: u32, chunk: Vec<u8> },
                 ModAll { data: (u32, u32, u32), chunk: Vec<u8> },
             }
-            
+
             #[no_mangle]
             pub unsafe fn main_function(state_ptr: i32, event_ptr: i32, is_owner: i32) -> u32 {
                 sdk::execute_contract(state_ptr, event_ptr, is_owner, contract_logic)
             }
-            
-            
+
+
                 context -> inmutable con estado inicial roles y evento
                 result -> mutable success y approvalRequired, y estado final
                 approvalRequired por defecto a false y siempre false si KO o error
-            
-            
+
+
             // Lógica del contrato con los tipos de datos esperados
             // Devuelve el puntero a los datos escritos con el estado modificado
             fn contract_logic(
@@ -749,7 +747,7 @@ mod test {
         });
     }
 
-    
+
     #[test]
     fn contract_execution_fail() {
         // Fail reason: Bad Event

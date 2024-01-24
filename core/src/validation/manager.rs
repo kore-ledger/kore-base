@@ -1,10 +1,8 @@
 use tokio_util::sync::CancellationToken;
 
-use super::{
-    errors::ValidationError, Validation, ValidationCommand, ValidationResponse,
-};
-use crate::database::DatabaseCollection;
+use super::{errors::ValidationError, Validation, ValidationCommand, ValidationResponse};
 use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
+use crate::database::DatabaseCollection;
 use crate::Notification;
 
 #[derive(Clone, Debug)]

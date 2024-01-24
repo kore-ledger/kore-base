@@ -28,8 +28,7 @@ impl<C: DatabaseCollection> ValidationDb<C> {
         ];
         let key = get_key(key_elements)?;
         let validation_register = self.collection.get(&key)?;
-        deserialize::<ValidationProof>(&validation_register)
-            .map_err(|_| DbError::DeserializeError)
+        deserialize::<ValidationProof>(&validation_register).map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_validation_register(

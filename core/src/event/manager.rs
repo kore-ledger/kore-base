@@ -3,11 +3,11 @@ use tokio_util::sync::CancellationToken;
 
 use super::{errors::EventError, event_completer::EventCompleter, EventCommand, EventResponse};
 
+use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::database::DatabaseCollection;
 use crate::governance::error::RequestError;
 use crate::governance::GovernanceUpdatedMessage;
 use crate::signature::Signed;
-use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::EventRequest;
 
 #[derive(Clone, Debug)]
@@ -35,7 +35,6 @@ impl EventAPIInterface for EventAPI {
         }
     }
 }
-
 
 pub struct EventManager<C: DatabaseCollection> {
     /// Communication channel for incoming petitions
@@ -132,20 +131,21 @@ impl<C: DatabaseCollection> EventManager<C> {
             match data {
                 EventCommand::Event { event_request } => {
                     let response = self.event_completer.pre_new_event(event_request).await;
-                    if let Err(error) = response.clone() { match error {
-                        EventError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(EventError::ChannelClosed);
+                    if let Err(error) = response.clone() {
+                        match error {
+                            EventError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(EventError::ChannelClosed);
+                            }
+                            EventError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(EventError::ChannelClosed);
+                            }
+                            _ => {}
                         }
-                        EventError::GovernanceError(RequestError::ChannelClosed) =>
-                        {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(EventError::ChannelClosed);
-                        }
-                        _ => {}
-                }}
+                    }
                     EventResponse::Event(response)
                 }
                 EventCommand::EvaluatorResponse { evaluator_response } => {
@@ -153,19 +153,21 @@ impl<C: DatabaseCollection> EventManager<C> {
                         .event_completer
                         .evaluator_signatures(evaluator_response)
                         .await;
-                    if let Err(error) = response { match error {
-                        EventError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(EventError::ChannelClosed);
+                    if let Err(error) = response {
+                        match error {
+                            EventError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(EventError::ChannelClosed);
+                            }
+                            EventError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(EventError::ChannelClosed);
+                            }
+                            _ => log::error!("{:?}", error),
                         }
-                        EventError::GovernanceError(RequestError::ChannelClosed) => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(EventError::ChannelClosed);
-                        }
-                        _ => log::error!("{:?}", error)
-                    }}
+                    }
                     EventResponse::NoResponse
                 }
                 EventCommand::ApproverResponse { approval } => {
@@ -194,7 +196,9 @@ impl<C: DatabaseCollection> EventManager<C> {
                     if let Err(error) = self
                         .event_completer
                         .validation_signatures(event_hash, signature, governance_version)
-                        .await {match error {
+                        .await
+                    {
+                        match error {
                             EventError::ChannelClosed => {
                                 log::error!("Channel Closed");
                                 self.token.cancel();
@@ -205,8 +209,9 @@ impl<C: DatabaseCollection> EventManager<C> {
                                 self.token.cancel();
                                 return Err(EventError::ChannelClosed);
                             }
-                            _ => log::error!("VALIDATION ERROR: {:?}", error)
-                        }}
+                            _ => log::error!("VALIDATION ERROR: {:?}", error),
+                        }
+                    }
                     EventResponse::NoResponse
                 }
                 EventCommand::HigherGovernanceExpected {
@@ -230,7 +235,7 @@ impl<C: DatabaseCollection> EventManager<C> {
                                 self.token.cancel();
                                 return Err(EventError::ChannelClosed);
                             }
-                            _ => log::error!("VALIDATION ERROR: {:?}", error)
+                            _ => log::error!("VALIDATION ERROR: {:?}", error),
                         },
                     }
                     EventResponse::NoResponse

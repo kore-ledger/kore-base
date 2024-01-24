@@ -16,8 +16,8 @@ use crate::{
     database::Error as DbError,
     ValueWrapper,
 };
-use serde_json::Value;
 use base64::prelude::*;
+use serde_json::Value;
 
 use super::{
     error::{InternalError, RequestError},
@@ -410,8 +410,9 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
             let mut contract: Contract = serde_json::from_value(schema["contract"].clone())
                 .map_err(|_| InternalError::InvalidGovernancePayload("5".into()))?;
 
-            let decoded_bytes =
-                BASE64_STANDARD.decode(contract.raw).map_err(|_| InternalError::Base64DecodingError)?;
+            let decoded_bytes = BASE64_STANDARD
+                .decode(contract.raw)
+                .map_err(|_| InternalError::Base64DecodingError)?;
             contract.raw =
                 String::from_utf8(decoded_bytes).map_err(|_| InternalError::Base64DecodingError)?;
 
@@ -526,10 +527,7 @@ fn get_as_array<'a>(data: &'a Value, key: &str) -> Result<&'a Vec<Value>, Intern
         .ok_or(InternalError::InvalidGovernancePayload("9".into()))
 }
 
-fn get_schema_from_policies<'a>(
-    data: &'a [Value],
-    key: &str,
-) -> Result<&'a Value, RequestError> {
+fn get_schema_from_policies<'a>(data: &'a [Value], key: &str) -> Result<&'a Value, RequestError> {
     data.iter()
         .find(|&policy| {
             let id = policy.get("id").unwrap().as_str().unwrap();

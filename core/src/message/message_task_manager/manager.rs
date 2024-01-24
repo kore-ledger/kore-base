@@ -19,7 +19,8 @@ use super::super::{
     TaskCommandContent,
 };
 
-pub type HandleList = HashMap<String, (JoinHandle<Result<Result<(), Error>, Aborted>>, AbortHandle)>;
+pub type HandleList =
+    HashMap<String, (JoinHandle<Result<Result<(), Error>, Aborted>>, AbortHandle)>;
 
 pub struct MessageTaskManager<T>
 where

@@ -3,8 +3,8 @@ use crate::{test_database_manager_trait, DatabaseCollection, DatabaseManager};
 use std::{
     collections::{btree_map::Iter, BTreeMap, HashMap},
     iter::Rev,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     rc::Rc,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 pub struct DataStore {

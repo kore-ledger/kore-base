@@ -7,7 +7,7 @@ use std::sync::Arc;
 /// Controller id database.
 /// This database stores the controller id.
 /// The key is the controller id.
-/// 
+///
 pub(crate) struct ControllerIdDb<C: DatabaseCollection> {
     collection: C,
     prefix: String,
@@ -24,15 +24,15 @@ impl<C: DatabaseCollection> ControllerIdDb<C> {
     }
 
     /// Get the controller id.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the controller id is not found.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Ok with the controller id.
-    /// 
+    ///
     pub fn get_controller_id(&self) -> Result<String, DbError> {
         let key_elements: Vec<Element> = vec![Element::S(self.prefix.clone())];
         let key = get_key(key_elements)?;
@@ -41,19 +41,19 @@ impl<C: DatabaseCollection> ControllerIdDb<C> {
     }
 
     /// Put the controller id.  
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `controller_id` - The controller id.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the controller id is not valid.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Ok if the controller id is put.
-    /// 
+    ///
     pub fn set_controller_id(&self, controller_id: String) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![Element::S(self.prefix.clone())];
         let key = get_key(key_elements)?;

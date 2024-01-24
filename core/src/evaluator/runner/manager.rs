@@ -77,7 +77,7 @@ impl<C: DatabaseCollection, G: GovernanceInterface> KoreRunner<C, G> {
                 return Err(ExecutorErrorResponses::OurGovIsLower);
             }
             std::cmp::Ordering::Equal => {}
-        }   
+        }
 
         // Governances can be updated without WASM because we know the contract beforehand
         let (contract, contract_gov_version): (Contract, u64) = if execute_contract
@@ -238,6 +238,5 @@ fn generate_json_patch(
     new_state: &Value,
 ) -> Result<Value, ExecutorErrorResponses> {
     let patch = diff(prev_state, new_state);
-    serde_json::to_value(patch)
-        .map_err(|_| ExecutorErrorResponses::JSONPATCHDeserializationFailed)
+    serde_json::to_value(patch).map_err(|_| ExecutorErrorResponses::JSONPATCHDeserializationFailed)
 }

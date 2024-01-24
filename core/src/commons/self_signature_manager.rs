@@ -51,8 +51,7 @@ impl SelfSignatureInterface for SelfSignatureManager {
         content: &T,
         derivator: DigestDerivator,
     ) -> Result<Signature, ProtocolErrors> {
-        Signature::new(content, &self.keys, derivator)
-            .map_err(|_| ProtocolErrors::SignatureError)
+        Signature::new(content, &self.keys, derivator).map_err(|_| ProtocolErrors::SignatureError)
     }
 
     fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool {

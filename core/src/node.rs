@@ -4,7 +4,10 @@
 #[cfg(feature = "approval")]
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
-use crate::approval::{ApprovalMessages, ApprovalResponses, inner_manager::{InnerApprovalManager, RequestNotifier}};
+use crate::approval::{
+    inner_manager::{InnerApprovalManager, RequestNotifier},
+    ApprovalMessages, ApprovalResponses,
+};
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
@@ -18,9 +21,11 @@ use crate::distribution::error::DistributionManagerError;
 use crate::distribution::inner_manager::InnerDistributionManager;
 use crate::distribution::manager::DistributionManager;
 use crate::distribution::DistributionMessagesNew;
-use crate::evaluator::compiler::manager::KoreCompiler;
 #[cfg(feature = "evaluation")]
-use crate::evaluator::{EvaluatorManager, EvaluatorMessage, EvaluatorResponse, runner::manager::KoreRunner};
+use crate::evaluator::{
+    compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager,
+    EvaluatorMessage, EvaluatorResponse,
+};
 use crate::event::event_completer::EventCompleter;
 use crate::event::manager::{EventAPI, EventManager};
 use crate::event::{EventCommand, EventResponse};
@@ -34,10 +39,10 @@ use crate::message::{
     NetworkEvent,
 };
 use crate::network::network_processor::NetworkProcessor;
-use crate::protocol::{ProtocolManager, ProtocolChannels, KoreMessages};
+use crate::protocol::{KoreMessages, ProtocolChannels, ProtocolManager};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
-use crate::validation::{Validation, manager::ValidationManager};
+use crate::validation::{manager::ValidationManager, Validation};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
 use ::futures::Future;
@@ -48,7 +53,7 @@ use std::sync::Arc;
 use tokio::sync::*;
 use tokio_util::sync::CancellationToken;
 
-use crate::api::{Api, ApiManager, inner_api::InnerApi};
+use crate::api::{inner_api::InnerApi, Api, ApiManager};
 use crate::error::Error;
 
 const BUFFER_SIZE: usize = 1000;
@@ -120,10 +125,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let database = Arc::new(database);
 
-        let controller_id = Self::register_node_key(
-            key_pair.clone(),
-            DB::new(database.clone()),
-        )?;
+        let controller_id = Self::register_node_key(key_pair.clone(), DB::new(database.clone()))?;
         info!("Controller ID: {}", &controller_id);
 
         let token = CancellationToken::new();
@@ -174,13 +176,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             approval_channel: approval_tx.clone(),
             ledger_channel: ledger_tx.clone(),
         };
-    
+
         // Build protocol manager
-        let protocol_manager = ProtocolManager::new(
-            channels,
-            token.clone(),
-            notification_tx.clone(),
-        );
+        let protocol_manager =
+            ProtocolManager::new(channels, token.clone(), notification_tx.clone());
 
         // Build governance
         let mut governance_manager = Governance::<M, C>::new(
@@ -215,18 +214,14 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
             task_tx.clone(),
-            distribution_tx,  
-            controller_id.clone(),   
+            distribution_tx,
+            controller_id.clone(),
             notification_tx.clone(),
             settings.node.digest_derivator,
         );
 
         // Build ledger manager
-        let ledger_manager = LedgerManager::new(
-            ledger_rx,
-            inner_ledger,
-            token.clone(),
-        );
+        let ledger_manager = LedgerManager::new(ledger_rx, inner_ledger, token.clone());
 
         let as_manager = AuthorizedSubjectsManager::new(
             as_rx,
@@ -243,19 +238,16 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 EventAPI::new(event_tx),
                 AuthorizedSubjectsAPI::new(as_tx),
                 DB::new(database.clone()),
-                #[cfg(feature = "approval")] ApprovalAPI::new(approval_tx),
+                #[cfg(feature = "approval")]
+                ApprovalAPI::new(approval_tx),
                 EventManagerAPI::new(ledger_tx),
             );
 
-            ApiManager::new(
-                api_rx,
-                token.clone(),
-                inner_api,
-            )
+            ApiManager::new(api_rx, token.clone(), inner_api)
         };
 
         // Build evaluation
-        #[cfg(feature = "evaluation")] 
+        #[cfg(feature = "evaluation")]
         let evaluator_manager: EvaluatorManager<M, C, GovernanceAPI> = {
             use wasmtime::Engine;
             let engine = Engine::default();
@@ -290,7 +282,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             )
         };
-        
+
         // Build approval
         #[cfg(feature = "approval")]
         let approval_manager = {
@@ -349,7 +341,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 notification_tx,
             )
         };
-        
+
         let taple = Node {
             notification_rx,
             token,
@@ -486,25 +478,23 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
     /// Register the node key. If the key is already registered, it will be checked that it is the same.
     /// If the key is not registered, it will be registered.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `key_pair` - Key pair to register.
     /// * `db` - Database to use.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// If the key is not registered and it is not possible to register it, an error will be returned.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Nothing.
-    /// 
-    fn register_node_key(
-        key_pair: KeyPair,
-        db: DB<C>,
-    ) -> Result<KeyIdentifier, Error> {
-        let key_identifier = KeyIdentifier::new(key_pair.get_key_derivator(), &key_pair.public_key_bytes());
+    ///
+    fn register_node_key(key_pair: KeyPair, db: DB<C>) -> Result<KeyIdentifier, Error> {
+        let key_identifier =
+            KeyIdentifier::new(key_pair.get_key_derivator(), &key_pair.public_key_bytes());
         let identifier = key_identifier.to_str();
         let stored_identifier = db.get_controller_id().ok();
         if let Some(stored_identifier) = stored_identifier {

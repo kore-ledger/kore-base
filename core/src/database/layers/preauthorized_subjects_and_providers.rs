@@ -38,7 +38,7 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
         from: Option<String>,
         quantity: isize,
     ) -> Result<Vec<(DigestIdentifier, HashSet<KeyIdentifier>)>, DbError> {
-        let result = self.collection.get_by_range(from, quantity,&self.prefix)?;
+        let result = self.collection.get_by_range(from, quantity, &self.prefix)?;
         let mut vec_result = vec![];
         for value in result {
             vec_result.push(

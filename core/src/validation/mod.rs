@@ -5,18 +5,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     commons::{
+        channel::SenderEnd,
         errors::ChannelErrors,
         models::{validation::ValidationEventResponse, validation::ValidationProof},
         self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
-        channel::SenderEnd,
     },
+    database::{DatabaseCollection, DB},
+    event::EventCommand,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     message::{MessageConfig, MessageTaskCommand},
     protocol::KoreMessages,
-    event::EventCommand,
     signature::Signature,
-    database::{DatabaseCollection, DB},
-    KeyIdentifier, DigestDerivator, Metadata, Derivable,
+    Derivable, DigestDerivator, KeyIdentifier, Metadata,
 };
 
 use self::errors::ValidationError;
@@ -110,21 +110,21 @@ impl<C: DatabaseCollection> Validation<C> {
                 return Err(ValidationError::GovernanceVersionTooHigh);
             }
             std::cmp::Ordering::Greater => {
-            // Report outdated Gov.
-            self.message_channel
-                .tell(MessageTaskCommand::Request(
-                    None,
-                    KoreMessages::EventMessage(
-                        crate::event::EventCommand::HigherGovernanceExpected {
-                            governance_id: validation_event.proof.governance_id.clone(),
-                            who_asked: self.signature_manager.get_own_identifier(),
-                        },
-                    ),
-                    vec![sender],
-                    MessageConfig::direct_response(),
-                ))
-                .await?;
-                return Err(ValidationError::GovernanceVersionTooLow);         
+                // Report outdated Gov.
+                self.message_channel
+                    .tell(MessageTaskCommand::Request(
+                        None,
+                        KoreMessages::EventMessage(
+                            crate::event::EventCommand::HigherGovernanceExpected {
+                                governance_id: validation_event.proof.governance_id.clone(),
+                                who_asked: self.signature_manager.get_own_identifier(),
+                            },
+                        ),
+                        vec![sender],
+                        MessageConfig::direct_response(),
+                    ))
+                    .await?;
+                return Err(ValidationError::GovernanceVersionTooLow);
             }
             std::cmp::Ordering::Equal => {}
         }
@@ -305,10 +305,7 @@ impl<C: DatabaseCollection> Validation<C> {
                     .collect();
             let actual_signers = actual_signers?;
             let (signers, quorum_size) = self
-                .get_signers_and_quorum(
-                    previous_proof.get_metadata(),
-                    ValidationStage::Validate,
-                )
+                .get_signers_and_quorum(previous_proof.get_metadata(), ValidationStage::Validate)
                 .await?;
             if !actual_signers.is_subset(&signers) {
                 return Err(ValidationError::InvalidSigner);

@@ -25,20 +25,20 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
 
     /// Gets the witness signatures for a given subject.
     /// Returns the last sequence number and the set of signatures.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - The subject identifier.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns the last sequence number and the set of signatures.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the subject identifier is invalid or if the
     /// database is corrupted.
-    /// 
+    ///
     pub fn get_witness_signatures(
         &self,
         subject_id: &DigestIdentifier,
@@ -51,22 +51,21 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
         let witness_signatures = self.collection.get(&key)?;
         deserialize::<(u64, HashSet<Signature>)>(&witness_signatures)
             .map_err(|_| DbError::DeserializeError)
-        
     }
 
     /// Gets all the witness signatures.
     /// Returns a vector of tuples containing the subject identifier, the last
     /// sequence number and the set of signatures.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns a vector of tuples containing the subject identifier, the last
     /// sequence number and the set of signatures.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the database is corrupted.
-    /// 
+    ///
     pub fn get_all_witness_signatures(
         &self,
     ) -> Result<Vec<(DigestIdentifier, u64, HashSet<Signature>)>, DbError> {
@@ -82,18 +81,18 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
     }
 
     /// Sets the witness signatures for a given subject.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - The subject identifier.
     /// * `sn` - The sequence number.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns the last sequence number and the set of signatures.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the subject identifier is invalid or if the
     /// database is corrupted.
     ///
@@ -125,20 +124,20 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
     }
 
     /// Deletes the witness signatures for a given subject.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - The subject identifier.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns the last sequence number and the set of signatures.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the subject identifier is invalid or if the
     /// database is corrupted.
-    /// 
+    ///
     pub fn del_witness_signatures(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),

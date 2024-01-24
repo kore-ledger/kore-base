@@ -7,7 +7,7 @@ pub mod tell;
 mod tests {
     pub use crate::message::{MessageReceiver, MessageSender, NetworkEvent};
     use crate::network::{
-        network_processor::{NetworkComposedEvent, NetworkProcessor, KoreNetworkBehavior},
+        network_processor::{KoreNetworkBehavior, NetworkComposedEvent, NetworkProcessor},
         tell::TellBehaviourEvent,
     };
     use crate::{message::Command, network::routing::RoutingComposedEvent, ListenAddr};

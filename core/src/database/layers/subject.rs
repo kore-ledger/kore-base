@@ -59,7 +59,9 @@ impl<C: DatabaseCollection> SubjectDb<C> {
         from: Option<String>,
         quantity: isize,
     ) -> Result<Vec<Subject>, DbError> {
-        let subjects = self.collection.get_by_range(from, quantity, &self.prefix.clone())?;
+        let subjects = self
+            .collection
+            .get_by_range(from, quantity, &self.prefix.clone())?;
         Ok(subjects
             .iter()
             .map(|subject| deserialize::<Subject>(subject).unwrap())

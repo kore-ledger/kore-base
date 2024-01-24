@@ -7,8 +7,7 @@ use crate::{
 };
 
 use super::{
-    error::DistributionManagerError,
-    inner_manager::InnerDistributionManager,
+    error::DistributionManagerError, inner_manager::InnerDistributionManager,
     DistributionMessagesNew,
 };
 

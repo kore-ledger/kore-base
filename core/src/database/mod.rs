@@ -87,7 +87,6 @@ pub trait DatabaseCollection: Sync + Send {
         }
         Ok(result)
     }
-    
 }
 
 /// Allows a TAPLE database implementation to be subjected to a battery of tests.

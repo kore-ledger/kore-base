@@ -14,17 +14,16 @@ pub(crate) struct KeysDb<C: DatabaseCollection> {
 
 /// KeysDb implementation
 impl<C: DatabaseCollection> KeysDb<C> {
-
     /// Create a new KeysDb instance
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `manager` - The database manager
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// A new KeysDb instance
-    /// 
+    ///
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
             collection: manager.create_collection("transfer"),
@@ -33,19 +32,19 @@ impl<C: DatabaseCollection> KeysDb<C> {
     }
 
     /// Get the keypair for a given public key identifier.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `public_key` - The public key identifier
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The keypair (only the public key) for the given public key identifier
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// An error is returned if the keypair cannot be found or deserialized.
-    /// 
+    ///
     pub fn get_keys(&self, public_key: &KeyIdentifier) -> Result<KeyPair, DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -58,20 +57,20 @@ impl<C: DatabaseCollection> KeysDb<C> {
     }
 
     /// Set the keypair for a given public key identifier.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `public_key` - The public key identifier
     /// * `keypair` - The keypair (only the public key)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Nothing
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// An error is returned if the keypair cannot be serialized or stored.
-    /// 
+    ///
     pub fn set_keys(&self, public_key: &KeyIdentifier, keypair: KeyPair) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -85,19 +84,19 @@ impl<C: DatabaseCollection> KeysDb<C> {
     }
 
     /// Delete the keypair for a given public key identifier.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `public_key` - The public key identifier
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Nothing
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// An error is returned if the keypair cannot be deleted.
-    /// 
+    ///
     pub fn del_keys(&self, public_key: &KeyIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -106,16 +105,15 @@ impl<C: DatabaseCollection> KeysDb<C> {
         let key = get_key(key_elements)?;
         self.collection.del(&key)
     }
-
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::crypto::KeyMaterial;
+    use crate::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::database::DatabaseManager;
     use crate::database::MemoryManager;
-    use crate::crypto::{KeyPair, KeyGenerator, Ed25519KeyPair};
     use crate::KeyIdentifier;
     use std::sync::Arc;
 
@@ -124,7 +122,8 @@ mod test {
         let manager = Arc::new(MemoryManager::default());
         let db = KeysDb::new(&manager);
         let keypair = KeyPair::Ed25519(Ed25519KeyPair::new());
-        let public_key = KeyIdentifier::new(crate::KeyDerivator::Ed25519, &keypair.public_key_bytes());
+        let public_key =
+            KeyIdentifier::new(crate::KeyDerivator::Ed25519, &keypair.public_key_bytes());
         db.set_keys(&public_key, keypair.clone()).unwrap();
         let result = db.get_keys(&public_key).unwrap();
         assert_eq!(keypair.public_key_bytes(), result.public_key_bytes());

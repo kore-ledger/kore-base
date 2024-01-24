@@ -5,7 +5,7 @@ use kore_base::{
     Settings,
 };
 
-use kore_base::{Node, crypto::KeyPair};
+use kore_base::{crypto::KeyPair, Node};
 use tokio::time::{sleep, Duration};
 
 use super::error::NotifierError;

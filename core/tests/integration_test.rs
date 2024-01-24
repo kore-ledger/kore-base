@@ -1,8 +1,8 @@
 mod common;
 use common::{generate_mc, NodeBuilder};
 use kore_base::{
+    crypto::{Ed25519KeyPair, KeyGenerator, KeyPair},
     DigestDerivator,
-    crypto::{KeyPair, KeyGenerator, Ed25519KeyPair},
 };
 
 use serial_test::serial;

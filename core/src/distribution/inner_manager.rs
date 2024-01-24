@@ -1,6 +1,6 @@
 use std::{
-    collections::{HashMap, HashSet},
     cmp::Ordering,
+    collections::{HashMap, HashSet},
 };
 
 use crate::commons::channel::SenderEnd;
@@ -26,8 +26,8 @@ use crate::{DigestDerivator, Metadata, Settings};
 use super::error::DistributionManagerError;
 use super::StartDistribution;
 
-type GovernacesStillWitness = HashMap<
-    (DigestIdentifier, String, String),(bool, Option<HashSet<KeyIdentifier>>)>;
+type GovernacesStillWitness =
+    HashMap<(DigestIdentifier, String, String), (bool, Option<HashSet<KeyIdentifier>>)>;
 
 pub struct InnerDistributionManager<G: GovernanceInterface, C: DatabaseCollection> {
     governance: G,
@@ -376,7 +376,8 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                             .filter(|s| requested.contains(&s.signer))
                             .cloned()
                             .collect();
-                        let response = create_distribution_response(msg.subject_id.clone(), sn, result);
+                        let response =
+                            create_distribution_response(msg.subject_id.clone(), sn, result);
                         self.messenger_channel
                             .tell(MessageTaskCommand::Request(
                                 None,
@@ -386,10 +387,10 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                             ))
                             .await
                             .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
-                    },
+                    }
                     Ordering::Greater => {
-                       // I don't see the need for a message for MSG.SN = SN + 1.
-                       let request = if self
+                        // I don't see the need for a message for MSG.SN = SN + 1.
+                        let request = if self
                             .governance
                             .is_governance(msg.subject_id.clone())
                             .await

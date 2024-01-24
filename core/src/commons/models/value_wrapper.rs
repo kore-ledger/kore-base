@@ -107,12 +107,10 @@ impl BorshDeserialize for ValueWrapper {
                         let data: u64 = BorshDeserialize::deserialize_reader(reader)?;
                         Ok(ValueWrapper(Value::Number(Number::from(data))))
                     }
-                    _ => {
-                        Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            format!("Invalid Number representation: {}", internal_order),
-                        ))
-                    }
+                    _ => Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("Invalid Number representation: {}", internal_order),
+                    )),
                 }
             }
             2 => {

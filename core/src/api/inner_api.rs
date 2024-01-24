@@ -90,17 +90,12 @@ impl<C: DatabaseCollection> InnerApi<C> {
         let result = self.approval_api.emit_vote(request_id, acceptance).await;
         match result {
             Ok(data) => Ok(ApiResponses::VoteResolve(Ok(data))), // Cambiar al digestIdentifier del sujeto o de la misma request
-            Err(ApprovalErrorResponse::RequestNotFound) => {
-                Ok(ApiResponses::VoteResolve(Err(ApiError::NotFound(format!(
-                    "Request {} not found",
-                    id_str
-                )))))
-            }
-            Err(ApprovalErrorResponse::RequestAlreadyResponded) => {
-                Ok(ApiResponses::VoteResolve(Err(ApiError::Conflict(
-                    "Request already responded".to_owned()
-                ))))
-            }
+            Err(ApprovalErrorResponse::RequestNotFound) => Ok(ApiResponses::VoteResolve(Err(
+                ApiError::NotFound(format!("Request {} not found", id_str)),
+            ))),
+            Err(ApprovalErrorResponse::RequestAlreadyResponded) => Ok(ApiResponses::VoteResolve(
+                Err(ApiError::Conflict("Request already responded".to_owned())),
+            )),
             Err(ApprovalErrorResponse::APIChannelNotAvailable) => {
                 Err(APIInternalError::ChannelError)
             }
@@ -200,7 +195,7 @@ impl<C: DatabaseCollection> InnerApi<C> {
                 ApiResponses::GetRequest(Err(ApiError::NotFound(format!(
                     "Request {}",
                     request_id.to_str()
-                )))) 
+                ))))
             }
             Err(error) => {
                 log::debug!("ENTRY ERROR DE DATABASE");

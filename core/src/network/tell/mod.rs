@@ -259,10 +259,7 @@ mod test {
             tokio::spawn(async move {
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
-                            data,
-                            peer_id,
-                        }) => {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received { data, peer_id }) => {
                             assert_eq!(peer_id, remote_peer);
                             assert_eq!(data, payload2);
                             break;
@@ -312,10 +309,7 @@ mod test {
             let id = tokio::spawn(async move {
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
-                            data,
-                            peer_id,
-                        }) => {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received { data, peer_id }) => {
                             assert_eq!(peer_id, remote_peer);
                             assert_eq!(data, payload2);
                             break;
@@ -371,10 +365,7 @@ mod test {
                 let mut counter_received = 0;
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
-                            data,
-                            peer_id,
-                        }) => {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received { data, peer_id }) => {
                             assert_eq!(peer_id, remote_peer);
                             assert_eq!(data, payload2);
                             counter_received += 1;

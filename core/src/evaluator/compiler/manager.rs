@@ -3,21 +3,16 @@ use wasmtime::{Engine, ExternType};
 
 use super::manifest::get_toml;
 use crate::{
-    database::{DB, Error as DbError},
+    database::{Error as DbError, DB},
     evaluator::errors::{CompilerError, CompilerErrorResponses},
     governance::{GovernanceInterface, GovernanceUpdatedMessage},
-    DatabaseCollection, Notification, DigestIdentifier, Derivable,
+    DatabaseCollection, Derivable, DigestIdentifier, Notification,
 };
 
 use log::{debug, info};
 
 use async_std::fs;
-use std::{
-    collections::HashSet,
-    path::Path,
-    fs::create_dir,
-    process::Command,
-};
+use std::{collections::HashSet, fs::create_dir, path::Path, process::Command};
 
 pub struct KoreCompiler<C: DatabaseCollection, G: GovernanceInterface> {
     input_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
@@ -277,12 +272,10 @@ impl<C: DatabaseCollection, G: GovernanceInterface> Compiler<C, G> {
 }
 
 fn get_sdk_functions_identifier() -> HashSet<String> {
-    HashSet::from_iter(
-        vec![
-            "alloc".to_owned(),
-            "write_byte".to_owned(),
-            "pointer_len".to_owned(),
-            "read_byte".to_owned(),
-        ],
-    )
+    HashSet::from_iter(vec![
+        "alloc".to_owned(),
+        "write_byte".to_owned(),
+        "pointer_len".to_owned(),
+        "read_byte".to_owned(),
+    ])
 }

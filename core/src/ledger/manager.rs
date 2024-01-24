@@ -114,21 +114,23 @@ impl<C: DatabaseCollection> LedgerManager<C> {
             match data {
                 LedgerCommand::GenerateKey(derivator) => {
                     let response = self.inner_ledger.generate_key(derivator).await;
-                    if let Err(error) = &response { match error {
-                        LedgerError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
+                    if let Err(error) = &response {
+                        match error {
+                            LedgerError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            LedgerError::GovernanceError(inner_error)
+                                if *inner_error == RequestError::ChannelClosed =>
+                            {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            _ => {}
                         }
-                        LedgerError::GovernanceError(inner_error)
-                            if *inner_error == RequestError::ChannelClosed =>
-                        {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
-                        }
-                        _ => {}
-                    }}
+                    }
                     LedgerResponse::GenerateKey(response)
                 }
                 LedgerCommand::OwnEvent {
@@ -140,21 +142,23 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                         .inner_ledger
                         .event_validated(event, signatures, validation_proof)
                         .await;
-                    if let Err(error) = response { match error {
-                        LedgerError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
+                    if let Err(error) = response {
+                        match error {
+                            LedgerError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            LedgerError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            _ => {
+                                log::error!("ERROR IN LEDGER {}", error);
+                            }
                         }
-                        LedgerError::GovernanceError(RequestError::ChannelClosed) => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
-                        }
-                        _ => {
-                            log::error!("ERROR IN LEDGER {}", error);
-                        }
-                    }}
+                    }
                     LedgerResponse::NoResponse
                 }
                 LedgerCommand::Genesis {
@@ -166,19 +170,21 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                         .inner_ledger
                         .genesis(event, signatures, validation_proof)
                         .await;
-                    if let Err(error) = response { match error {
-                        LedgerError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
+                    if let Err(error) = response {
+                        match error {
+                            LedgerError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            LedgerError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            _ => {}
                         }
-                        LedgerError::GovernanceError(RequestError::ChannelClosed) => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
-                        }
-                        _ => {}
-                    }}
+                    }
                     LedgerResponse::NoResponse
                 }
                 LedgerCommand::ExternalEvent {
@@ -191,36 +197,40 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                         .inner_ledger
                         .external_event(event, signatures, sender, validation_proof)
                         .await;
-                    if let Err(error) = response { match error {
-                        LedgerError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
+                    if let Err(error) = response {
+                        match error {
+                            LedgerError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            LedgerError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            _ => {}
                         }
-                        LedgerError::GovernanceError(RequestError::ChannelClosed) => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
-                        }
-                        _ => {} 
-                    }}
+                    }
                     LedgerResponse::NoResponse
                 }
                 LedgerCommand::ExternalIntermediateEvent { event } => {
                     let response = self.inner_ledger.external_intermediate_event(event).await;
-                    if let Err(error) = response { match error {
-                        LedgerError::ChannelClosed => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
+                    if let Err(error) = response {
+                        match error {
+                            LedgerError::ChannelClosed => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            LedgerError::GovernanceError(RequestError::ChannelClosed) => {
+                                log::error!("Channel Closed");
+                                self.token.cancel();
+                                return Err(LedgerError::ChannelClosed);
+                            }
+                            _ => {}
                         }
-                        LedgerError::GovernanceError(RequestError::ChannelClosed) => {
-                            log::error!("Channel Closed");
-                            self.token.cancel();
-                            return Err(LedgerError::ChannelClosed);
-                        }
-                        _ => {}
-                    }}
+                    }
                     LedgerResponse::NoResponse
                 }
                 LedgerCommand::GetEvent {
@@ -238,7 +248,7 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                             }
                             LedgerError::DatabaseError(crate::DbError::EntryNotFound) => {
                                 return Ok(());
-                            },
+                            }
                             _ => Err(error),
                         },
                         Ok(event) => Ok(event),
@@ -257,9 +267,9 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                                 self.token.cancel();
                                 return Err(LedgerError::ChannelClosed);
                             }
-                            LedgerError::DatabaseError(crate::DbError::EntryNotFound) =>  {
+                            LedgerError::DatabaseError(crate::DbError::EntryNotFound) => {
                                 return Ok(());
-                            },
+                            }
                             _ => Err(error),
                         },
                         Ok(event) => Ok(event),

@@ -80,10 +80,7 @@ impl FromStr for DigestIdentifier {
                     .decode(&s[code.code_len()..code.material_len()])?,
             ))
         } else {
-            Err(Error::Semantic(format!(
-                "Incorrect Prefix Length: {}",
-                s
-            )))
+            Err(Error::Semantic(format!("Incorrect Prefix Length: {}", s)))
         }
     }
 }

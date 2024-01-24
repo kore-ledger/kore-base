@@ -143,8 +143,7 @@ pub struct Signed<T: BorshSerialize + BorshDeserialize + Clone> {
 pub mod tests {
     use super::*;
     use crate::commons::models::{
-        request::tests::get_eol_request,
-        approval::tests::get_approval_request,
+        approval::tests::get_approval_request, request::tests::get_eol_request,
     };
     use crate::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
 

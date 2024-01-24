@@ -90,13 +90,13 @@ impl<'de> Deserialize<'de> for Quorum {
                 self.visit_str(&v)
             }
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error, {
+            where
+                E: serde::de::Error,
+            {
                 match v {
                     "MAJORITY" => Ok(Self::Value::MAJORITY),
                     other => Err(serde::de::Error::unknown_variant(other, &["MAJORITY"])),
                 }
-                        
             }
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
             where
@@ -192,8 +192,9 @@ impl<'de> Deserialize<'de> for Who {
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error, {
+            where
+                E: serde::de::Error,
+            {
                 match v {
                     "MEMBERS" => Ok(Who::MEMBERS),
                     "ALL" => Ok(Who::ALL),
@@ -202,7 +203,7 @@ impl<'de> Deserialize<'de> for Who {
                         other,
                         &["MEMBERS", "ALL", "NOT_MEMBERS"],
                     )),
-                }                        
+                }
             }
 
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
@@ -292,8 +293,9 @@ impl<'de> Deserialize<'de> for SchemaEnum {
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: serde::de::Error, {
+            where
+                E: serde::de::Error,
+            {
                 match v {
                     "ALL" => Ok(Self::Value::ALL),
                     "NOT_GOVERNANCE" => Ok(Self::Value::NOT_GOVERNANCE),
@@ -302,7 +304,6 @@ impl<'de> Deserialize<'de> for SchemaEnum {
                         &["ALL", "NOT_GOVERNANCE"],
                     )),
                 }
-                        
             }
 
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>

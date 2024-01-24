@@ -17,8 +17,6 @@ use crate::{
 
 use super::error::{ApprovalErrorResponse, ApprovalManagerError};
 
-
-
 pub trait NotifierInterface {
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64);
     fn request_obsolete(&self, id: String, subject_id: String, sn: u64);
@@ -35,7 +33,6 @@ impl RequestNotifier {
 }
 
 impl NotifierInterface for RequestNotifier {
-
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64) {
         #[allow(clippy::let_underscore_future)]
         let _ = self.sender.send(Notification::ApprovalReceived {
@@ -332,7 +329,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
     ) -> Result<Result<(ApprovalEntity, KeyIdentifier), ApprovalErrorResponse>, ApprovalManagerError>
     {
         // Obtenemos la petición
-        let Ok(mut data) = self.get_single_request(                  request_id) else {
+        let Ok(mut data) = self.get_single_request(request_id) else {
             return Ok(Err(ApprovalErrorResponse::RequestNotFound));
         };
         if let ApprovalState::RespondedAccepted = data.state {

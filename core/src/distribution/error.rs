@@ -33,7 +33,7 @@ pub enum DistributionManagerError {
     SignaturesNotFound,
 }
 
-/* 
+/*
 #[derive(Error, Debug, Clone)]
 pub enum DistributionManagerError {
     #[error("The node is not a witness of subject")]

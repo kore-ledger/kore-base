@@ -92,7 +92,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// * `DbError::SerializeError` if the request identifier cannot be serialized.
     /// # Returns
     /// Ok if the operation is successful.
-    /// 
+    ///
     pub fn set_governance_approval_index(
         &self,
         governance_id: &DigestIdentifier,
@@ -119,7 +119,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// * `DbError::SerializeError` if the request identifier cannot be serialized.
     /// # Returns
     /// Ok if the operation is successful.
-    /// 
+    ///
     pub fn del_governance_approval_index(
         &self,
         governance_id: &DigestIdentifier,
@@ -189,7 +189,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// * `DbError::SerializeError` if the request identifier cannot be serialized.
     /// # Returns
     /// Ok with the list of approvals by suject.
-    /// 
+    ///
     pub fn get_approvals_by_subject(
         &self,
         subject_id: &DigestIdentifier,
@@ -238,7 +238,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// * `DbError::EntryNotFound` if the approval is not found.
     /// # Returns
     /// Ok with the approval.
-    /// 
+    ///
     pub fn get_approval(&self, request_id: &DigestIdentifier) -> Result<ApprovalEntity, DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -250,7 +250,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     }
 
     /// Gets approvals.
-    /// 
+    ///
     /// # Arguments
     /// * `status` - The approval status.
     /// * `from` - The start key.
@@ -261,7 +261,7 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// * `DbError::EntryNotFound` if the approval is not found.
     /// # Returns
     /// Ok with the list of approvals.
-    /// 
+    ///
     pub fn get_approvals(
         &self,
         status: Option<ApprovalState>,
@@ -334,22 +334,22 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     }
 
     /// Sets approval.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `request_id` - The request identifier.
     /// * `approval` - The approval.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// This function may return:
-    /// 
+    ///
     /// * `DbError::SerializeError` if the approval cannot be serialized.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Ok if the operation is successful.
-    /// 
+    ///
     pub fn set_approval(
         &self,
         request_id: &DigestIdentifier,
@@ -383,21 +383,21 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     }
 
     /// Deletes approval.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `request_id` - The request identifier.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Ok if the operation is successful.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// This function may return:
-    /// 
+    ///
     /// * `DbError::SerializeError` if the approval cannot be serialized.
-    /// 
+    ///
     pub fn del_approval(&self, request_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -425,8 +425,7 @@ mod tests {
             DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"subject_id".as_bytes());
         let request_id =
             DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"request_id".as_bytes());
-        let result = approvals_db
-            .set_subject_approval_index(&subject_id, &request_id);
+        let result = approvals_db.set_subject_approval_index(&subject_id, &request_id);
         assert!(result.is_ok());
         let result = approvals_db.del_subject_approval_index(&subject_id, &request_id);
         assert!(result.is_ok());
@@ -436,8 +435,10 @@ mod tests {
     fn test_governance_approval_index() {
         let manager = MemoryManager::new();
         let approvals_db = ApprovalsDb::<MemoryCollection>::new(&Arc::new(manager));
-        let governance_id =
-            DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"governance_id".as_bytes());
+        let governance_id = DigestIdentifier::new(
+            crate::DigestDerivator::Blake3_256,
+            &"governance_id".as_bytes(),
+        );
         let request_id =
             DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"request_id".as_bytes());
         let result = approvals_db.set_governance_approval_index(&governance_id, &request_id);
@@ -450,12 +451,13 @@ mod tests {
     fn test_get_approvals_by_governance() {
         let manager = MemoryManager::new();
         let approvals_db = ApprovalsDb::<MemoryCollection>::new(&Arc::new(manager));
-        let governance_id =
-            DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"governance_id".as_bytes());
+        let governance_id = DigestIdentifier::new(
+            crate::DigestDerivator::Blake3_256,
+            &"governance_id".as_bytes(),
+        );
         let request_id =
             DigestIdentifier::new(crate::DigestDerivator::Blake3_256, &"request_id".as_bytes());
-        let result = approvals_db
-            .set_governance_approval_index(&governance_id, &request_id);
+        let result = approvals_db.set_governance_approval_index(&governance_id, &request_id);
         assert!(result.is_ok());
         let request = get_signed_approval_request();
         let approval = ApprovalEntity {

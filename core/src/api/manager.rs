@@ -1,6 +1,5 @@
 /// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 use std::collections::HashSet;
 
 use super::{
@@ -9,17 +8,15 @@ use super::{
     APICommands, ApiResponses, GetAllowedSubjects,
 };
 use super::{GetEvents, GetGovernanceSubjects};
+use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::SubjectData;
 use crate::signature::Signature;
 #[cfg(feature = "approval")]
 use crate::ApprovalEntity;
 use crate::ValidationProof;
-use crate::{
-    signature::Signed, Event, EventRequest,
-};
-use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::{identifier::DigestIdentifier, DatabaseCollection};
+use crate::{signature::Signed, Event, EventRequest};
 use crate::{KeyDerivator, KeyIdentifier};
 use libp2p::PeerId;
 use log::{error, info};

@@ -9,8 +9,8 @@ use crate::{
     ValueWrapper,
 };
 pub mod error;
-pub mod main_governance;
 pub mod inner_governance;
+pub mod main_governance;
 pub mod stage;
 
 pub use main_governance::{GovernanceAPI, GovernanceInterface};

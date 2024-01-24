@@ -10,9 +10,9 @@ use std::collections::HashSet;
 
 mod manager;
 
+pub use error::ApiError;
 pub use manager::Api;
 pub(crate) use manager::ApiManager;
-pub use error::ApiError;
 
 mod error;
 pub(crate) mod inner_api;

@@ -40,8 +40,7 @@ pub struct Ledger<C: DatabaseCollection> {
     subject_is_gov: HashMap<DigestIdentifier, bool>,
     ledger_state: HashMap<DigestIdentifier, LedgerState>,
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-    distribution_channel:
-        SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
+    distribution_channel: SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     our_id: KeyIdentifier,
     notification_sender: tokio::sync::mpsc::Sender<Notification>,
     derivator: DigestDerivator,

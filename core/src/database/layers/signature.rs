@@ -33,7 +33,7 @@ impl<C: DatabaseCollection> SignatureDb<C> {
         let key = get_key(key_elements)?;
         let signatures = self.collection.get(&key)?;
         deserialize::<(HashSet<Signature>, ValidationProof)>(&signatures)
-                .map_err(|_| DbError::DeserializeError)
+            .map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_signatures(

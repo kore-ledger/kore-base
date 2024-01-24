@@ -41,7 +41,6 @@ impl HashId for ApprovalRequest {
 }
 
 impl Signed<ApprovalRequest> {
-
     pub fn new(content: ApprovalRequest, signature: Signature) -> Self {
         Self { content, signature }
     }
@@ -150,8 +149,8 @@ pub mod tests {
     use super::*;
 
     use crate::commons::models::{
-        request::tests::get_signed_eol_request, 
-        signature::tests::get_signature_approval_request};
+        request::tests::get_signed_eol_request, signature::tests::get_signature_approval_request,
+    };
     use serde_json::Value;
 
     /// Returns an approval approval reguest for testing.
@@ -163,7 +162,10 @@ pub mod tests {
             gov_version: 0,
             patch: ValueWrapper(Value::String("value".to_string())),
             state_hash: DigestIdentifier::new(DigestDerivator::Blake3_256, "state_hash".as_bytes()),
-            hash_prev_event: DigestIdentifier::new(DigestDerivator::Blake3_256, "hash_prev_event".as_bytes()),
+            hash_prev_event: DigestIdentifier::new(
+                DigestDerivator::Blake3_256,
+                "hash_prev_event".as_bytes(),
+            ),
             gov_id: DigestIdentifier::new(DigestDerivator::Blake3_256, "gov_id".as_bytes()),
         }
     }
@@ -174,5 +176,4 @@ pub mod tests {
         let signature = get_signature_approval_request();
         Signed::<ApprovalRequest>::new(approval_request, signature)
     }
-    
 }

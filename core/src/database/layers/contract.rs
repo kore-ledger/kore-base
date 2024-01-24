@@ -24,16 +24,16 @@ impl<C: DatabaseCollection> ContractDb<C> {
 
     /// Get the contract for a given governance and schema.
     /// Returns the contract, the hash of the contract and the governance version.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `governance_id` - The governance id.
     /// * `schema_id` - The schema id.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the contract is not found or if the contract is not valid.
-    /// 
+    ///
     pub fn get_contract(
         &self,
         governance_id: &DigestIdentifier,
@@ -51,23 +51,23 @@ impl<C: DatabaseCollection> ContractDb<C> {
     }
 
     /// Put a contract for a given governance and schema.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `governance_id` - The governance id.
     /// * `schema_id` - The schema id.
     /// * `contract` - The contract.
     /// * `hash` - The hash of the contract.
     /// * `gov_version` - The governance version.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the contract is not valid.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns Ok if the contract is successfully stored.
-    /// 
+    ///
     pub fn put_contract(
         &self,
         governance_id: &DigestIdentifier,

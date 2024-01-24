@@ -60,7 +60,7 @@ impl RoutingBehaviour {
     pub fn handle_event(&mut self, event: RoutingComposedEvent) {
         match event {
             RoutingComposedEvent::IdentifyEvent(event) => {
-                if let  IdentifyEvent::Received { peer_id, info } = *event {
+                if let IdentifyEvent::Received { peer_id, info } = *event {
                     debug!(
                         "{}: ENTRANDO EN IDENTIFIED PARA {} con info: {:?}",
                         LOG_TARGET, peer_id, info

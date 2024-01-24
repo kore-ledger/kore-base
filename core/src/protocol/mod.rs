@@ -1,6 +1,5 @@
 /// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 mod error;
 
 pub use error::ProtocolErrors;
@@ -44,7 +43,8 @@ impl TaskCommandContent for KoreMessages {}
 /// Protocol channels
 pub struct ProtocolChannels {
     pub input_channel: MpscChannel<Signed<MessageContent<KoreMessages>>, ()>,
-    pub distribution_channel: SenderEnd<DistributionMessagesNew,Result<(), DistributionManagerError>>,
+    pub distribution_channel:
+        SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     #[cfg(feature = "evaluation")]
     pub evaluation_channel: SenderEnd<EvaluatorMessage, EvaluatorResponse>,
     #[cfg(feature = "validation")]
@@ -127,9 +127,8 @@ impl ProtocolManager {
         command: ChannelData<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Result<(), ProtocolErrors> {
         let message = match command {
-            ChannelData::AskData(_data) => 
-                return Err(ProtocolErrors::AskCommandDetected),
-            ChannelData::TellData(data) => data.get(),            
+            ChannelData::AskData(_data) => return Err(ProtocolErrors::AskCommandDetected),
+            ChannelData::TellData(data) => data.get(),
         };
         let msg = message.content.content;
         let sender = message.content.sender_id;

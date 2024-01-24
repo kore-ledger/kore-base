@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, collections::{HashMap, HashSet}};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use json_patch::{patch, Patch};
 use log::warn;
@@ -43,7 +46,8 @@ const TIMEOUT: u32 = 2000;
 // const GET_ALL: isize = 200;
 const QUORUM_PORCENTAGE_AMPLIFICATION: f64 = 0.2;
 
-type SubjectsCompletingEvent = HashMap<DigestIdentifier, (ValidationStage, HashSet<KeyIdentifier>, (u32, u32))>;
+type SubjectsCompletingEvent =
+    HashMap<DigestIdentifier, (ValidationStage, HashSet<KeyIdentifier>, (u32, u32))>;
 
 #[allow(dead_code)]
 pub struct EventCompleter<C: DatabaseCollection> {
@@ -310,15 +314,15 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                             // Cancel signature request
                             self.message_channel
                                 .tell(MessageTaskCommand::Cancel(
-                                    event_prevalidated.content.subject_id.to_str().to_owned()
+                                    event_prevalidated.content.subject_id.to_str().to_owned(),
                                 ))
                                 .await
                                 .map_err(EventError::ChannelError)?;
                             self.subjects_completing_event.remove(subject_id);
                             self.subjects_by_governance.remove(subject_id);
-                            self.database.del_prevalidated_event(subject_id).map_err(
-                                |error| EventError::DatabaseError(error.to_string()),
-                            )?;
+                            self.database
+                                .del_prevalidated_event(subject_id)
+                                .map_err(|error| EventError::DatabaseError(error.to_string()))?;
                             self.new_event(event_prevalidated.content.event_request)
                                 .await?;
                             continue;
@@ -350,17 +354,15 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                             quorum_size,
                         )
                         .await?;
-                        let event_prevalidated_hash =
-                            DigestIdentifier::from_serializable_borsh(
-                                &event_prevalidated.content,
-                                self.derivator,
+                        let event_prevalidated_hash = DigestIdentifier::from_serializable_borsh(
+                            &event_prevalidated.content,
+                            self.derivator,
+                        )
+                        .map_err(|_| {
+                            EventError::CryptoError(
+                                "Error generating event prevalidated hash in NGV".to_owned(),
                             )
-                            .map_err(|_| {
-                                EventError::CryptoError(
-                                    "Error generating event prevalidated hash in NGV"
-                                        .to_owned(),
-                                )
-                            })?;
+                        })?;
                         self.event_validation_events
                             .insert(event_prevalidated_hash, validation_event);
                         // Make update of the phase the event is going through
@@ -1371,7 +1373,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         } else {
             return Err(EventError::SubjectNotFound(subject_id.to_str()));
         };
-        
+
         // Check if the governance version matches ours.
         match our_governance_version.cmp(&governance_version) {
             Ordering::Less => {
@@ -1488,8 +1490,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                 .del_request(&subject_id)
                 .map_err(|error| EventError::DatabaseError(error.to_string()))?;
             self.message_channel
-                .tell(MessageTaskCommand::Cancel(
-                    subject_id.to_str().to_owned()))
+                .tell(MessageTaskCommand::Cancel(subject_id.to_str().to_owned()))
                 .await
                 .map_err(EventError::ChannelError)?;
             self.events_to_validate.remove(&event_hash);
