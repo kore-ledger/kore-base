@@ -5,12 +5,12 @@ use tokio::task::JoinError;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Subject Task error")]
-    TaskError {
+    Task {
         #[from]
         source: JoinError,
     },
     #[error("Sender Channel Error")]
-    SenderChannelError,
+    SenderChannel,
     #[error("Serde JSON error")]
     SerdeJson {
         #[from]
@@ -31,5 +31,5 @@ pub enum Error {
     #[error("Cant send message. Channel closed")]
     ChannelClosed,
     #[error("Error Creating message")]
-    CreatingMessageError,
+    CreatingMessage,
 }

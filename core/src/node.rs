@@ -1,7 +1,10 @@
+/// Copyright 2024 Antonio Estévez
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #[cfg(feature = "approval")]
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
-use crate::approval::{ApprovalMessages, ApprovalResponses};
+use crate::approval::{ApprovalMessages, ApprovalResponses, inner_manager::{InnerApprovalManager, RequestNotifier}};
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
@@ -11,26 +14,30 @@ use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
 use crate::commons::settings::Settings;
 use crate::database::{DatabaseCollection, DatabaseManager, DB};
-use crate::distribution::error::DistributionErrorResponses;
+use crate::distribution::error::DistributionManagerError;
+use crate::distribution::inner_manager::InnerDistributionManager;
 use crate::distribution::manager::DistributionManager;
 use crate::distribution::DistributionMessagesNew;
+use crate::evaluator::compiler::manager::KoreCompiler;
 #[cfg(feature = "evaluation")]
-use crate::evaluator::{EvaluatorManager, EvaluatorMessage, EvaluatorResponse};
+use crate::evaluator::{EvaluatorManager, EvaluatorMessage, EvaluatorResponse, runner::manager::KoreRunner};
+use crate::event::event_completer::EventCompleter;
 use crate::event::manager::{EventAPI, EventManager};
 use crate::event::{EventCommand, EventResponse};
 use crate::governance::GovernanceAPI;
-use crate::governance::{governance::Governance, GovernanceMessage, GovernanceResponse};
+use crate::governance::{main_governance::Governance, GovernanceMessage, GovernanceResponse};
+use crate::ledger::inner_ledger::Ledger;
 use crate::ledger::manager::EventManagerAPI;
 use crate::ledger::{manager::LedgerManager, LedgerCommand, LedgerResponse};
 use crate::message::{
     MessageContent, MessageReceiver, MessageSender, MessageTaskCommand, MessageTaskManager,
     NetworkEvent,
 };
-use crate::network::network::NetworkProcessor;
-use crate::protocol::protocol_message_manager::{ProtocolManager, TapleMessages};
+use crate::network::network_processor::NetworkProcessor;
+use crate::protocol::{ProtocolManager, ProtocolChannels, KoreMessages};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
-use crate::validation::manager::ValidationManager;
+use crate::validation::{Validation, manager::ValidationManager};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
 use ::futures::Future;
@@ -41,7 +48,7 @@ use std::sync::Arc;
 use tokio::sync::*;
 use tokio_util::sync::CancellationToken;
 
-use crate::api::{Api, ApiManager};
+use crate::api::{Api, ApiManager, inner_api::InnerApi};
 use crate::error::Error;
 
 const BUFFER_SIZE: usize = 1000;
@@ -89,14 +96,14 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let (governance_update_sx, governance_update_rx) = broadcast::channel(BUFFER_SIZE);
 
         let (task_rx, task_tx) =
-            MpscChannel::<MessageTaskCommand<TapleMessages>, ()>::new(BUFFER_SIZE);
+            MpscChannel::<MessageTaskCommand<KoreMessages>, ()>::new(BUFFER_SIZE);
 
         let (protocol_rx, protocol_tx) =
-            MpscChannel::<Signed<MessageContent<TapleMessages>>, ()>::new(BUFFER_SIZE);
+            MpscChannel::<Signed<MessageContent<KoreMessages>>, ()>::new(BUFFER_SIZE);
 
         let (distribution_rx, distribution_tx) = MpscChannel::<
             DistributionMessagesNew,
-            Result<(), DistributionErrorResponses>,
+            Result<(), DistributionManagerError>,
         >::new(BUFFER_SIZE);
 
         #[cfg(feature = "approval")]
@@ -154,21 +161,28 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let task_manager =
             MessageTaskManager::new(network_tx, task_rx, token.clone(), notification_tx.clone());
 
-        let protocol_manager = ProtocolManager::new(
-            protocol_rx,
-            distribution_tx.clone(),
+        // Defines protocol channels
+        let channels = ProtocolChannels {
+            input_channel: protocol_rx,
+            distribution_channel: distribution_tx.clone(),
             #[cfg(feature = "evaluation")]
-            evaluation_tx,
+            evaluation_channel: evaluation_tx,
             #[cfg(feature = "validation")]
-            validation_tx,
-            event_tx.clone(),
+            validation_channel: validation_tx,
+            event_channel: event_tx.clone(),
             #[cfg(feature = "approval")]
-            approval_tx.clone(),
-            ledger_tx.clone(),
+            approval_channel: approval_tx.clone(),
+            ledger_channel: ledger_tx.clone(),
+        };
+    
+        // Build protocol manager
+        let protocol_manager = ProtocolManager::new(
+            channels,
             token.clone(),
             notification_tx.clone(),
         );
 
+        // Build governance
         let mut governance_manager = Governance::<M, C>::new(
             governance_rx,
             token.clone(),
@@ -177,30 +191,41 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             governance_update_sx.clone(),
         );
 
-        let event_manager = EventManager::new(
-            event_rx,
-            governance_update_rx,
+        // Build event completer
+        let event_completer = EventCompleter::new(
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
-            token.clone(),
             task_tx.clone(),
             notification_tx.clone(),
             ledger_tx.clone(),
-            signature_manager.get_own_identifier(),
             signature_manager.clone(),
             settings.node.digest_derivator,
         );
 
-        let ledger_manager = LedgerManager::new(
-            ledger_rx,
+        // Build event manager
+        let event_manager = EventManager::new(
+            event_rx,
+            governance_update_rx,
             token.clone(),
-            notification_tx.clone(),
+            event_completer,
+        );
+
+        // Build inner ledger
+        let inner_ledger = Ledger::new(
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
             task_tx.clone(),
-            distribution_tx,
-            controller_id.clone(),
+            distribution_tx,  
+            controller_id.clone(),   
+            notification_tx.clone(),
             settings.node.digest_derivator,
+        );
+
+        // Build ledger manager
+        let ledger_manager = LedgerManager::new(
+            ledger_rx,
+            inner_ledger,
+            token.clone(),
         );
 
         let as_manager = AuthorizedSubjectsManager::new(
@@ -212,76 +237,124 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             notification_tx.clone(),
         );
 
-        let api_manager = ApiManager::new(
-            api_rx,
-            EventAPI::new(event_tx),
-            #[cfg(feature = "approval")]
-            ApprovalAPI::new(approval_tx),
-            AuthorizedSubjectsAPI::new(as_tx),
-            EventManagerAPI::new(ledger_tx),
-            token.clone(),
-            notification_tx.clone(),
-            DB::new(database.clone()),
-        );
+        // Build api
+        let api_manager = {
+            let inner_api = InnerApi::new(
+                EventAPI::new(event_tx),
+                AuthorizedSubjectsAPI::new(as_tx),
+                DB::new(database.clone()),
+                #[cfg(feature = "approval")] ApprovalAPI::new(approval_tx),
+                EventManagerAPI::new(ledger_tx),
+            );
 
-        #[cfg(feature = "evaluation")]
-        let evaluator_manager = EvaluatorManager::new(
-            evaluation_rx,
-            database.clone(),
-            signature_manager.clone(),
-            governance_update_sx.subscribe(),
-            token.clone(),
-            notification_tx.clone(),
-            GovernanceAPI::new(governance_tx.clone()),
-            settings.node.smartcontracts_directory.clone(),
-            task_tx.clone(),
-            settings.node.digest_derivator,
-        );
+            ApiManager::new(
+                api_rx,
+                token.clone(),
+                inner_api,
+            )
+        };
 
+        // Build evaluation
+        #[cfg(feature = "evaluation")] 
+        let evaluator_manager: EvaluatorManager<M, C, GovernanceAPI> = {
+            use wasmtime::Engine;
+            let engine = Engine::default();
+
+            // Build core compiler
+            let compiler = KoreCompiler::new(
+                governance_update_sx.subscribe(),
+                DB::new(database.clone()),
+                GovernanceAPI::new(governance_tx.clone()),
+                settings.node.smartcontracts_directory.clone(),
+                engine.clone(),
+                token.clone(),
+                notification_tx.clone(),
+            );
+
+            // Build core runner
+            let runner = KoreRunner::new(
+                DB::new(database.clone()),
+                engine,
+                GovernanceAPI::new(governance_tx.clone()),
+                settings.node.digest_derivator,
+            );
+
+            // Build evaluation manager
+            EvaluatorManager::new(
+                evaluation_rx,
+                compiler,
+                runner,
+                signature_manager.clone(),
+                token.clone(),
+                task_tx.clone(),
+                settings.node.digest_derivator,
+            )
+        };
+        
+        // Build approval
         #[cfg(feature = "approval")]
-        let approval_manager = ApprovalManager::new(
+        let approval_manager = {
+            let passvotation = settings.node.passvotation.into();
+            let inner_approval = InnerApprovalManager::new(
+                GovernanceAPI::new(governance_tx.clone()),
+                DB::new(database.clone()),
+                RequestNotifier::new(notification_tx.clone()),
+                signature_manager.clone(),
+                passvotation,
+                settings.node.digest_derivator,
+            );
+
+            ApprovalManager::new(
+                approval_rx,
+                token.clone(),
+                task_tx.clone(),
+                governance_update_sx.subscribe(),
+                inner_approval,
+            )
+        };
+        // Build inner distribution
+        let inner_distribution = InnerDistributionManager::new(
             GovernanceAPI::new(governance_tx.clone()),
-            approval_rx,
-            token.clone(),
-            task_tx.clone(),
-            governance_update_sx.subscribe(),
-            signature_manager.clone(),
-            notification_tx.clone(),
-            settings.clone(),
             DB::new(database.clone()),
+            task_tx.clone(),
+            signature_manager.clone(),
+            settings.clone(),
             settings.node.digest_derivator,
         );
 
+        // Build distribution manager
         let distribution_manager = DistributionManager::new(
             distribution_rx,
             governance_update_sx.subscribe(),
             token.clone(),
             notification_tx.clone(),
-            task_tx.clone(),
-            GovernanceAPI::new(governance_tx.clone()),
-            signature_manager.clone(),
-            settings.clone(),
-            DB::new(database.clone()),
-            settings.node.digest_derivator,
+            inner_distribution,
         );
 
+        // Build validation
         #[cfg(feature = "validation")]
-        let validation_manager = ValidationManager::new(
-            validation_rx,
-            GovernanceAPI::new(governance_tx),
-            DB::new(database),
-            signature_manager,
-            token.clone(),
-            notification_tx,
-            task_tx,
-            settings.node.digest_derivator,
-        );
+        let validation_manager = {
+            let inner_validation = Validation::new(
+                GovernanceAPI::new(governance_tx.clone()),
+                DB::new(database.clone()),
+                signature_manager.clone(),
+                task_tx.clone(),
+                settings.node.digest_derivator,
+            );
 
+            ValidationManager::new(
+                validation_rx,
+                inner_validation,
+                token.clone(),
+                notification_tx,
+            )
+        };
+        
         let taple = Node {
             notification_rx,
             token,
-            _m: PhantomData::default(),
-            _c: PhantomData::default(),
+            _m: PhantomData,
+            _c: PhantomData,
         };
 
         let api = Api::new(

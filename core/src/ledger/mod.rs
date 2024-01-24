@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub mod errors;
-pub mod ledger;
+pub mod inner_ledger;
 pub mod manager;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]

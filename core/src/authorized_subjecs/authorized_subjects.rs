@@ -5,7 +5,7 @@ use crate::{
     database::DB,
     ledger::LedgerCommand,
     message::{MessageConfig, MessageTaskCommand},
-    protocol::protocol_message_manager::TapleMessages,
+    protocol::KoreMessages,
     DatabaseCollection, DigestIdentifier, KeyIdentifier,
 };
 
@@ -16,7 +16,7 @@ pub struct AuthorizedSubjects<C: DatabaseCollection> {
     /// Object that handles the connection to the database.
     database: DB<C>,
     /// Message channel used to communicate with other system components.
-    message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     /// Unique identifier for the component using this structure.
     our_id: KeyIdentifier,
 }
@@ -31,7 +31,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
     /// * `our_id` - Unique identifier.
     pub fn new(
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         our_id: KeyIdentifier,
     ) -> Self {
         Self {
@@ -53,9 +53,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
             .get_allowed_subjects_and_providers(None, 10000)
         {
             Ok(psp) => psp,
-            Err(error) => match error {
-                _ => return Err(AuthorizedSubjectsError::DatabaseError(error)),
-            },
+            Err(error) =>  return Err(AuthorizedSubjectsError::DatabaseError(error)),
         };
 
         // For each pre-authorized subject, we send a message to the associated providers through the message channel.
@@ -64,7 +62,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
                 self.message_channel
                     .tell(MessageTaskCommand::Request(
                         None,
-                        TapleMessages::LedgerMessages(LedgerCommand::GetLCE {
+                        KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
                             who_asked: self.our_id.clone(),
                             subject_id,
                         }),
@@ -98,7 +96,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
             self.message_channel
                 .tell(MessageTaskCommand::Request(
                     None,
-                    TapleMessages::LedgerMessages(LedgerCommand::GetLCE {
+                    KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
                         who_asked: self.our_id.clone(),
                         subject_id,
                     }),

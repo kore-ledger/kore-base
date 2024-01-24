@@ -4,6 +4,7 @@ use crate::ValueWrapper;
 
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Quorum {
     MAJORITY,
     FIXED { fixed: u32 },
@@ -86,10 +87,16 @@ impl<'de> Deserialize<'de> for Quorum {
             where
                 E: serde::de::Error,
             {
-                match v.as_str() {
+                self.visit_str(&v)
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error, {
+                match v {
                     "MAJORITY" => Ok(Self::Value::MAJORITY),
                     other => Err(serde::de::Error::unknown_variant(other, &["MAJORITY"])),
                 }
+                        
             }
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
             where
@@ -108,6 +115,7 @@ impl<'de> Deserialize<'de> for Quorum {
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Who {
     ID { ID: String },
     NAME { NAME: String },
@@ -180,7 +188,13 @@ impl<'de> Deserialize<'de> for Who {
             where
                 E: serde::de::Error,
             {
-                match v.as_str() {
+                self.visit_str(&v)
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error, {
+                match v {
                     "MEMBERS" => Ok(Who::MEMBERS),
                     "ALL" => Ok(Who::ALL),
                     "NOT_MEMBERS" => Ok(Who::NOT_MEMBERS),
@@ -188,8 +202,9 @@ impl<'de> Deserialize<'de> for Who {
                         other,
                         &["MEMBERS", "ALL", "NOT_MEMBERS"],
                     )),
-                }
+                }                        
             }
+
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
@@ -212,6 +227,7 @@ impl<'de> Deserialize<'de> for Who {
 #[derive(Debug, Clone)]
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum SchemaEnum {
     ID { ID: String },
     NOT_GOVERNANCE,
@@ -272,7 +288,13 @@ impl<'de> Deserialize<'de> for SchemaEnum {
             where
                 E: serde::de::Error,
             {
-                match v.as_str() {
+                self.visit_str(&v)
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error, {
+                match v {
                     "ALL" => Ok(Self::Value::ALL),
                     "NOT_GOVERNANCE" => Ok(Self::Value::NOT_GOVERNANCE),
                     other => Err(serde::de::Error::unknown_variant(
@@ -280,7 +302,9 @@ impl<'de> Deserialize<'de> for SchemaEnum {
                         &["ALL", "NOT_GOVERNANCE"],
                     )),
                 }
+                        
             }
+
             fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,

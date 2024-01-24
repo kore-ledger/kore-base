@@ -19,7 +19,7 @@ use crate::commons::crypto::{
 };
 
 /// Key based identifier
-#[derive(Debug, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, Hash, BorshSerialize, BorshDeserialize, PartialEq, PartialOrd, Ord)]
 pub struct KeyIdentifier {
     pub public_key: Vec<u8>,
 
@@ -50,7 +50,7 @@ impl KeyIdentifier {
                     SignatureDerivator::Ed25519Sha512 => {
                         kp.verify(Payload::Buffer(data.to_vec()), &signature.signature)
                     }
-                    _ => Err(Error::VerificationError("Wrong signature type".to_owned())),
+                    _ => Err(Error::Verification("Wrong signature type".to_owned())),
                 }
             }
             KeyDerivator::Secp256k1 => {
@@ -59,7 +59,7 @@ impl KeyIdentifier {
                     SignatureDerivator::ECDSAsecp256k1 => {
                         kp.verify(Payload::Buffer(data.to_vec()), &signature.signature)
                     }
-                    _ => Err(Error::VerificationError("Wrong signature type".to_owned())),
+                    _ => Err(Error::Verification("Wrong signature type".to_owned())),
                 }
             }
         }
@@ -73,13 +73,6 @@ impl Default for KeyIdentifier {
             public_key: vec![0; 32],
             derivator: KeyDerivator::Ed25519,
         }
-    }
-}
-
-/// Partial equal for KeyIdentifier
-impl PartialEq for KeyIdentifier {
-    fn eq(&self, other: &Self) -> bool {
-        self.public_key == other.public_key && self.derivator == other.derivator
     }
 }
 
@@ -103,7 +96,7 @@ impl FromStr for KeyIdentifier {
                 public_key: k_vec,
             })
         } else {
-            Err(Error::SemanticError(format!(
+            Err(Error::Semantic(format!(
                 "Incorrect Identifier Length: {}",
                 s
             )))

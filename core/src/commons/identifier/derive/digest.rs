@@ -94,9 +94,9 @@ impl FromStr for DigestDerivator {
                 "J" => Ok(Self::Blake3_512),
                 "L" => Ok(Self::SHA2_512),
                 "M" => Ok(Self::SHA3_512),
-                _ => Err(Error::DeserializationError),
+                _ => Err(Error::Deserialization),
             },
-            _ => Err(Error::DeserializationError),
+            _ => Err(Error::Deserialization),
         }
     }
 }

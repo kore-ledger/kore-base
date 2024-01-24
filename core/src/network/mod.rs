@@ -1,5 +1,5 @@
 mod error;
-pub mod network;
+pub mod network_processor;
 pub mod routing;
 pub mod tell;
 
@@ -7,7 +7,7 @@ pub mod tell;
 mod tests {
     pub use crate::message::{MessageReceiver, MessageSender, NetworkEvent};
     use crate::network::{
-        network::{NetworkComposedEvent, NetworkProcessor, TapleNetworkBehavior},
+        network_processor::{NetworkComposedEvent, NetworkProcessor, KoreNetworkBehavior},
         tell::TellBehaviourEvent,
     };
     use crate::{message::Command, network::routing::RoutingComposedEvent, ListenAddr};
@@ -49,7 +49,8 @@ mod tests {
                 format!("pepe").as_bytes(),
             ));
             let (sender_boot, receiver_boot) = mpsc::channel(10000);
-            let (notification_tx, notification_rx) = mpsc::channel(1000);
+            // TODO: Could be notificaction_rx removed?
+            let (notification_tx, _notification_rx) = mpsc::channel(1000);
             let token = CancellationToken::new();
             let bootstrap_network = NetworkProcessor::new(
                 vec![ListenAddr::try_from(String::from("/memory/647988")).unwrap()],
@@ -150,13 +151,13 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             assert_eq!(node2_peer_id, peer_id);
                         }
@@ -183,13 +184,13 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             println!("TELL SENDED 1");
                             assert_eq!(node2_peer_id, peer_id);
@@ -227,14 +228,14 @@ mod tests {
                         println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                        TellBehaviourEvent::Received { peer_id: _, data },
                     )) => {
                         println!("Tell RECEIVED 2");
                         assert_eq!(&data, b"Hello Node2!");
                         break;
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestSent { peer_id },
+                        TellBehaviourEvent::Sent { peer_id },
                     )) => {
                         println!("TELL SENDED 2");
                         assert_eq!(node1_peer_id, peer_id);
@@ -302,13 +303,13 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             assert_eq!(node2_peer_id, peer_id);
                         }
@@ -335,13 +336,13 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             assert_eq!(node2_peer_id, peer_id);
                         }
@@ -368,13 +369,13 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             assert_eq!(node2_peer_id, peer_id);
                         }
@@ -411,14 +412,14 @@ mod tests {
                         println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                        TellBehaviourEvent::Received { peer_id: _, data },
                     )) => {
                         println!("Tell RECEIVED 2");
                         assert_eq!(&data, b"Hello Node2!");
                         break;
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestSent { peer_id },
+                        TellBehaviourEvent::Sent { peer_id },
                     )) => {
                         assert_eq!(node1_peer_id, peer_id);
                     }
@@ -496,12 +497,12 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data: _ },
+                            TellBehaviourEvent::Received { peer_id: _, data: _ },
                         )) => {
                             println!("Tell RECEIVED 1");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             assert_eq!(node1_peer_id, peer_id);
                         }
@@ -552,7 +553,7 @@ mod tests {
                             println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                            TellBehaviourEvent::Received { peer_id: _, data },
                         )) => {
                             println!("Tell RECEIVED 1");
                             assert_eq!(&data, b"Hello Node1!");
@@ -562,7 +563,7 @@ mod tests {
                             println!("HACIENDO GET DESDE NODO1 FIN");
                         }
                         SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                            TellBehaviourEvent::RequestSent { peer_id },
+                            TellBehaviourEvent::Sent { peer_id },
                         )) => {
                             println!("TELL SENDED 1");
                             assert_eq!(node2_peer_id, peer_id);
@@ -658,14 +659,14 @@ mod tests {
                         println!("{}: Dialing to peer: {:?}", LOG_TARGET, peer_id);
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestReceived { peer_id: _, data },
+                        TellBehaviourEvent::Received { peer_id: _, data },
                     )) => {
                         println!("Tell RECEIVED 2");
                         assert_eq!(&data, b"Hello Node2!");
                         break;
                     }
                     SwarmEvent::Behaviour(NetworkComposedEvent::TellBehaviourEvent(
-                        TellBehaviourEvent::RequestSent { peer_id },
+                        TellBehaviourEvent::Sent { peer_id },
                     )) => {
                         println!("TELL SENDED 2");
                         assert_eq!(node1_peer_id, peer_id);
@@ -700,7 +701,7 @@ mod tests {
     // Build swarm with `TapleNodeBehaviour`
     fn build_swarm(
         boot_node: Option<(&PeerId, Multiaddr)>,
-    ) -> (Swarm<TapleNetworkBehavior>, Multiaddr) {
+    ) -> (Swarm<KoreNetworkBehavior>, Multiaddr) {
         let keypair = Keypair::generate_ed25519();
 
         let noise_keys = noise::Keypair::<noise::X25519Spec>::new()
@@ -713,9 +714,9 @@ mod tests {
             .multiplex(yamux::YamuxConfig::default())
             .boxed();
         let behaviour = if let Some(boot_node) = boot_node {
-            TapleNetworkBehavior::new(keypair.clone(), vec![(boot_node.0.to_owned(), boot_node.1)])
+            KoreNetworkBehavior::new(keypair.clone(), vec![(boot_node.0.to_owned(), boot_node.1)])
         } else {
-            TapleNetworkBehavior::new(keypair.clone(), vec![])
+            KoreNetworkBehavior::new(keypair.clone(), vec![])
         };
 
         let mut swarm = Swarm::new(transport, behaviour, keypair.public().to_peer_id());

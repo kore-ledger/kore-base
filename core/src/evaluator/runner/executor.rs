@@ -65,7 +65,7 @@ impl ContractExecutor {
                 let Ok(patched_state) = apply_patch(data.0.clone(), state.0.clone()) else {
                     return Ok(ContractResult::error());
                 };
-                if let Ok(_) = check_governance_state(&patched_state) {
+                if check_governance_state(&patched_state).is_ok() {
                     Ok(ContractResult {
                         final_state: ValueWrapper(serde_json::to_value(patched_state).unwrap()),
                         approval_required: true,
@@ -95,7 +95,7 @@ impl ContractExecutor {
         // Cargar wasm
         let module = unsafe { Module::deserialize(&self.engine, contract_bytes).unwrap() };
         // Generar contexto
-        let (context, state_ptr, event_ptr) = self.generate_context(&state, &event)?;
+        let (context, state_ptr, event_ptr) = self.generate_context(state, event)?;
         let mut store = Store::new(&self.engine, context);
         // Generar Linker
         let linker = self.generate_linker(&self.engine)?;
@@ -153,7 +153,7 @@ impl ContractExecutor {
         &self,
         engine: &Engine,
     ) -> Result<Linker<MemoryManager>, ExecutorErrorResponses> {
-        let mut linker = Linker::new(&engine);
+        let mut linker = Linker::new(engine);
         linker
             .func_wrap(
                 "env",

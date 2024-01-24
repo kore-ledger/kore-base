@@ -109,9 +109,9 @@ impl TellBehaviour {
 
 #[derive(Debug)]
 pub enum TellBehaviourEvent {
-    RequestSent { peer_id: PeerId },
-    RequestReceived { data: Vec<u8>, peer_id: PeerId },
-    RequestFailed { peer_id: PeerId },
+    Sent { peer_id: PeerId },
+    Received { data: Vec<u8>, peer_id: PeerId },
+    Failed { peer_id: PeerId },
 }
 
 impl NetworkBehaviour for TellBehaviour {
@@ -137,26 +137,26 @@ impl NetworkBehaviour for TellBehaviour {
                 self.routes.remove(&peer_id);
                 self.pending_events
                     .push_back(NetworkBehaviourAction::GenerateEvent(
-                        TellBehaviourEvent::RequestFailed { peer_id },
+                        TellBehaviourEvent::Failed { peer_id },
                     ))
             }
             TellHandlerEvent::OutboundTimeout => {
                 self.routes.remove(&peer_id);
                 self.pending_events
                     .push_back(NetworkBehaviourAction::GenerateEvent(
-                        TellBehaviourEvent::RequestFailed { peer_id },
+                        TellBehaviourEvent::Failed { peer_id },
                     ))
             }
             TellHandlerEvent::RequestReceived { data } => {
                 self.pending_events
                     .push_back(NetworkBehaviourAction::GenerateEvent(
-                        TellBehaviourEvent::RequestReceived { data, peer_id },
+                        TellBehaviourEvent::Received { data, peer_id },
                     ))
             }
             TellHandlerEvent::RequestSent => {
                 self.pending_events
                     .push_back(NetworkBehaviourAction::GenerateEvent(
-                        TellBehaviourEvent::RequestSent { peer_id },
+                        TellBehaviourEvent::Sent { peer_id },
                     ))
             }
         }
@@ -259,7 +259,7 @@ mod test {
             tokio::spawn(async move {
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::RequestReceived {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
                             data,
                             peer_id,
                         }) => {
@@ -278,10 +278,10 @@ mod test {
             let mut request_received = false;
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestSent { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Sent { .. }) => {
                         request_received = true;
                     }
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestFailed { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Failed { .. }) => {
                         assert!(false);
                         break;
                     }
@@ -312,7 +312,7 @@ mod test {
             let id = tokio::spawn(async move {
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::RequestReceived {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
                             data,
                             peer_id,
                         }) => {
@@ -332,10 +332,10 @@ mod test {
             let mut has_closed = false;
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestSent { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Sent { .. }) => {
                         request_received = true;
                     }
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestFailed { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Failed { .. }) => {
                         assert!(false);
                         break;
                     }
@@ -371,7 +371,7 @@ mod test {
                 let mut counter_received = 0;
                 loop {
                     match swarm2.select_next_some().await {
-                        SwarmEvent::Behaviour(TellBehaviourEvent::RequestReceived {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Received {
                             data,
                             peer_id,
                         }) => {
@@ -386,7 +386,7 @@ mod test {
                             assert_eq!(counter_received, 10);
                             break;
                         }
-                        SwarmEvent::Behaviour(TellBehaviourEvent::RequestFailed { .. }) => {
+                        SwarmEvent::Behaviour(TellBehaviourEvent::Failed { .. }) => {
                             assert!(false);
                             break;
                         }
@@ -398,10 +398,10 @@ mod test {
             let mut counter_sent = 0;
             loop {
                 match swarm1.select_next_some().await {
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestSent { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Sent { .. }) => {
                         counter_sent += 1;
                     }
-                    SwarmEvent::Behaviour(TellBehaviourEvent::RequestFailed { .. }) => {
+                    SwarmEvent::Behaviour(TellBehaviourEvent::Failed { .. }) => {
                         assert!(false);
                         break;
                     }

@@ -75,7 +75,7 @@ impl EventRequest {
 
 impl HashId for EventRequest {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator).map_err(|_| {
+        DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for EventRequest Fails".to_string())
         })
     }

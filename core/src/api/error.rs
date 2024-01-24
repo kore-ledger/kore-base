@@ -1,6 +1,6 @@
 //! Errors that may occur when interacting with a TAPLE node through its API
 
-pub use crate::protocol::errors::EventCreationError;
+//pub use crate::protocol::errors::EventCreationError;
 use crate::{approval::error::ApprovalErrorResponse, event::errors::EventError};
 use thiserror::Error;
 

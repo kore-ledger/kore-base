@@ -53,9 +53,9 @@ impl FromStr for SignatureDerivator {
             "S" => match &s[1..2] {
                 "E" => Ok(Self::Ed25519Sha512),
                 "S" => Ok(Self::ECDSAsecp256k1),
-                _ => Err(Error::DeserializationError),
+                _ => Err(Error::Deserialization),
             },
-            _ => Err(Error::DeserializationError),
+            _ => Err(Error::Deserialization),
         }
     }
 }

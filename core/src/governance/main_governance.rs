@@ -46,7 +46,7 @@ impl<M: DatabaseManager<C>, C: DatabaseCollection> Governance<M, C> {
                 get_governance_schema(),
                 update_channel,
             ),
-            _m: PhantomData::default(),
+            _m: PhantomData,
         }
     }
 
@@ -109,7 +109,9 @@ impl<M: DatabaseManager<C>, C: DatabaseCollection> Governance<M, C> {
                     }
                     GovernanceMessage::GetQuorum { metadata, stage } => {
                         let to_send = self.inner_governance.get_quorum(metadata, stage)?;
-                        Ok(sender.send(GovernanceResponse::GetQuorum(to_send)).unwrap())
+                        // TODO: Review handling of errors.
+                        sender.send(GovernanceResponse::GetQuorum(to_send)).unwrap();
+                        Ok(())
                     }
                     GovernanceMessage::GetGovernanceVersion {
                         governance_id,

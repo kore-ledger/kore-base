@@ -32,10 +32,8 @@ impl<C: DatabaseCollection> SignatureDb<C> {
         ];
         let key = get_key(key_elements)?;
         let signatures = self.collection.get(&key)?;
-        Ok(
-            deserialize::<(HashSet<Signature>, ValidationProof)>(&signatures)
-                .map_err(|_| DbError::DeserializeError)?,
-        )
+        deserialize::<(HashSet<Signature>, ValidationProof)>(&signatures)
+                .map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_signatures(
@@ -92,9 +90,9 @@ impl<C: DatabaseCollection> SignatureDb<C> {
         if let Some(vproof) = iter.next() {
             let vproof = deserialize::<(HashSet<Signature>, ValidationProof)>(&vproof.1)
                 .map_err(|_| DbError::DeserializeError)?;
-            return Ok(vproof);
+            Ok(vproof)
         } else {
-            return Err(DbError::EntryNotFound);
+            Err(DbError::EntryNotFound)
         }
     }
 }

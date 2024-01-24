@@ -82,11 +82,11 @@ impl KeyMaterial for Secp256k1KeyPair {
     fn to_secret_der(&self) -> Result<Vec<u8>, Error> {
         let secret_bytes = self.decrypt_secret_bytes()?;
         let signing_key = SigningKey::try_from(secret_bytes.as_slice())
-            .map_err(|_| Error::KeyPairError("Cannot generate signing key".into()))?;
+            .map_err(|_| Error::KeyPair("Cannot generate signing key".into()))?;
         let secret_key = SecretKey::from(signing_key);
         let der = secret_key
             .to_pkcs8_der()
-            .map_err(|_| Error::KeyPairError("pkcs8 serialize error".into()))?;
+            .map_err(|_| Error::KeyPair("pkcs8 serialize error".into()))?;
         Ok(der.as_bytes().to_vec())
     }
 
@@ -97,7 +97,7 @@ impl KeyMaterial for Secp256k1KeyPair {
         match kp_type {
             KeyPairType::Secp256k1 => {
                 let secret_key = SecretKey::from_pkcs8_der(der)
-                    .map_err(|_| Error::KeyPairError("pkcs8 deserialize error".into()))?;
+                    .map_err(|_| Error::KeyPair("pkcs8 deserialize error".into()))?;
                 let signing_key = SigningKey::from(secret_key);
                 let public_key = VerifyingKey::from(&signing_key);
                 let mut kp = Secp256k1KeyPair {
@@ -107,7 +107,7 @@ impl KeyMaterial for Secp256k1KeyPair {
                 let _ = kp.encrypt_secret_bytes(&signing_key.to_bytes());
                 Ok(kp)
             }
-            _ => Err(Error::KeyPairError("Key type not supported".into())),
+            _ => Err(Error::KeyPair("Key type not supported".into())),
         }
     }
 }
@@ -117,12 +117,12 @@ impl DSA for Secp256k1KeyPair {
         let encr = self
             .secret_key
             .as_ref()
-            .ok_or(Error::SignError("No secret key".into()))?;
+            .ok_or(Error::Sign("No secret key".into()))?;
         let sk = encr
             .decrypt()
-            .map_err(|_| Error::SignError("Cannot decrypt secret key".into()))?;
+            .map_err(|_| Error::Sign("Cannot decrypt secret key".into()))?;
         let signing_key = SigningKey::try_from(sk.as_ref())
-            .map_err(|_| Error::SignError("Cannot generate signing key".into()))?;
+            .map_err(|_| Error::Sign("Cannot generate signing key".into()))?;
 
         match payload {
             Payload::Buffer(payload) => {
@@ -130,7 +130,7 @@ impl DSA for Secp256k1KeyPair {
                 let signature: Signature = signing_key.sign(&message);
                 Ok(signature.to_bytes().to_vec())
             }
-            _ => Err(Error::SignError(
+            _ => Err(Error::Sign(
                 "Payload type not supported for this key".into(),
             )),
         }
@@ -150,7 +150,7 @@ impl DSA for Secp256k1KeyPair {
         if verified {
             Ok(())
         } else {
-            Err(Error::SignError("Signature verify failed".into()))
+            Err(Error::Sign("Signature verify failed".into()))
         }
     }
 }
@@ -179,7 +179,7 @@ impl<'de> Deserialize<'de> for Secp256k1KeyPair {
     {
         let s = String::deserialize(deserializer)?;
         let bytes = general_purpose::URL_SAFE_NO_PAD
-            .decode(&s)
+            .decode(s)
             .map_err(serde::de::Error::custom)?;
 
         Ok(Secp256k1KeyPair::from_secret_key(

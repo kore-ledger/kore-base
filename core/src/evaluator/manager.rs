@@ -1,24 +1,25 @@
+/// Copyright 2024 Antonio Estévez
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
-use wasmtime::Engine;
 
-use super::compiler::manager::TapleCompiler;
+use super::compiler::manager::KoreCompiler;
 use super::errors::EvaluatorError;
 use super::{EvaluatorMessage, EvaluatorResponse};
 use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
-use crate::database::{DatabaseCollection, DatabaseManager, DB};
+use crate::database::{DatabaseCollection, DatabaseManager};
 use crate::evaluator::errors::ExecutorErrorResponses;
-use crate::evaluator::runner::manager::TapleRunner;
-use crate::governance::{GovernanceInterface, GovernanceUpdatedMessage};
+use crate::evaluator::runner::manager::KoreRunner;
+use crate::governance::GovernanceInterface;
 use crate::message::{MessageConfig, MessageTaskCommand};
-use crate::protocol::protocol_message_manager::TapleMessages;
+use crate::protocol::KoreMessages;
 use crate::request::EventRequest;
 use crate::signature::Signed;
 use crate::utils::message::event::create_evaluator_response;
-use crate::{DigestDerivator, EvaluationResponse, Notification};
+use crate::{DigestDerivator, EvaluationResponse};
 
 pub struct EvaluatorManager<
     M: DatabaseManager<C>,
@@ -28,11 +29,10 @@ pub struct EvaluatorManager<
     /// Communication channel for incoming petitions
     input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
     /// Contract executioner
-    runner: TapleRunner<C, G>,
+    runner: KoreRunner<C, G>,
     signature_manager: SelfSignatureManager,
     token: CancellationToken,
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
-    messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     derivator: DigestDerivator,
     _m: PhantomData<M>,
     _g: PhantomData<G>,
@@ -46,43 +46,27 @@ impl<
 {
     pub fn new(
         input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
-        database: Arc<M>,
+        compiler: KoreCompiler<C, G>,
+        runner: KoreRunner<C, G>,
         signature_manager: SelfSignatureManager,
-        compiler_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        gov_api: G,
-        contracts_path: String,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
     ) -> Self {
-        let engine = Engine::default();
-        let compiler = TapleCompiler::new(
-            compiler_channel,
-            DB::new(database.clone()),
-            gov_api.clone(),
-            contracts_path,
-            engine.clone(),
-            token.clone(),
-            notification_tx.clone(),
-        );
+
+        // spawn compiler
         tokio::spawn(async move {
             compiler.start().await;
         });
+
         Self {
             input_channel,
-            runner: TapleRunner::new(
-                DB::new(database.clone()),
-                engine,
-                gov_api,
-                derivator.clone(),
-            ),
+            runner,
             signature_manager,
             token,
-            _notification_tx: notification_tx,
             messenger_channel,
-            _m: PhantomData::default(),
-            _g: PhantomData::default(),
+            _m: PhantomData,
+            _g: PhantomData,
             derivator,
         }
     }
@@ -170,7 +154,7 @@ impl<
                             self.messenger_channel
                                 .tell(MessageTaskCommand::Request(
                                     None,
-                                    TapleMessages::EventMessage(
+                                    KoreMessages::EventMessage(
                                         crate::event::EventCommand::HigherGovernanceExpected {
                                             governance_id: evaluation_request.context.governance_id,
                                             who_asked: self.signature_manager.get_own_identifier(),
@@ -189,7 +173,7 @@ impl<
                             self.messenger_channel
                                 .tell(MessageTaskCommand::Request(
                                     None,
-                                    TapleMessages::LedgerMessages(
+                                    KoreMessages::LedgerMessages(
                                         crate::ledger::LedgerCommand::GetLCE {
                                             who_asked: self.signature_manager.get_own_identifier(),
                                             subject_id: evaluation_request.context.governance_id,
@@ -250,6 +234,7 @@ impl<
 #[cfg(test)]
 mod test {
 
+    /* TODO - Fix this test
     use std::{collections::HashSet, fs, str::FromStr, sync::Arc};
 
     use async_trait::async_trait;
@@ -279,7 +264,7 @@ mod test {
         },
         identifier::{DigestIdentifier, KeyIdentifier},
         message::MessageTaskCommand,
-        protocol::protocol_message_manager::TapleMessages,
+        protocol::KoreMessages,
         request::{EventRequest, FactRequest},
         signature::Signed,
         MemoryManager, Metadata, ValueWrapper,
@@ -400,11 +385,11 @@ mod test {
                 sdk::execute_contract(state_ptr, event_ptr, is_owner, contract_logic)
             }
             
-            /*
+            
                 context -> inmutable con estado inicial roles y evento
                 result -> mutable success y approvalRequired, y estado final
                 approvalRequired por defecto a false y siempre false si KO o error
-            */
+            
             
             // Lógica del contrato con los tipos de datos esperados
             // Devuelve el puntero a los datos escritos con el estado modificado
@@ -583,7 +568,7 @@ mod test {
         SenderEnd<EvaluatorMessage, EvaluatorResponse>,
         Sender<GovernanceUpdatedMessage>,
         SelfSignatureManager,
-        MpscChannel<MessageTaskCommand<TapleMessages>, ()>,
+        MpscChannel<MessageTaskCommand<KoreMessages>, ()>,
     ) {
         let (rx, sx) = MpscChannel::new(100);
         let (msg_rx, msg_sx) = MpscChannel::new(100);
@@ -673,7 +658,7 @@ mod test {
 
     // TODO - Fix this test
 
-    /*#[test]
+    #[test]
     fn contract_execution() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
@@ -762,9 +747,9 @@ mod test {
             remove_dir();
             handler.abort();
         });
-    }*/
+    }
 
-    /*
+    
     #[test]
     fn contract_execution_fail() {
         // Fail reason: Bad Event
@@ -1041,6 +1026,5 @@ mod test {
                 panic!("Invalid response received");
             };
         });
-    }
-    */
+    }*/
 }

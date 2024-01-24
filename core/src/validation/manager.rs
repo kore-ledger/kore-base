@@ -1,19 +1,11 @@
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    errors::ValidationError, validation::Validation, ValidationCommand, ValidationResponse,
+    errors::ValidationError, Validation, ValidationCommand, ValidationResponse,
 };
-use crate::database::{DatabaseCollection, DB};
-use crate::message::MessageTaskCommand;
-use crate::protocol::protocol_message_manager::TapleMessages;
-use crate::{
-    commons::{
-        channel::{ChannelData, MpscChannel, SenderEnd},
-        self_signature_manager::SelfSignatureManager,
-    },
-    governance::GovernanceAPI,
-};
-use crate::{DigestDerivator, Notification};
+use crate::database::DatabaseCollection;
+use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
+use crate::Notification;
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -34,31 +26,21 @@ pub struct ValidationManager<C: DatabaseCollection> {
     /// Validation functions
     inner_validation: Validation<C>,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> ValidationManager<C> {
     pub fn new(
         input_channel: MpscChannel<ValidationCommand, ValidationResponse>,
-        gov_api: GovernanceAPI,
-        database: DB<C>,
-        signature_manager: SelfSignatureManager,
+        inner_validation: Validation<C>,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        message_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
-        derivator: DigestDerivator,
     ) -> Self {
         Self {
             input_channel,
-            inner_validation: Validation::new(
-                gov_api,
-                database,
-                signature_manager,
-                message_channel,
-                derivator,
-            ),
+            inner_validation,
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
         }
     }
 
@@ -124,8 +106,8 @@ impl<C: DatabaseCollection> ValidationManager<C> {
                 }
             }
         };
-        if sender.is_some() {
-            sender.unwrap().send(response).expect("Sender Dropped");
+        if let Some(sender) = sender {
+            sender.send(response).expect("Sender Dropped");
         }
         Ok(())
     }

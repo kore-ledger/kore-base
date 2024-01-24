@@ -39,7 +39,7 @@ pub struct MessageContent<T: TaskCommandContent> {
 
 impl<T: TaskCommandContent> HashId for MessageContent<T> {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator)
+        DigestIdentifier::from_serializable_borsh(self, derivator)
             .map_err(|_| SubjectError::CryptoError("Hashing error in MessageContent".to_string()))
     }
 }
@@ -59,7 +59,7 @@ impl<T: TaskCommandContent> Signed<MessageContent<T>> {
         };
         let signature = sender_sm
             .sign(&message_content, derivator)
-            .map_err(|_| Error::CreatingMessageError)?;
+            .map_err(|_| Error::CreatingMessage)?;
         Ok(Self {
             content: message_content,
             signature,

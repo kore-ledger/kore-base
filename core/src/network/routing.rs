@@ -3,7 +3,6 @@ use instant::Duration;
 use libp2p::identify::Identify;
 use libp2p::identify::IdentifyConfig;
 use libp2p::identify::IdentifyEvent;
-use libp2p::identify::*;
 use libp2p::identity::Keypair;
 use libp2p::kad::record::store::MemoryStore;
 use libp2p::kad::{
@@ -60,17 +59,18 @@ impl RoutingBehaviour {
 
     pub fn handle_event(&mut self, event: RoutingComposedEvent) {
         match event {
-            RoutingComposedEvent::IdentifyEvent(IdentifyEvent::Received { peer_id, info }) => {
-                debug!(
-                    "{}: ENTRANDO EN IDENTIFIED PARA {} con info: {:?}",
-                    LOG_TARGET, peer_id, info
-                );
-                for addr in info.listen_addrs {
-                    self.kademlia.add_address(&peer_id, addr);
-                }
-            }
             RoutingComposedEvent::IdentifyEvent(event) => {
-                debug!("{}: Unhandled Identify Event: {:?}", LOG_TARGET, event);
+                if let  IdentifyEvent::Received { peer_id, info } = *event {
+                    debug!(
+                        "{}: ENTRANDO EN IDENTIFIED PARA {} con info: {:?}",
+                        LOG_TARGET, peer_id, info
+                    );
+                    for addr in info.listen_addrs {
+                        self.kademlia.add_address(&peer_id, addr);
+                    }
+                } else {
+                    debug!("{}: Unhandled Identify Event: {:?}", LOG_TARGET, event);
+                }
             }
             RoutingComposedEvent::KademliaEvent(KademliaEvent::RoutingUpdated {
                 peer,
@@ -176,14 +176,14 @@ impl RoutingBehaviour {
 /// TAPLE network event
 #[derive(Debug)]
 pub enum RoutingComposedEvent {
-    IdentifyEvent(IdentifyEvent),
+    IdentifyEvent(Box<IdentifyEvent>),
     KademliaEvent(KademliaEvent),
 }
 
 /// Adapt `IdentifyEvent` to `RoutingComposedEvent`
 impl From<IdentifyEvent> for RoutingComposedEvent {
     fn from(event: IdentifyEvent) -> RoutingComposedEvent {
-        RoutingComposedEvent::IdentifyEvent(event)
+        RoutingComposedEvent::IdentifyEvent(Box::new(event))
     }
 }
 

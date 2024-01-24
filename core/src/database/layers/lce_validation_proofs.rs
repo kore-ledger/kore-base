@@ -28,8 +28,8 @@ impl<C: DatabaseCollection> LceValidationProofs<C> {
         ];
         let key = get_key(key_elements)?;
         let lce_validation_proof = self.collection.get(&key)?;
-        Ok(deserialize::<ValidationProof>(&lce_validation_proof)
-            .map_err(|_| DbError::DeserializeError)?)
+        deserialize::<ValidationProof>(&lce_validation_proof)
+            .map_err(|_| DbError::DeserializeError)
     }
 
     pub fn set_lce_validation_proof(

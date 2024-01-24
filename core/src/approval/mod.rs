@@ -13,7 +13,7 @@ use self::error::ApprovalErrorResponse;
 
 pub(crate) mod error;
 #[cfg(feature = "approval")]
-mod inner_manager;
+pub(crate) mod inner_manager;
 #[cfg(feature = "approval")]
 pub(crate) mod manager;
 

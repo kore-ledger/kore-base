@@ -1,26 +1,20 @@
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    commons::{
-        channel::{ChannelData, MpscChannel, SenderEnd},
-        self_signature_manager::SelfSignatureManager,
-    },
-    database::DB,
+    commons::channel::{ChannelData, MpscChannel},
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
-    message::MessageTaskCommand,
-    protocol::protocol_message_manager::TapleMessages,
-    DatabaseCollection, DigestDerivator, Notification, Settings,
+    DatabaseCollection, Notification,
 };
 
 use super::{
-    error::{DistributionErrorResponses, DistributionManagerError},
+    error::DistributionManagerError,
     inner_manager::InnerDistributionManager,
     DistributionMessagesNew,
 };
 
 pub struct DistributionManager<C: DatabaseCollection> {
     governance_update_input: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
-    input_channel: MpscChannel<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
+    input_channel: MpscChannel<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     token: CancellationToken,
     // TODO: What we do with this?
     _notification_tx: tokio::sync::mpsc::Sender<Notification>,
@@ -29,30 +23,18 @@ pub struct DistributionManager<C: DatabaseCollection> {
 
 impl<C: DatabaseCollection> DistributionManager<C> {
     pub fn new(
-        input_channel: MpscChannel<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
+        input_channel: MpscChannel<DistributionMessagesNew, Result<(), DistributionManagerError>>,
         governance_update_input: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         token: CancellationToken,
         notification_tx: tokio::sync::mpsc::Sender<Notification>,
-        messenger_channel: SenderEnd<MessageTaskCommand<TapleMessages>, ()>,
-        gov_api: GovernanceAPI,
-        signature_manager: SelfSignatureManager,
-        settings: Settings,
-        db: DB<C>,
-        derivator: DigestDerivator,
+        inner_manager: InnerDistributionManager<GovernanceAPI, C>,
     ) -> Self {
         Self {
             input_channel,
             governance_update_input,
             token,
             _notification_tx: notification_tx,
-            inner_manager: InnerDistributionManager::new(
-                gov_api,
-                db,
-                messenger_channel,
-                signature_manager,
-                settings,
-                derivator,
-            ),
+            inner_manager,
         }
     }
 
@@ -105,7 +87,7 @@ impl<C: DatabaseCollection> DistributionManager<C> {
 
     async fn process_command(
         &mut self,
-        command: ChannelData<DistributionMessagesNew, Result<(), DistributionErrorResponses>>,
+        command: ChannelData<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     ) -> Result<(), DistributionManagerError> {
         let (sender, data) = match command {
             ChannelData::AskData(data) => {

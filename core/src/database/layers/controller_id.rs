@@ -37,7 +37,7 @@ impl<C: DatabaseCollection> ControllerIdDb<C> {
         let key_elements: Vec<Element> = vec![Element::S(self.prefix.clone())];
         let key = get_key(key_elements)?;
         let controller_id = self.collection.get(&key)?;
-        Ok(deserialize::<String>(&controller_id).map_err(|_| DbError::DeserializeError)?)
+        deserialize::<String>(&controller_id).map_err(|_| DbError::DeserializeError)
     }
 
     /// Put the controller id.  

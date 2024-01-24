@@ -8,14 +8,14 @@ use crate::signature::Signed;
 use crate::{ApprovalState, Event, EventRequest, KeyDerivator, KeyIdentifier, ValidationProof};
 use std::collections::HashSet;
 
-mod api;
+mod manager;
 
-pub use api::Api;
-pub(crate) use api::ApiManager;
+pub use manager::Api;
+pub(crate) use manager::ApiManager;
 pub use error::ApiError;
 
 mod error;
-mod inner_api;
+pub(crate) mod inner_api;
 
 #[derive(Debug, Clone)]
 pub enum APICommands {

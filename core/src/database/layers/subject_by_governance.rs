@@ -73,7 +73,7 @@ impl<C: DatabaseCollection> SubjectByGovernanceDb<C> {
                 &format!("{}{}{}", &self.prefix.clone(), char::MAX, char::MAX),
             )?,
         };
-        Ok(self.return_subjects(governances)?)
+        self.return_subjects(governances)
     }
 
     pub fn get_governance_subjects(
@@ -92,7 +92,7 @@ impl<C: DatabaseCollection> SubjectByGovernanceDb<C> {
                 governance_id.to_str()
             ),
         )?;
-        Ok(self.return_subjects(subjects)?)
+        self.return_subjects(subjects)
     }
 
     fn return_subjects(&self, values: Vec<Vec<u8>>) -> Result<Vec<Subject>, DbError> {

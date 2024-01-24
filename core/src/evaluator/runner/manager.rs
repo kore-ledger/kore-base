@@ -17,14 +17,16 @@ use crate::{
 
 use super::executor::{Contract, ContractExecutor, ContractResult};
 use crate::database::Error as DbError;
-pub struct TapleRunner<C: DatabaseCollection, G: GovernanceInterface> {
+
+/// Kore runner for contract execution.
+pub struct KoreRunner<C: DatabaseCollection, G: GovernanceInterface> {
     database: DB<C>,
     executor: ContractExecutor,
     gov_api: G,
     derivator: DigestDerivator,
 }
 
-impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
+impl<C: DatabaseCollection, G: GovernanceInterface> KoreRunner<C, G> {
     pub fn new(database: DB<C>, engine: Engine, gov_api: G, derivator: DigestDerivator) -> Self {
         Self {
             database,
@@ -65,13 +67,17 @@ impl<C: DatabaseCollection, G: GovernanceInterface> TapleRunner<C, G> {
             }
             Err(error) => return Err(ExecutorErrorResponses::DatabaseError(error.to_string())),
         };
-        if governance.sn > execute_contract.gov_version {
-            // Nuestra gov es mayor: mandamos mensaje para que actualice el emisor
-            return Err(ExecutorErrorResponses::OurGovIsHigher);
-        } else if governance.sn < execute_contract.gov_version {
-            // Nuestra gov es menor: no podemos hacer nada. Pedimos LCE al que nos lo envió
-            return Err(ExecutorErrorResponses::OurGovIsLower);
-        }
+        match governance.sn.cmp(&execute_contract.gov_version) {
+            std::cmp::Ordering::Greater => {
+                // Nuestra gov es mayor: mandamos mensaje para que actualice el emisor
+                return Err(ExecutorErrorResponses::OurGovIsHigher);
+            }
+            std::cmp::Ordering::Less => {
+                // Nuestra gov es menor: no podemos hacer nada. Pedimos LCE al que nos lo envió
+                return Err(ExecutorErrorResponses::OurGovIsLower);
+            }
+            std::cmp::Ordering::Equal => {}
+        }   
 
         // Governances can be updated without WASM because we know the contract beforehand
         let (contract, contract_gov_version): (Contract, u64) = if execute_contract
@@ -231,7 +237,7 @@ fn generate_json_patch(
     prev_state: &Value,
     new_state: &Value,
 ) -> Result<Value, ExecutorErrorResponses> {
-    let patch = diff(&prev_state, &new_state);
-    Ok(serde_json::to_value(&patch)
-        .map_err(|_| ExecutorErrorResponses::JSONPATCHDeserializationFailed)?)
+    let patch = diff(prev_state, new_state);
+    serde_json::to_value(patch)
+        .map_err(|_| ExecutorErrorResponses::JSONPATCHDeserializationFailed)
 }

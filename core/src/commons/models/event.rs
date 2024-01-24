@@ -71,14 +71,14 @@ impl Event {
 
 impl HashId for Event {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator)
+        DigestIdentifier::from_serializable_borsh(self, derivator)
             .map_err(|_| SubjectError::SignatureCreationFails("HashId for Event Fails".to_string()))
     }
 }
 
 impl HashId for Signed<Event> {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator).map_err(|_| {
+        DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
             SubjectError::SignatureCreationFails("HashId for Signed Event Fails".to_string())
         })
     }
@@ -129,7 +129,7 @@ impl Signed<Event> {
             approvers: HashSet::new(),
         };
         let subject_signature_event =
-            Signature::new(&content, &subject_keys, derivator).map_err(|_| {
+            Signature::new(&content, subject_keys, derivator).map_err(|_| {
                 SubjectError::CryptoError(String::from("Error signing the hash of the proposal"))
             })?;
         Ok(Self {

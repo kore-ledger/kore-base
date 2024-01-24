@@ -19,15 +19,18 @@ use super::super::{
     TaskCommandContent,
 };
 
+pub type HandleList = HashMap<String, (JoinHandle<Result<Result<(), Error>, Aborted>>, AbortHandle)>;
+
 pub struct MessageTaskManager<T>
 where
     T: TaskCommandContent + Serialize + DeserializeOwned,
 {
-    list: HashMap<String, (JoinHandle<Result<Result<(), Error>, Aborted>>, AbortHandle)>,
+    list: HandleList,
     receiver: MpscChannel<MessageTaskCommand<T>, ()>,
     sender: MessageSender,
     token: CancellationToken,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
+    // TODO: Could be removed?
+    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTaskManager<T> {
@@ -42,7 +45,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTask
             receiver,
             sender,
             token,
-            notification_tx,
+            _notification_tx: notification_tx,
         }
     }
 
@@ -89,7 +92,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTask
                 }
             },
             None => {
-                return Err(Error::SenderChannelError);
+                return Err(Error::SenderChannel);
             }
         }
         Ok(())
@@ -130,7 +133,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTask
         };
         abort_handler.abort();
         match tokio_handler.await {
-            Err(error) => return Err(Error::TaskError { source: error }),
+            Err(error) => return Err(Error::Task { source: error }),
             Ok(inner_state) => match inner_state {
                 Ok(task_result) => {
                     if let Err(e) = task_result {

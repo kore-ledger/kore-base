@@ -40,7 +40,7 @@ pub struct ValidationProof {
 
 impl HashId for ValidationProof {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-        DigestIdentifier::from_serializable_borsh(&self, derivator)
+        DigestIdentifier::from_serializable_borsh(self, derivator)
             .map_err(|_| SubjectError::CryptoError("Hashing error in ValidationProof".to_string()))
     }
 }

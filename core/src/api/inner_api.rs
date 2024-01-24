@@ -89,37 +89,32 @@ impl<C: DatabaseCollection> InnerApi<C> {
         let id_str = request_id.to_str();
         let result = self.approval_api.emit_vote(request_id, acceptance).await;
         match result {
-            Ok(data) => return Ok(ApiResponses::VoteResolve(Ok(data))), // Cambiar al digestIdentifier del sujeto o de la misma request
+            Ok(data) => Ok(ApiResponses::VoteResolve(Ok(data))), // Cambiar al digestIdentifier del sujeto o de la misma request
             Err(ApprovalErrorResponse::RequestNotFound) => {
-                return Ok(ApiResponses::VoteResolve(Err(ApiError::NotFound(format!(
+                Ok(ApiResponses::VoteResolve(Err(ApiError::NotFound(format!(
                     "Request {} not found",
                     id_str
                 )))))
             }
             Err(ApprovalErrorResponse::RequestAlreadyResponded) => {
-                return Ok(ApiResponses::VoteResolve(Err(ApiError::Conflict(format!(
-                    "Request already responded"
-                )))))
+                Ok(ApiResponses::VoteResolve(Err(ApiError::Conflict(
+                    "Request already responded".to_owned()
+                ))))
             }
             Err(ApprovalErrorResponse::APIChannelNotAvailable) => {
-                return Err(APIInternalError::ChannelError)
+                Err(APIInternalError::ChannelError)
             }
-            _ => return Err(APIInternalError::UnexpectedManagerResponse),
-        };
+            _ => Err(APIInternalError::UnexpectedManagerResponse),
+        }
     }
 
     fn get_from_and_quantity(&self, data: GetSubjects) -> (Option<String>, isize) {
-        let from = if data.from.is_none() {
-            None
-        } else {
-            Some(format!("{}", data.from.unwrap()))
-        };
         let quantity = if data.quantity.is_none() {
             MAX_QUANTITY
         } else {
             (data.quantity.unwrap() as isize).min(MAX_QUANTITY)
         };
-        (from, quantity)
+        (data.from, quantity)
     }
 
     pub fn get_subjects_by_governance(
@@ -202,14 +197,14 @@ impl<C: DatabaseCollection> InnerApi<C> {
             }
             Err(DbError::EntryNotFound) => {
                 log::debug!("entry not found apra get request");
-                return ApiResponses::GetRequest(Err(ApiError::NotFound(format!(
+                ApiResponses::GetRequest(Err(ApiError::NotFound(format!(
                     "Request {}",
                     request_id.to_str()
-                ))));
+                )))) 
             }
             Err(error) => {
                 log::debug!("ENTRY ERROR DE DATABASE");
-                return ApiResponses::GetRequest(Err(ApiError::DatabaseError(error.to_string())));
+                ApiResponses::GetRequest(Err(ApiError::DatabaseError(error.to_string())))
             }
         }
     }
@@ -240,8 +235,8 @@ impl<C: DatabaseCollection> InnerApi<C> {
     #[cfg(feature = "approval")]
     pub async fn get_pending_request(&self) -> ApiResponses {
         match self.approval_api.get_all_requests().await {
-            Ok(data) => return ApiResponses::GetPendingRequests(Ok(data)),
-            Err(error) => return ApiResponses::GetPendingRequests(Err(error.into())),
+            Ok(data) => ApiResponses::GetPendingRequests(Ok(data)),
+            Err(error) => ApiResponses::GetPendingRequests(Err(error.into())),
         }
     }
 
@@ -252,14 +247,14 @@ impl<C: DatabaseCollection> InnerApi<C> {
             .get_single_request(request_id.clone())
             .await
         {
-            Ok(data) => return ApiResponses::GetSingleRequest(Ok(data)),
+            Ok(data) => ApiResponses::GetSingleRequest(Ok(data)),
             Err(ApprovalErrorResponse::ApprovalRequestNotFound) => {
-                return ApiResponses::GetSingleRequest(Err(ApiError::NotFound(format!(
+                ApiResponses::GetSingleRequest(Err(ApiError::NotFound(format!(
                     "Approval Request {} not found",
                     request_id.to_str()
                 ))))
             }
-            Err(error) => return ApiResponses::GetSingleRequest(Err(error.into())),
+            Err(error) => ApiResponses::GetSingleRequest(Err(error.into())),
         }
     }
 
@@ -319,11 +314,7 @@ impl<C: DatabaseCollection> InnerApi<C> {
     }
 
     pub async fn get_governance_subjects(&self, data: GetGovernanceSubjects) -> ApiResponses {
-        let from = if data.from.is_none() {
-            None
-        } else {
-            Some(format!("{}", data.from.unwrap()))
-        };
+        let from = data.from;
         let quantity = if data.quantity.is_none() {
             MAX_QUANTITY
         } else {
@@ -391,7 +382,7 @@ fn get_init_and_end<T>(
     quantity: Option<usize>,
     data: &Vec<T>,
 ) -> (usize, usize) {
-    let init = if from.is_some() { from.unwrap() } else { 0 };
+    let init = if let Some(from) = from { from } else { 0 };
     let end = if quantity.is_some() {
         let to = quantity.unwrap() + init;
         if to > data.len() {

@@ -68,13 +68,13 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
         let schemas = get_as_array(&governance.properties.0, "schemas")?;
         for schema in schemas {
             let tmp = get_as_str(schema, "id")?;
-            if tmp == &schema_id {
+            if tmp == schema_id {
                 return Ok(Ok(ValueWrapper(
                     schema.get("initial_value").unwrap().to_owned(),
                 )));
             }
         }
-        return Ok(Err(RequestError::SchemaNotFound(schema_id)));
+        Ok(Err(RequestError::SchemaNotFound(schema_id)))
     }
 
     // UPDATED
@@ -99,11 +99,11 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
         let schemas = get_as_array(&governance.properties.0, "schemas")?;
         for schema in schemas {
             let tmp = get_as_str(schema, "id")?;
-            if tmp == &schema_id {
+            if tmp == schema_id {
                 return Ok(Ok(ValueWrapper(schema.get("schema").unwrap().to_owned())));
             }
         }
-        return Ok(Err(RequestError::SchemaNotFound(schema_id)));
+        Ok(Err(RequestError::SchemaNotFound(schema_id)))
     }
 
     fn get_signers_aux(
@@ -135,7 +135,7 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
             }
             match role.schema {
                 SchemaEnum::ID { ID } => {
-                    if &ID != schema_id {
+                    if ID != schema_id {
                         continue;
                     }
                 }
@@ -259,11 +259,11 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
                 },
             };
         let policies = get_as_array(&governance.properties.0, "policies")?;
-        let schema_policy = get_schema_from_policies(policies, &schema_id);
+        let schema_policy = get_schema_from_policies(policies, schema_id);
         let Ok(schema_policy) = schema_policy else {
             return Ok(Err(schema_policy.unwrap_err()));
         }; // El return dentro de otro return es una **** que obliga a hacer cosas como esta
-        let quorum = get_quorum(&schema_policy, stage.to_str())?;
+        let quorum = get_quorum(schema_policy, stage.to_str())?;
         let signers = self.get_signers(metadata, stage)?;
         let Ok(signers) = signers else {
             return Ok(Err(signers.unwrap_err()));
@@ -336,12 +336,12 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
     ) -> Result<bool, RequestError> {
         let is_member = members.0.contains(&invoker);
         for role in roles {
-            if &role.role != stage.to_role() {
+            if role.role != stage.to_role() {
                 continue;
             }
             match role.schema {
                 SchemaEnum::ID { ID } => {
-                    if &ID != schema_id {
+                    if ID != schema_id {
                         continue;
                     }
                 }
@@ -440,7 +440,7 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
             }
             Err(error) => return Err(InternalError::DatabaseError { source: error }),
         };
-        if &governance.governance_id.to_str() != "" {
+        if !governance.governance_id.to_str().is_empty() {
             return Ok(Err(RequestError::InvalidGovernanceID));
         }
         Ok(Ok(governance.sn))
@@ -451,7 +451,7 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
         &self,
         subject_id: &DigestIdentifier,
     ) -> Result<Result<bool, RequestError>, InternalError> {
-        let subject = match self.repo_access.get_subject(&subject_id) {
+        let subject = match self.repo_access.get_subject(subject_id) {
             Ok(subject) => subject,
             Err(DbError::EntryNotFound) => return Ok(Err(RequestError::SubjectNotFound)),
             Err(error) => return Err(InternalError::DatabaseError { source: error }),
@@ -487,27 +487,27 @@ impl<C: DatabaseCollection> InnerGovernance<C> {
             }
             Err(error) => return Err(RequestError::DatabaseError(error)),
         };
-        if gov_subject.sn == governance_version {
-            Ok(gov_subject)
-        } else if gov_subject.sn > governance_version {
-            let gov_genesis = self.repo_access.get_event(governance_id, 0)?;
-            let init_state = get_governance_initial_state();
-            let mut gov_subject = Subject::from_genesis_event(
-                gov_genesis,
-                init_state,
-                None,
-                governance_id.derivator.clone(),
-            )?;
-            for i in 1..=governance_version {
-                let event = self.repo_access.get_event(governance_id, i)?;
-                gov_subject.update_subject(event.content.patch, i)?;
+        match gov_subject.sn.cmp(&governance_version) {
+            std::cmp::Ordering::Equal => Ok(gov_subject),
+            std::cmp::Ordering::Greater => {
+                let gov_genesis = self.repo_access.get_event(governance_id, 0)?;
+                let init_state = get_governance_initial_state();
+                let mut gov_subject = Subject::from_genesis_event(
+                    gov_genesis,
+                    init_state,
+                    None,
+                    governance_id.derivator,
+                )?;
+                for i in 1..=governance_version {
+                    let event = self.repo_access.get_event(governance_id, i)?;
+                    gov_subject.update_subject(event.content.patch, i)?;
+                }
+                Ok(gov_subject)
             }
-            Ok(gov_subject)
-        } else {
-            Err(RequestError::GovernanceVersionTooHigh(
+            std::cmp::Ordering::Less => Err(RequestError::GovernanceVersionTooHigh(
                 governance_id.to_str(),
                 governance_version,
-            ))
+            )),
         }
     }
 }
@@ -527,7 +527,7 @@ fn get_as_array<'a>(data: &'a Value, key: &str) -> Result<&'a Vec<Value>, Intern
 }
 
 fn get_schema_from_policies<'a>(
-    data: &'a Vec<Value>,
+    data: &'a [Value],
     key: &str,
 ) -> Result<&'a Value, RequestError> {
     data.iter()
@@ -538,7 +538,7 @@ fn get_schema_from_policies<'a>(
         .ok_or(RequestError::SchemaNotFoundInPolicies)
 }
 
-fn get_quorum<'a>(data: &'a Value, key: &str) -> Result<Quorum, InternalError> {
+fn get_quorum(data: &Value, key: &str) -> Result<Quorum, InternalError> {
     let json_data = data
         .get(key)
         .ok_or(InternalError::InvalidGovernancePayload("10".into()))?
@@ -612,7 +612,7 @@ fn namespace_contiene(namespace_padre: &str, namespace_hijo: &str) -> bool {
     // Verificar si el namespace padre contiene al hijo como subnamespace
     if let Some(remaining) = namespace_hijo.strip_prefix(namespace_padre) {
         // El primer carácter después del prefijo del namespace padre debe ser un punto
-        return remaining.starts_with(".");
+        return remaining.starts_with('.');
     }
 
     false

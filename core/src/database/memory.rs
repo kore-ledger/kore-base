@@ -4,6 +4,7 @@ use std::{
     collections::{btree_map::Iter, BTreeMap, HashMap},
     iter::Rev,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    rc::Rc,
 };
 
 pub struct DataStore {
@@ -17,31 +18,32 @@ impl DataStore {
         }
     }
 
-    fn _get_inner_read_lock<'a>(&'a self) -> RwLockReadGuard<'a, BTreeMap<String, Vec<u8>>> {
+    fn _get_inner_read_lock(&self) -> RwLockReadGuard<'_, BTreeMap<String, Vec<u8>>> {
         self.data.read().unwrap()
     }
 
-    fn _get_inner_write_lock<'a>(&'a self) -> RwLockWriteGuard<'a, BTreeMap<String, Vec<u8>>> {
+    fn _get_inner_write_lock(&self) -> RwLockWriteGuard<'_, BTreeMap<String, Vec<u8>>> {
         self.data.write().unwrap()
     }
 }
 
 impl DataStore {
     fn iter(&self, prefix: &str) -> MemoryIterator {
-        MemoryIterator::new(&self, prefix)
+        MemoryIterator::new(self, prefix)
     }
 
     fn rev_iter(&self, prefix: &str) -> RevMemoryIterator {
-        RevMemoryIterator::new(&self, prefix)
+        RevMemoryIterator::new(self, prefix)
     }
 }
 
-/// In-memory database implementation for TAPLE.
+/// In-memory database implementation for Kore Ledger.
 pub struct MemoryManager {
     data: RwLock<HashMap<String, Arc<DataStore>>>,
 }
 
 impl MemoryManager {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
@@ -109,7 +111,7 @@ impl DatabaseCollection for MemoryCollection {
     }
 }
 
-type GuardIter<'a, K, V> = (Arc<RwLockReadGuard<'a, BTreeMap<K, V>>>, Iter<'a, K, V>);
+type GuardIter<'a, K, V> = (Rc<RwLockReadGuard<'a, BTreeMap<K, V>>>, Iter<'a, K, V>);
 
 pub struct MemoryIterator<'a> {
     map: &'a DataStore,
@@ -136,10 +138,10 @@ impl<'a> Iterator for MemoryIterator<'a> {
             let guard = self.map._get_inner_read_lock();
             let sref: &BTreeMap<String, Vec<u8>> = unsafe { change_lifetime_const(&*guard) };
             let iter = sref.iter();
-            self.current = Some((Arc::new(guard), iter));
+            self.current = Some((Rc::new(guard), iter));
             &mut self.current.as_mut().unwrap().1
         };
-        while let Some(item) = iter.next() {
+        for item in iter.by_ref() {
             let key = {
                 let value = item.0.clone();
                 if !value.starts_with(&self.table_name) {
@@ -165,7 +167,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
 }
 
 type GuardRevIter<'a> = (
-    Arc<RwLockReadGuard<'a, BTreeMap<String, Vec<u8>>>>,
+    Rc<RwLockReadGuard<'a, BTreeMap<String, Vec<u8>>>>,
     Rev<Iter<'a, String, Vec<u8>>>,
 );
 
@@ -194,10 +196,10 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
             let guard = self.map._get_inner_read_lock();
             let sref: &BTreeMap<String, Vec<u8>> = unsafe { change_lifetime_const(&*guard) };
             let iter = sref.iter().rev();
-            self.current = Some((Arc::new(guard), iter));
+            self.current = Some((Rc::new(guard), iter));
             &mut self.current.as_mut().unwrap().1
         };
-        while let Some(item) = iter.next() {
+        for item in iter.by_ref() {
             let key = {
                 let value = item.0.clone();
                 if !value.starts_with(&self.table_name) {
@@ -221,7 +223,7 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
     }
 }
 
-unsafe fn change_lifetime_const<'a, 'b, T>(x: &'a T) -> &'b T {
+unsafe fn change_lifetime_const<'b, T>(x: &T) -> &'b T {
     &*(x as *const T)
 }
 
