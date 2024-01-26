@@ -1,5 +1,6 @@
 /// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     oneshot::{self, Sender as OneshotSender},
@@ -73,6 +74,7 @@ impl<I: Send> TellData<I> {
     }
 }
 
+/// Sender end of a channel (request/response).
 #[derive(Clone, Debug)]
 pub struct SenderEnd<I, R>
 where
