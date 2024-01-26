@@ -13,8 +13,8 @@ pub(crate) struct RequestDb<C: DatabaseCollection> {
 impl<C: DatabaseCollection> RequestDb<C> {
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("taple-request"),
-            prefix: "taple-request".to_string(),
+            collection: manager.create_collection("kore_request"),
+            prefix: "kore_equest".to_string(),
         }
     }
 

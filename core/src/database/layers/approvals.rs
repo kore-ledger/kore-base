@@ -22,14 +22,14 @@ impl<C: DatabaseCollection> ApprovalsDb<C> {
     /// Create a new approvals data store.
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            index_collection: manager.create_collection("subjindex-approval-index"),
-            index_by_governance_collection: manager.create_collection("governance-approval-index"),
+            index_collection: manager.create_collection("subjindex_approval_index"),
+            index_by_governance_collection: manager.create_collection("governance_approval_index"),
             collection: manager.create_collection("approvals"),
-            index_prefix: "subjindex-approval-index".to_string(),
+            index_prefix: "subjindex_approval_index".to_string(),
             prefix: "approvals".to_string(),
-            governance_prefix: "governance-approval-index".to_string(),
-            pending_prefix: "pending-approval-index".to_string(),
-            pending_collection: manager.create_collection("pending-approval-index"),
+            governance_prefix: "governance_approval_index".to_string(),
+            pending_prefix: "pending_approval_index".to_string(),
+            pending_collection: manager.create_collection("pending_approval_index"),
         }
     }
 

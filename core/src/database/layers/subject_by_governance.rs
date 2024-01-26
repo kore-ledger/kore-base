@@ -13,8 +13,8 @@ pub(crate) struct SubjectByGovernanceDb<C: DatabaseCollection> {
 impl<C: DatabaseCollection> SubjectByGovernanceDb<C> {
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("governance-index"),
-            prefix: "governance-index".to_string(),
+            collection: manager.create_collection("governance_index"),
+            prefix: "governance_index".to_string(),
         }
     }
 

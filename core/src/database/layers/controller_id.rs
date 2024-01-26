@@ -18,8 +18,8 @@ impl<C: DatabaseCollection> ControllerIdDb<C> {
     /// Create a new controller id database.
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("controller-id"),
-            prefix: "controller-id".to_string(),
+            collection: manager.create_collection("controller_id"),
+            prefix: "controller_id".to_string(),
         }
     }
 
