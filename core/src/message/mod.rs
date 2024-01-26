@@ -9,7 +9,7 @@ use crate::{
         errors::SubjectError,
         identifier::KeyIdentifier,
         models::HashId,
-        self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
     signature::Signed,
     DigestDerivator, DigestIdentifier,

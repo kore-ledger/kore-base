@@ -14,7 +14,7 @@ use crate::commons::channel::MpscChannel;
 use crate::commons::crypto::{KeyMaterial, KeyPair};
 use crate::commons::identifier::{Derivable, KeyIdentifier};
 use crate::commons::models::notification::Notification;
-use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
+use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::commons::settings::Settings;
 use crate::database::{DatabaseCollection, DatabaseManager, DB};
 use crate::distribution::error::DistributionManagerError;

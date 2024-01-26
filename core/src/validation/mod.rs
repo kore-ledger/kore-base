@@ -8,7 +8,7 @@ use crate::{
         channel::SenderEnd,
         errors::ChannelErrors,
         models::{validation::ValidationEventResponse, validation::ValidationProof},
-        self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
     database::{DatabaseCollection, DB},
     event::EventCommand,

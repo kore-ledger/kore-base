@@ -18,7 +18,7 @@ use crate::{
             validation::ValidationProof,
             HashId,
         },
-        self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
     crypto::KeyPair,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},

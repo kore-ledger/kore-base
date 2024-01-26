@@ -8,7 +8,7 @@ use super::compiler::manager::KoreCompiler;
 use super::errors::EvaluatorError;
 use super::{EvaluatorMessage, EvaluatorResponse};
 use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
-use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
+use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::database::{DatabaseCollection, DatabaseManager};
 use crate::evaluator::errors::ExecutorErrorResponses;
 use crate::evaluator::runner::manager::KoreRunner;

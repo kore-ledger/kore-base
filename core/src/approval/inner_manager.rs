@@ -4,7 +4,7 @@ use crate::{
             approval::{ApprovalEntity, ApprovalResponse, ApprovalState},
             state::generate_subject_id,
         },
-        self_signature_manager::{SelfSignatureInterface, SelfSignatureManager},
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
         settings::VotationType,
     },
     database::DB,

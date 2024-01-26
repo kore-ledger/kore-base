@@ -5,7 +5,7 @@ use std::{
 
 use crate::commons::channel::SenderEnd;
 use crate::commons::models::state::Subject;
-use crate::commons::self_signature_manager::{SelfSignatureInterface, SelfSignatureManager};
+use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::distribution::{AskForSignatures, SignaturesReceived};
 use crate::governance::stage::ValidationStage;
 use crate::identifier::{Derivable, DigestIdentifier, KeyIdentifier};

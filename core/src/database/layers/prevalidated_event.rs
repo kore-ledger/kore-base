@@ -13,8 +13,8 @@ pub(crate) struct PrevalidatedEventDb<C: DatabaseCollection> {
 impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("prevalidated-event"),
-            prefix: "prevalidated-event".to_string(),
+            collection: manager.create_collection("prevalidated_event"),
+            prefix: "prevalidated_event".to_string(),
         }
     }
 
