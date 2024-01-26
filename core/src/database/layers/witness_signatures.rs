@@ -18,8 +18,8 @@ impl<C: DatabaseCollection> WitnessSignaturesDb<C> {
     /// Creates a new instance of witness signatures database.
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("witness-signatures"),
-            prefix: "witness-signatures".to_string(),
+            collection: manager.create_collection("witness_signatures"),
+            prefix: "witness_signatures".to_string(),
         }
     }
 

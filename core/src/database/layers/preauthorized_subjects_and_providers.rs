@@ -5,19 +5,42 @@ use crate::{DbError, KeyIdentifier};
 use std::collections::HashSet;
 use std::sync::Arc;
 
+/// Preauthorized subjects and providers database.
 pub(crate) struct PreauthorizedSbujectsAndProovidersDb<C: DatabaseCollection> {
     collection: C,
     prefix: String,
 }
 
+/// Preauthorized subjects and providers database implementation.
 impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
+
+    /// Create a new preauthorized subjects and providers database.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `manager` - Database manager.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Self` - Returns preauthorized subjects and providers database.
+    /// 
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
-            collection: manager.create_collection("preauthorized-subjects-and-providers"),
-            prefix: "preauthorized-subjects-and-providers".to_string(),
+            collection: manager.create_collection("preauthorized_subjects_and_providers"),
+            prefix: "preauthorized_subjects_and_providers".to_string(),
         }
     }
 
+    /// Get the preauthorized subject and providers.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `subject_id` - Subject id.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<HashSet<KeyIdentifier>, DbError>` - Returns the preauthorized subject and providers.
+    /// 
     pub fn get_preauthorized_subject_and_providers(
         &self,
         subject_id: &DigestIdentifier,
@@ -33,6 +56,17 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
         Ok(result.1)
     }
 
+    /// Get the allowed subjects and providers.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `from` - From.
+    /// * `quantity` - Quantity.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<Vec<(DigestIdentifier, HashSet<KeyIdentifier>)>, DbError>` - Returns the allowed subjects and providers.
+    /// 
     pub fn get_allowed_subjects_and_providers(
         &self,
         from: Option<String>,
@@ -49,6 +83,17 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
         Ok(vec_result)
     }
 
+    /// Put the preauthorized subject and providers.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `subject_id` - Subject id.
+    /// * `providers` - Providersset.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Result<(), DbError>` - Returns Ok if the preauthorized subject and providers is put.
+    /// 
     pub fn set_preauthorized_subject_and_providers(
         &self,
         subject_id: &DigestIdentifier,
@@ -66,5 +111,27 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
             return Err(DbError::SerializeError);
         };
         self.collection.put(&key, &data)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::database::MemoryManager;
+
+    #[test]
+    fn test_preauthorized_subjects_and_providers() {
+        let manager = Arc::new(MemoryManager::new());
+        let preauthorized_subjects_and_providers_db =
+            PreauthorizedSbujectsAndProovidersDb::new(&manager);
+        let subject_id = DigestIdentifier::default();
+        let providers = HashSet::new();
+        preauthorized_subjects_and_providers_db
+            .set_preauthorized_subject_and_providers(&subject_id, providers.clone())
+            .unwrap();
+        let providers = preauthorized_subjects_and_providers_db
+            .get_preauthorized_subject_and_providers(&subject_id)
+            .unwrap();
+        assert_eq!(providers, providers);
     }
 }

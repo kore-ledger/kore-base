@@ -38,6 +38,24 @@ pub struct ValidationProof {
     pub governance_version: u64,
 }
 
+impl Default for ValidationProof {
+    fn default() -> Self {
+        Self {
+            governance_id: DigestIdentifier::default(),
+            governance_version: 0,
+            subject_id: DigestIdentifier::default(),
+            sn: 0,
+            schema_id: "subjet_id".to_string(),
+            namespace: "namespace".to_string(),
+            prev_event_hash: DigestIdentifier::default(),
+            event_hash: DigestIdentifier::default(),
+            subject_public_key: KeyIdentifier::default(),
+            genesis_governance_version: 0,
+            name: "name".to_string(),
+        }
+    }
+}
+
 impl HashId for ValidationProof {
     fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
         DigestIdentifier::from_serializable_borsh(self, derivator)
