@@ -1,4 +1,4 @@
-/// Copyright 2024 Antonio Estévez
+// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #[cfg(feature = "approval")]
@@ -38,7 +38,7 @@ use crate::message::{
     MessageContent, MessageReceiver, MessageSender, MessageTaskCommand, MessageTaskManager,
     NetworkEvent,
 };
-use crate::network::network_processor::NetworkProcessor;
+use crate::network::processor::NetworkProcessor;
 use crate::protocol::{KoreMessages, ProtocolChannels, ProtocolManager};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
@@ -46,7 +46,6 @@ use crate::validation::{manager::ValidationManager, Validation};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
 use ::futures::Future;
-use libp2p::{Multiaddr, PeerId};
 use log::{error, info};
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -131,15 +130,11 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let token = CancellationToken::new();
 
         let network_manager = NetworkProcessor::new(
-            settings.network.listen_addr.clone(),
-            network_access_points(&settings.network.known_nodes)?,
-            network_tx,
             key_pair.clone(),
             token.clone(),
-            notification_tx.clone(),
-            external_addresses(&settings.network.external_address)?,
-        )
-        .expect("Network created");
+            network_tx,
+            &settings.network,
+        );
 
         //TODO: change name. It's not a task
         let signature_manager = SelfSignatureManager::new(key_pair.clone(), &settings);
@@ -507,56 +502,5 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 .map_err(|e| Error::DatabaseError(e.to_string()))?;
         }
         Ok(key_identifier)
-    }
-}
-
-// TODO: move to better place, maybe settings
-fn network_access_points(points: &[String]) -> Result<Vec<(PeerId, Multiaddr)>, Error> {
-    let mut access_points: Vec<(PeerId, Multiaddr)> = Vec::new();
-    for point in points {
-        let data: Vec<&str> = point.split("/p2p/").collect();
-        if data.len() != 2 {
-            return Err(Error::AcessPointError(point.to_string()));
-        }
-        if let Some(value) = multiaddr(point) {
-            if let Ok(id) = data[1].parse::<PeerId>() {
-                access_points.push((id, value));
-            } else {
-                return Err(Error::AcessPointError(format!(
-                    "Invalid PeerId conversion: {}",
-                    point
-                )));
-            }
-        } else {
-            return Err(Error::AcessPointError(format!(
-                "Invalid MultiAddress conversion: {}",
-                point
-            )));
-        }
-    }
-    Ok(access_points)
-}
-
-// TODO: move to better place, maybe settings
-fn external_addresses(addresses: &[String]) -> Result<Vec<Multiaddr>, Error> {
-    let mut external_addresses: Vec<Multiaddr> = Vec::new();
-    for address in addresses {
-        if let Some(value) = multiaddr(address) {
-            external_addresses.push(value);
-        } else {
-            return Err(Error::AcessPointError(format!(
-                "Invalid MultiAddress conversion in External Address: {}",
-                address
-            )));
-        }
-    }
-    Ok(external_addresses)
-}
-
-// TODO: move to better place, maybe settings
-fn multiaddr(addr: &str) -> Option<Multiaddr> {
-    match addr.parse::<Multiaddr>() {
-        Ok(a) => Some(a),
-        Err(_) => None,
     }
 }

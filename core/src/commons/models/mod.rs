@@ -23,17 +23,19 @@ pub trait HashId: BorshSerialize {
 pub mod test {
 
     use super::*;
-    use borsh::{BorshSerialize, BorshDeserialize};
+    use borsh::{BorshDeserialize, BorshSerialize};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+    #[derive(
+        Debug, Clone, Serialize, Deserialize, Eq, PartialEq, BorshSerialize, BorshDeserialize,
+    )]
     pub struct Content(pub String);
 
     impl HashId for Content {
         fn hash_id(&self, derivator: DigestDerivator) -> Result<DigestIdentifier, SubjectError> {
-            DigestIdentifier::from_serializable_borsh(self, derivator)
-                .map_err(|_| SubjectError::SignatureCreationFails("HashId for Event Fails".to_string()))
+            DigestIdentifier::from_serializable_borsh(self, derivator).map_err(|_| {
+                SubjectError::SignatureCreationFails("HashId for Event Fails".to_string())
+            })
         }
     }
-
 }

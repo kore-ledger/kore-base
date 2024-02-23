@@ -1,5 +1,5 @@
 [package]
-name = "kore-tell"
+name = "tell"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,17 +15,29 @@ rust-version.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
-borsh = { workspace = true }
+borsh = { workspace = true, optional = true }
 futures = { workspace = true }
+futures-bounded = "0.2"
 libp2p = { version = "0.53.0", default_features = false, features = [
 	"identify",
 ]}
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+lru = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true, features = ["derive"]}
+serde_json = { workspace = true, optional = true }
 smallvec = "1.11.1"
+tracing = { workspace = true }
 void = "1.0.2"
 
-
 [dev-dependencies]
+anyhow = "1.0.79"
 async-std = { version = "1.6.2", features = ["attributes"] }
 futures_ringbuf = "0.4.0"
+libp2p-swarm-test = { version = "0.3.0" }
+rand = "0.8.4"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+default = ["binary", "borsh", "json"]
+json = ["serde_json"]
+binary = []

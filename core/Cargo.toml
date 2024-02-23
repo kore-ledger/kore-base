@@ -20,15 +20,16 @@ validation = []
 secp256k1 = ["dep:k256"]
 
 [dependencies]
-tokio = { workspace = true, features = ["time", "sync", "macros"] }
+tokio = { workspace = true, features = ["time", "sync", "macros", "rt"] }
 libp2p = { workspace = true, default_features = false, features = [
 	"identify",
 	"kad",
-	"dns-tokio",
-	"tcp-tokio",
-	"mplex",
 	"noise",
 	"yamux",
+	"macros",
+	"tcp",
+	"tokio",
+	"dns",
 ] }
 config = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -59,8 +60,12 @@ sha2 = { workspace = true }
 sha3 = { workspace = true }
 wasmtime = { workspace = true, features = ["cache"], optional = true }
 memsecurity = { workspace = true, features = ["encryption"] }
+tell = { path = "../protocols/tell" }
 
 [dev-dependencies]
 kore-base = { path = ".", features = ["all"] }
+libp2p-swarm-test = { workspace = true }
 serial_test = { workspace = true }
+async-std = { version = "1.6.2", features = ["attributes"] }
+quickcheck = { version = "1" }
 
