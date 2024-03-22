@@ -32,6 +32,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -186,7 +187,7 @@ impl fmt::Display for InboundFailure {
 impl std::error::Error for InboundFailure {}
 
 /// The configuration for a `Behaviour` protocol.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     message_timeout: Duration,
     max_concurrent_streams: usize,
@@ -675,7 +676,8 @@ where
     ) -> std::task::Poll<ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
         if let Some(ev) = self.pending_events.pop_front() {
             return Poll::Ready(ev);
-        } else if self.pending_events.capacity() > EMPTY_QUEUE_SHRINK_THRESHOLD {
+        }
+        if self.pending_events.capacity() > EMPTY_QUEUE_SHRINK_THRESHOLD {
             self.pending_events.shrink_to_fit();
         }
 

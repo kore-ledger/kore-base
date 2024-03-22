@@ -1,0 +1,16 @@
+[package]
+name = "kore-boot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.20", features = [
+    "default",
+    "time",
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "macros",
+] }
+tracing = { version = "0.1", features = ["tokio"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

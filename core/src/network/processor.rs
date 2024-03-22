@@ -73,7 +73,7 @@ impl NetworkProcessor {
         key_pair: KeyPair,
         token: CancellationToken,
         event_sender: mpsc::Sender<NetworkEvent>,
-        settings: &NetworkSettings ,
+        settings: &NetworkSettings,
     ) -> Self {
         // Create channels to communicate events and commands
         let (command_sender, command_receiver) = mpsc::channel(10000);
@@ -87,8 +87,8 @@ impl NetworkProcessor {
             Keypair::from(kp)
         };
 
-        let bootstrap_nodes = super::network_access_points(&settings.known_nodes)
-            .expect("Invalid bootstrap nodes");
+        let bootstrap_nodes =
+            super::network_access_points(&settings.known_nodes).expect("Invalid bootstrap nodes");
         let external_addresses = super::external_addresses(&settings.external_address)
             .expect("Invalid external addresses");
         //let mut bytes = [0u8; 32];
@@ -156,8 +156,8 @@ impl NetworkProcessor {
         //let node_public_key = key_pair.public_key_bytes();
         let keys = Keypair::generate_ed25519();
         let public_key = keys.public();
-        let bootstrap_nodes = super::network_access_points(&settings.known_nodes)
-            .expect("Invalid bootstrap nodes");
+        let bootstrap_nodes =
+            super::network_access_points(&settings.known_nodes).expect("Invalid bootstrap nodes");
         let external_addresses = super::external_addresses(&settings.external_address)
             .expect("Invalid external addresses");
 
@@ -673,9 +673,7 @@ impl NetworkProcessor {
         if let Some(pending_messages) = pending_messages {
             for message in pending_messages.into_iter() {
                 log::debug!("MANDANDO MENSAJE");
-                self.swarm
-                    .behaviour_mut()
-                    .send_message(peer_id, message);
+                self.swarm.behaviour_mut().send_message(peer_id, message);
             }
         }
     }
@@ -690,9 +688,9 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-
     /// Add a known address for the given peer id.
     pub fn add_address(&mut self, peer_id: &PeerId, addr: Multiaddr) {
+        self.tell.add_address(peer_id, addr.clone());
         self.routing.add_address(peer_id, addr);
     }
 
@@ -729,15 +727,20 @@ impl From<RoutingEvent> for KoreNetworkEvent {
 
 #[cfg(test)]
 mod tests {
- 
-    use crate::{
-        network::{routing::{RoutingBehavior, RoutingBehaviorEvent}, KORE_PROTOCOL},
+
+    use crate::network::{
+        routing::{RoutingBehavior, RoutingBehaviorEvent},
+        KORE_PROTOCOL,
     };
 
     use super::{Behaviour as TestBehaviour, KoreNetworkEvent};
 
     use libp2p::{
-        identify::Event as IdentifyEvent, kad::Event as KadEvent, multiaddr::Protocol, swarm::{FromSwarm, SwarmEvent}, Multiaddr, PeerId, StreamProtocol, Swarm
+        identify::Event as IdentifyEvent,
+        kad::Event as KadEvent,
+        multiaddr::Protocol,
+        swarm::{FromSwarm, SwarmEvent},
+        Multiaddr, PeerId, StreamProtocol, Swarm,
     };
     use libp2p_swarm_test::SwarmExt;
 
@@ -750,7 +753,6 @@ mod tests {
 
     #[async_std::test]
     async fn test_send_message() {
-
         let mut boot_nodes = vec![];
 
         // Build node 1
@@ -761,14 +763,18 @@ mod tests {
         let (node2_addr, mut node2) = build_node(boot_nodes.clone());
         let node2_peer = *node2.local_peer_id();
 
-        node1.connect(&mut node2).await;
+        let result = node1.dial(node2_addr);
+        assert!(result.is_ok());
 
         let node1_loop = async move {
             let message = b"Hello node 2".to_vec();
-            node1.behaviour_mut().send_message(&node2_peer, message);    
+            node1.behaviour_mut().send_message(&node2_peer, message);
             loop {
                 match node1.next().await {
-                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message }))) => {
+                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Tell(tell::Event::Message {
+                        peer_id,
+                        message,
+                    }))) => {
                         println!(
                             "Message received from {:?}: {}",
                             peer_id,
@@ -778,7 +784,18 @@ mod tests {
                         assert_eq!(&message.message, b"Hello node 1");
                         break;
                     }
-                    e => println!("{:?}", e),
+                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Routing(
+                        RoutingBehaviorEvent::Identify(IdentifyEvent::Received { peer_id, info }),
+                    ))) => {
+                        assert_eq!(peer_id, node2_peer);
+                        for addr in info.listen_addrs {
+                            node1.behaviour_mut().add_address(&peer_id, addr);
+                        }
+                    }
+                    e => {
+                        println!("Node 1 -> {:?}", e);
+                        println!("");
+                    }
                 }
             }
         };
@@ -786,7 +803,10 @@ mod tests {
         let node2_loop = async move {
             loop {
                 match node2.next().await {
-                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message }))) => {
+                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Tell(tell::Event::Message {
+                        peer_id,
+                        message,
+                    }))) => {
                         println!(
                             "Message received from {:?}: {}",
                             peer_id,
@@ -798,7 +818,18 @@ mod tests {
                         node2.behaviour_mut().send_message(&node1_peer, message);
                         break;
                     }
-                    e => println!("{:?}", e),
+                    Some(SwarmEvent::Behaviour(KoreNetworkEvent::Routing(
+                        RoutingBehaviorEvent::Identify(IdentifyEvent::Received { peer_id, info }),
+                    ))) => {
+                        assert_eq!(peer_id, node1_peer);
+                        for addr in info.listen_addrs {
+                            node2.behaviour_mut().add_address(&peer_id, addr);
+                        }
+                    }
+                    e => {
+                        println!("Node 2 -> {:?}", e);
+                        println!("");
+                    }
                 }
             }
         };
@@ -811,14 +842,15 @@ mod tests {
 
     /// Build node.
     fn build_node(bootstrap_nodes: Vec<(PeerId, Multiaddr)>) -> (Multiaddr, TestSwarm) {
-        let mut swarm = Swarm::new_ephemeral(|key_pair| {
-            TestBehaviour {
-                routing: RoutingBehavior::new(&key_pair.public(), bootstrap_nodes.clone(), None),
-                tell: tell::binary::Behaviour::new(
-                    vec![(StreamProtocol::new(KORE_PROTOCOL), tell::ProtocolSupport::InboundOutbound)],
-                    Default::default(),
-                ),
-            }
+        let mut swarm = Swarm::new_ephemeral(|key_pair| TestBehaviour {
+            routing: RoutingBehavior::new(&key_pair.public(), bootstrap_nodes.clone(), None),
+            tell: tell::binary::Behaviour::new(
+                vec![(
+                    StreamProtocol::new(KORE_PROTOCOL),
+                    tell::ProtocolSupport::InboundOutbound,
+                )],
+                Default::default(),
+            ),
         });
 
         let address: Multiaddr = Protocol::Memory(random::<u64>()).into();
@@ -828,112 +860,112 @@ mod tests {
         (address, swarm)
     }
 
-/* 
-    use crate::network::routing::RoutingBehaviorEvent::*;
+    /*
+        use crate::network::routing::RoutingBehaviorEvent::*;
 
-    use super::*;
+        use super::*;
 
-    use libp2p::{
-        identify::Event as IdentifyEvent,
-        kad::{Event as KadEvent, RoutingUpdate},
-        swarm::SwarmEvent,
-        Swarm,
-    };
-    use libp2p_swarm_test::SwarmExt;
-
-    use IdentifyEvent::*;
-    use KadEvent::*;
-
-    #[async_std::test]
-    async fn test_network_behaviour() {
-        let mut bootstrap_nodes = vec![];
-
-        let mut bootstrap = Swarm::new_ephemeral(|key_pair| {
-            Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
-        });
-        let bootstrap_peer_id = *bootstrap.local_peer_id();
-        let (memory_addr, _) = bootstrap.listen().await;
-        bootstrap.add_external_address(memory_addr.clone());
-
-        bootstrap_nodes.push((bootstrap_peer_id, memory_addr.clone()));
-
-        let mut node1 = Swarm::new_ephemeral(|key_pair| {
-            Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
-        });
-
-        let node1_peer = *node1.local_peer_id();
-
-        let peer = node1
-            .wait(|e| match e {
-                SwarmEvent::Behaviour(KoreNetworkEvent::Routing(RoutingEvent::Kad(
-                    RoutingUpdated { peer, .. },
-                ))) => Some(peer),
-                _ => None,
-            })
-            .await;
-        println!("{:?}", peer);
-        assert_eq!(peer, bootstrap_peer_id);
-        node1.behaviour_mut().bootstrap();
-
-        let mut node2 = Swarm::new_ephemeral(|key_pair| {
-            Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
-        });
-
-        let node2_peer = *node2.local_peer_id();
-
-        let peer = node2
-            .wait(|e| match e {
-                SwarmEvent::Behaviour(KoreNetworkEvent::Routing(RoutingEvent::Kad(
-                    RoutingUpdated { peer, .. },
-                ))) => Some(peer),
-                _ => None,
-            })
-            .await;
-
-        assert_eq!(peer, bootstrap_peer_id);
-        node2.behaviour_mut().bootstrap();
-
-        node1
-            .behaviour_mut()
-            .tell
-            .send_message(&node2_peer, b"Hello node 2".to_vec());
-
-        let peer1 = async move {
-            loop {
-                match node1.next_swarm_event().await.try_into_behaviour_event() {
-                    Ok(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message })) => {
-                        println!("{}", String::from_utf8_lossy(&message.message));
-                        assert_eq!(peer_id, node2_peer);
-                        assert_eq!(&message.message, b"Hello node 1");
-                        node1
-                            .behaviour_mut()
-                            .tell
-                            .send_message(&node2_peer, b"Hello node 2".to_vec());
-                    }
-                    e => println!("{:?}", e),
-                }
-            }
+        use libp2p::{
+            identify::Event as IdentifyEvent,
+            kad::{Event as KadEvent, RoutingUpdate},
+            swarm::SwarmEvent,
+            Swarm,
         };
+        use libp2p_swarm_test::SwarmExt;
 
-        let peer2 = async move {
-            node2
+        use IdentifyEvent::*;
+        use KadEvent::*;
+
+        #[async_std::test]
+        async fn test_network_behaviour() {
+            let mut bootstrap_nodes = vec![];
+
+            let mut bootstrap = Swarm::new_ephemeral(|key_pair| {
+                Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
+            });
+            let bootstrap_peer_id = *bootstrap.local_peer_id();
+            let (memory_addr, _) = bootstrap.listen().await;
+            bootstrap.add_external_address(memory_addr.clone());
+
+            bootstrap_nodes.push((bootstrap_peer_id, memory_addr.clone()));
+
+            let mut node1 = Swarm::new_ephemeral(|key_pair| {
+                Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
+            });
+
+            let node1_peer = *node1.local_peer_id();
+
+            let peer = node1
+                .wait(|e| match e {
+                    SwarmEvent::Behaviour(KoreNetworkEvent::Routing(RoutingEvent::Kad(
+                        RoutingUpdated { peer, .. },
+                    ))) => Some(peer),
+                    _ => None,
+                })
+                .await;
+            println!("{:?}", peer);
+            assert_eq!(peer, bootstrap_peer_id);
+            node1.behaviour_mut().bootstrap();
+
+            let mut node2 = Swarm::new_ephemeral(|key_pair| {
+                Behaviour::new(&key_pair.public(), bootstrap_nodes.clone())
+            });
+
+            let node2_peer = *node2.local_peer_id();
+
+            let peer = node2
+                .wait(|e| match e {
+                    SwarmEvent::Behaviour(KoreNetworkEvent::Routing(RoutingEvent::Kad(
+                        RoutingUpdated { peer, .. },
+                    ))) => Some(peer),
+                    _ => None,
+                })
+                .await;
+
+            assert_eq!(peer, bootstrap_peer_id);
+            node2.behaviour_mut().bootstrap();
+
+            node1
                 .behaviour_mut()
                 .tell
-                .send_message(&node1_peer, b"Hello node 1".to_vec());
-            loop {
-                match node2.next_swarm_event().await.try_into_behaviour_event() {
-                    Ok(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message })) => {
-                        println!("{}", String::from_utf8_lossy(&message.message));
-                        assert_eq!(peer_id, node1_peer);
-                        assert_eq!(&message.message, b"Hello node 2");
-                    }
-                    e => println!("{:?}", e),
-                }
-            }
-        };
+                .send_message(&node2_peer, b"Hello node 2".to_vec());
 
-        async_std::task::spawn(Box::pin(peer1));
-        peer2.await;
-    }
-*/
+            let peer1 = async move {
+                loop {
+                    match node1.next_swarm_event().await.try_into_behaviour_event() {
+                        Ok(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message })) => {
+                            println!("{}", String::from_utf8_lossy(&message.message));
+                            assert_eq!(peer_id, node2_peer);
+                            assert_eq!(&message.message, b"Hello node 1");
+                            node1
+                                .behaviour_mut()
+                                .tell
+                                .send_message(&node2_peer, b"Hello node 2".to_vec());
+                        }
+                        e => println!("{:?}", e),
+                    }
+                }
+            };
+
+            let peer2 = async move {
+                node2
+                    .behaviour_mut()
+                    .tell
+                    .send_message(&node1_peer, b"Hello node 1".to_vec());
+                loop {
+                    match node2.next_swarm_event().await.try_into_behaviour_event() {
+                        Ok(KoreNetworkEvent::Tell(tell::Event::Message { peer_id, message })) => {
+                            println!("{}", String::from_utf8_lossy(&message.message));
+                            assert_eq!(peer_id, node1_peer);
+                            assert_eq!(&message.message, b"Hello node 2");
+                        }
+                        e => println!("{:?}", e),
+                    }
+                }
+            };
+
+            async_std::task::spawn(Box::pin(peer1));
+            peer2.await;
+        }
+    */
 }

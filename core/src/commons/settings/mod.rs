@@ -26,7 +26,10 @@ pub struct NetworkSettings {
     /// List of bootstrap nodes to connect to.
     pub external_address: Vec<String>,
     /// Maximum number of concurrent streams allowed.
-    #[serde(rename = "maxConcurrentStreams", default = "default_max_concurrent_streams")]
+    #[serde(
+        rename = "maxConcurrentStreams",
+        default = "default_max_concurrent_streams"
+    )]
     pub max_concurrent_streams: usize,
     /// Timeout to be used for messages.
     #[serde(rename = "messageTimeout", default = "default_message_timeout")]

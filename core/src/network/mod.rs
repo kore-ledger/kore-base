@@ -1,7 +1,6 @@
 //mod error;
 //pub mod network_processor;
 
-
 pub mod processor;
 mod routing;
 
@@ -61,10 +60,9 @@ fn external_addresses(addresses: &[String]) -> Result<Vec<Multiaddr>, Error> {
     Ok(external_addresses)
 }
 
-
 #[cfg(test)]
 mod tests {
-/* 
+    /*
     pub use crate::message::{MessageReceiver, MessageSender, NetworkEvent};
     use crate::network::network_node::{KoreNetworkEvent, NetworkProcessor};
     use crate::{message::Command, ListenAddr};
