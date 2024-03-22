@@ -1,7 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::utils::{LruHashSet, convert_boot_nodes};
+use crate::utils::{convert_boot_nodes, LruHashSet};
 
 use futures_timer::Delay;
 use ip_network::IpNetwork;
@@ -242,6 +242,13 @@ impl Behaviour {
         }
     }
 
+    /// Discover closet peers to the given `PeerId`.
+    pub fn discover(&mut self, peer_id: PeerId) {
+        if let Some(k) = self.kademlia.as_mut() {
+            k.get_closest_peers(peer_id);
+        }
+    }
+
     /// Start fetching a record from the DHT.
     ///
     /// A corresponding `ValueFound` or `ValueNotFound` event will later be generated.
@@ -353,7 +360,7 @@ pub enum Event {
 
     /// Started a random Kademlia query.
     ///
-    /// Only happens if [`DiscoveryConfig::with_dht_random_walk`] has been configured to `true`.
+    /// Only happens if [`Config::with_dht_random_walk`] has been configured to `true`.
     RandomKademliaStarted,
 }
 

@@ -11,11 +11,14 @@ use crate::{
 };
 
 use libp2p::{
-    identify::Info as IdentifyInfo, identity::PublicKey, kad::RecordKey, swarm::NetworkBehaviour,
-    swarm::behaviour::toggle::Toggle,
     dcutr::{self, Behaviour as Dcutr},
-    relay::{self, Behaviour as RelayServer, client::{Behaviour as RelayClient}},
-    Multiaddr, PeerId, StreamProtocol, 
+    identify::Info as IdentifyInfo,
+    identity::PublicKey,
+    kad::RecordKey,
+    relay::{self, client::Behaviour as RelayClient, Behaviour as RelayServer},
+    swarm::behaviour::toggle::Toggle,
+    swarm::NetworkBehaviour,
+    Multiaddr, PeerId, StreamProtocol,
 };
 use tell::{
     binary, Event as TellEvent, InboundFailure, InboundTellId, OutboundFailure, OutboundTellId,
@@ -30,16 +33,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-/// The network service trait. 
-pub trait BehaviourService {
-
-    /// Returns the known peers.
-    fn known_peers(&mut self) -> HashSet<PeerId>;
-
-    /// Send message to peer.
-    fn send_message(&mut self, peer_id: &PeerId, message: Vec<u8>) -> OutboundTellId;
-
-}
 
 /// The network composed behaviour.
 #[derive(NetworkBehaviour)]
@@ -53,6 +46,15 @@ pub struct Behaviour {
 
     /// The `node` behaviour.
     node: node::Behaviour,
+
+    /// The `relay` server behaviour.
+    relay_server: Toggle<RelayServer>,
+
+    /// The `relay` client behaviour.
+    relay_client: Toggle<RelayClient>,
+
+    /// The Direct Connection Upgrade through Relay (DCUTR) behaviour.
+    dcutr: Toggle<Dcutr>,
 }
 
 impl Behaviour {
@@ -61,15 +63,38 @@ impl Behaviour {
         public_key: &PublicKey,
         config: Config,
         external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
+        relay_client: Option<RelayClient>,
     ) -> Self {
+
+        let peer_id = PeerId::from_public_key(&public_key);
         let protocols = iter::once((
             StreamProtocol::new(crate::NETWORK_PROTOCOL),
             ProtocolSupport::InboundOutbound,
         ));
+
+        let (dcutr, relay_server) = match config.node_type {
+            NodeType::Bootstrap{..} => {
+                //let dcutr = dcutr::Behaviour::new(peer_id);
+                let relay_server = RelayServer::new(peer_id, Default::default());
+                (Toggle::from(None), Toggle::from(Some(relay_server)))
+            }
+            NodeType::Ephemeral => {
+                let dcutr = dcutr::Behaviour::new(peer_id);
+                (Toggle::from(Some(dcutr)), Toggle::from(None))
+            }
+            NodeType::Addressable{..} => {
+                let dcutr = dcutr::Behaviour::new(peer_id);
+                let relay_server = RelayServer::new(peer_id, Default::default());
+                (Toggle::from(Some(dcutr)), Toggle::from(Some(relay_server)))
+            }
+        };
         Self {
             tell: binary::Behaviour::new(protocols, config.tell),
             routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config.routing),
             node: node::Behaviour::new(&config.user_agent, public_key, external_addresses),
+            relay_server,
+            relay_client: Toggle::from(relay_client),
+            dcutr,
         }
     }
 
@@ -137,6 +162,8 @@ impl Behaviour {
         self.routing
             .add_self_reported_address(peer_id, supported_protocols, addr);
     }
+
+
 }
 
 /// Network event.
@@ -182,6 +209,15 @@ pub enum Event {
         outbound_id: OutboundTellId,
         error: OutboundFailure,
     },
+
+    /// Relay server event
+    RelayServer(relay::Event),
+
+    /// Relay client event
+    RelayClient(relay::client::Event),
+
+    /// Dcutr event
+    Dcutr(dcutr::Event),
 
     /// Started a random iterative Kademlia discovery query.
     RandomKademliaStarted,
@@ -239,7 +275,10 @@ impl From<TellEvent<Vec<u8>>> for Event {
 impl From<node::Event> for Event {
     fn from(event: node::Event) -> Self {
         match event {
-            node::Event::Identified { peer_id, info } => Event::Identified { peer_id, info: Box::new(info) },
+            node::Event::Identified { peer_id, info } => Event::Identified {
+                peer_id,
+                info: Box::new(info),
+            },
         }
     }
 }
@@ -258,12 +297,29 @@ impl From<routing::Event> for Event {
     }
 }
 
+impl From<relay::client::Event> for Event {
+    fn from(event: relay::client::Event) -> Self {
+        Event::RelayClient(event)
+    }
+}
+
+impl From<dcutr::Event> for Event {
+    fn from(event: dcutr::Event) -> Self {
+        Event::Dcutr(event)
+    }
+}
+
+impl From<relay::Event> for Event {
+    fn from(event: relay::Event) -> Self {
+        Event::RelayServer(event)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::{behaviour, Config, TransportType, NodeType};
+    use crate::{behaviour, Config, NodeType, TransportType};
 
     use futures::prelude::*;
     use futures::{join, select};
@@ -366,6 +422,7 @@ mod tests {
                 &key_pair.public(),
                 config,
                 Arc::new(Mutex::new(HashSet::new())),
+                None,
             )
         });
         let listen_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())

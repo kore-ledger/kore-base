@@ -3,10 +3,10 @@
 
 //! # Network package.
 
-mod addressable;
+//mod addressable;
 mod behaviour;
-mod circuit;
-mod ephemeral;
+//mod bootstrap;
+//mod ephemeral;
 pub mod error;
 mod node;
 mod routing;
@@ -14,6 +14,7 @@ mod service;
 mod utils;
 
 pub use error::Error;
+pub use service::NetworkService;
 
 use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
@@ -58,14 +59,14 @@ pub struct Config {
 pub enum TransportType {
     /// Normal
     Normal {
-	    /// If true, the network will use mDNS to discover other libp2p nodes on the local network
-		/// and connect to them if they support the same chain.
-		enable_mdns: bool,
+        /// If true, the network will use mDNS to discover other libp2p nodes on the local network
+        /// and connect to them if they support the same chain.
+        enable_mdns: bool,
 
-		/// If true, allow connecting to private IPv4/IPv6 addresses (as defined in
-		/// [RFC1918](https://tools.ietf.org/html/rfc1918)). Irrelevant for addresses that have
-		/// been passed in `::sc_network::config::NetworkConfiguration::boot_nodes`.
-		allow_private_ip: bool,
+        /// If true, allow connecting to private IPv4/IPv6 addresses (as defined in
+        /// [RFC1918](https://tools.ietf.org/html/rfc1918)). Irrelevant for addresses that have
+        /// been passed in `::sc_network::config::NetworkConfiguration::boot_nodes`.
+        allow_private_ip: bool,
     },
     /// Memory transport.
     Memory,
@@ -75,18 +76,12 @@ pub enum TransportType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NodeType {
     /// Bootstrap node.
-    Bootstrap {
-        external_addresses: Vec<String>,
-    },
+    Bootstrap { external_addresses: Vec<String> },
     /// Addressable node.
-    Addressable {
-        external_addresses: Vec<String>,
-    },
+    Addressable { external_addresses: Vec<String> },
     /// Ephemeral node.
     Ephemeral,
 }
-
-
 
 /// Command enumeration for the network service.
 pub enum Command {

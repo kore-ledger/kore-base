@@ -4,24 +4,29 @@
 //! # Network service
 //!
 
-use crate::{behaviour::Behaviour, utils::convert_boot_nodes, Command, Config, Error, Event, NodeType, TransportType};
+use crate::{
+    behaviour::Behaviour, utils::convert_boot_nodes, Command, Config, Error, Event, NodeType,
+    TransportType,
+};
 
-use identity::keys::{KeyPair, KeyMaterial};
+use identity::keys::{KeyMaterial, KeyPair};
 
 use libp2p::{
     core::{
-		muxing::StreamMuxerBox,
-		transport::{Boxed, OptionalTransport},
-		upgrade,
-	},
+        muxing::StreamMuxerBox,
+        transport::{Boxed, OptionalTransport},
+        upgrade,
+    },
+    swarm::NetworkBehaviour,
+    dns,
     identity::{ed25519, Keypair},
-    Swarm, SwarmBuilder, PeerId, Multiaddr, tcp, dns, noise, yamux,
+    noise, tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 
+use either::Either;
+use prometheus_client::registry::Registry;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use prometheus_client::registry::Registry;
-use either::Either;
 
 use std::{
     collections::HashSet,
@@ -42,9 +47,12 @@ pub struct NetworkService {
     metrics: Registry,
     /// The external addresses.
     external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
+
 }
 
 impl NetworkService {
+
+    /// Create a new `NetworkService`.
     pub fn new(
         key_pair: KeyPair,
         event_sender: mpsc::Sender<Event>,
@@ -55,7 +63,6 @@ impl NetworkService {
         let (command_sender, command_receiver) = mpsc::channel(10000);
 
         // Prepare the network crypto key.
-        let node_public_key = key_pair.public_key_bytes();
         let key = {
             let sk = ed25519::SecretKey::try_from_bytes(key_pair.secret_key_bytes())
                 .expect("Invalid keypair");
@@ -69,7 +76,7 @@ impl NetworkService {
         // Create metrics registry.
         let mut metrics = Registry::default();
 
-        
+        // Create the network behaviour.
 
         Ok(Self {
             command_sender,
@@ -80,5 +87,5 @@ impl NetworkService {
             external_addresses,
         })
     }
-}
 
+}

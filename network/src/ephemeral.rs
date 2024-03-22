@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! # Ephemeral node implementation.
-//! 
+//!
 
-use crate::{Config, Error, behaviour::BehaviourService};
+use crate::{Config, Error};
 
 use libp2p::{
-    dcutr, tcp, noise, yamux,
+    dcutr,
     identity::{Keypair, PublicKey},
+    noise,
     relay::client::Behaviour as RelayClient,
     swarm::NetworkBehaviour,
-    Multiaddr, PeerId, Swarm, SwarmBuilder,
+    tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
+
+use prometheus_client::registry::Registry;
 
 use std::{
     collections::HashSet,
@@ -41,25 +44,10 @@ impl Behaviour {
     ) -> Self {
         let peer_id = PeerId::from_public_key(&public_key);
         Self {
-            common: crate::behaviour::Behaviour::new(
-                public_key,
-                config,
-                external_addresses,
-            ),
+            common: crate::behaviour::Behaviour::new(public_key, config, external_addresses),
             dcutr: dcutr::Behaviour::new(peer_id),
             relay_client,
         }
-    }
-}
-
-impl BehaviourService for Behaviour {
-
-    fn known_peers(&mut self) -> HashSet<PeerId> {
-        self.common.known_peers()
-    }
-
-    fn send_message(&mut self, peer_id: &PeerId, message: Vec<u8>) -> tell::OutboundTellId {
-        self.common.send_message(peer_id, message)
     }
 }
 
@@ -68,8 +56,8 @@ pub fn build_swarm(
     key: Keypair,
     config: Config,
     external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
+    registry: &mut Registry,
 ) -> Result<Swarm<Behaviour>, Error> {
-	
     // TCP configuration.
     // With TCP_NODELAY we disable Nagle's algorithm and with PORT_REUSE we allow reusing the port
     // in ephemeral nodes.
@@ -78,12 +66,13 @@ pub fn build_swarm(
     Ok(SwarmBuilder::with_existing_identity(key)
         .with_tokio()
         .with_tcp(tcp_config, noise::Config::new, yamux::Config::default)
-            .map_err(|e| Error::Transport(format!("Failed to create TCP transport -> {}", e)))?
+        .map_err(|e| Error::Transport(format!("Failed to create TCP transport -> {}", e)))?
         .with_quic()
         .with_dns()
-            .map_err(|e| Error::Dns(format!("{}", e)))?
+        .map_err(|e| Error::Dns(format!("{}", e)))?
         .with_relay_client(noise::Config::new, yamux::Config::default)
-            .map_err(|e| Error::Relay(format!("Failed to build client -> {}", e)))?
+        .map_err(|e| Error::Relay(format!("Failed to build client -> {}", e)))?
+        .with_bandwidth_metrics(registry)
         .with_behaviour(|keypair, relay_behaviour| {
             Behaviour::new(
                 &keypair.public(),

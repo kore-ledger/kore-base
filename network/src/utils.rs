@@ -68,7 +68,6 @@ pub fn convert_boot_nodes(boot_nodes: Vec<(String, String)>) -> Vec<(PeerId, Mul
         .collect::<Vec<_>>()
 }
 
-
 #[cfg(test)]
 mod tests {
 
