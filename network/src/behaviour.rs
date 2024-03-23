@@ -210,13 +210,13 @@ pub enum Event {
         error: OutboundFailure,
     },
 
-    /// Relay server event
+    /// Relay server event.
     RelayServer(relay::Event),
 
-    /// Relay client event
+    /// Relay client event.
     RelayClient(relay::client::Event),
 
-    /// Dcutr event
+    ///Direct Connection Upgrade through Relay (DCUTR) event.
     Dcutr(dcutr::Event),
 
     /// Started a random iterative Kademlia discovery query.

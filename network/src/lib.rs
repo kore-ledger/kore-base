@@ -12,6 +12,7 @@ mod node;
 mod routing;
 mod service;
 mod utils;
+mod worker;
 
 pub use error::Error;
 pub use service::NetworkService;
