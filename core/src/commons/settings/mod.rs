@@ -267,7 +267,7 @@ pub struct NodeSettings {
     pub timeout: u32,
     #[doc(hidden)]
     pub passvotation: u8,
-    #[cfg(feature = "evaluation")]
+    //#[cfg(feature = "evaluation")]
     pub smartcontracts_directory: String,
 }
 

@@ -17,15 +17,16 @@ use libp2p::{
         transport::{Boxed, OptionalTransport},
         upgrade,
     },
-    swarm::NetworkBehaviour,
     dns,
     identity::{ed25519, Keypair},
-    noise, tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
+    noise,
+    swarm::NetworkBehaviour,
+    tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 
 use either::Either;
 use prometheus_client::registry::Registry;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 
 use std::{
@@ -35,57 +36,22 @@ use std::{
 
 /// The network service.
 pub struct NetworkService {
-    /// The command sender.
-    command_sender: mpsc::Sender<Command>,
-    /// The command receiver.
-    command_receiver: mpsc::Receiver<Command>,
-    /// The event sender.
-    event_sender: mpsc::Sender<Event>,
-    /// The cancellation token.
-    cancel: CancellationToken,
-    /// The network metrics registry.
-    metrics: Registry,
-    /// The external addresses.
-    external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
+    /// The command sender to communicate with the worker.
+    command_sender: Sender<Command>,
 
+    /// The addresses that the node is listening on.
+    external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
 }
 
 impl NetworkService {
-
     /// Create a new `NetworkService`.
     pub fn new(
-        key_pair: KeyPair,
-        event_sender: mpsc::Sender<Event>,
-        cancel: CancellationToken,
-        config: Config,
+        command_sender: Sender<Command>,
+        external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
     ) -> Result<Self, Error> {
-        // Create channels to communicate events and commands
-        let (command_sender, command_receiver) = mpsc::channel(10000);
-
-        // Prepare the network crypto key.
-        let key = {
-            let sk = ed25519::SecretKey::try_from_bytes(key_pair.secret_key_bytes())
-                .expect("Invalid keypair");
-            let kp = ed25519::Keypair::from(sk);
-            Keypair::from(kp)
-        };
-
-        // Create the external addresses set.
-        let external_addresses = Arc::new(Mutex::new(HashSet::new()));
-
-        // Create metrics registry.
-        let mut metrics = Registry::default();
-
-        // Create the network behaviour.
-
         Ok(Self {
             command_sender,
-            command_receiver,
-            event_sender,
-            cancel,
-            metrics,
             external_addresses,
         })
     }
-
 }

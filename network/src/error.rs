@@ -17,4 +17,6 @@ pub enum Error {
     Relay(String),
     #[error("Behaviour error: {0}")]
     Behaviour(String),
+    #[error("Address error: {0}")]
+    Address(String),
 }

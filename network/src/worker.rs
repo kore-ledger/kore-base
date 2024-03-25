@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! # Network worker.
-//! 
+//!
 
-use crate::{Error, Config, NodeType, Command, service::NetworkService, behaviour::Behaviour};
+use crate::{behaviour::Behaviour, service::NetworkService, Command, Config, Error, NodeType};
 
-use identity::keys::{KeyPair, KeyMaterial};
+use identity::keys::{KeyMaterial, KeyPair};
 
 use libp2p::{
     identity::{ed25519, Keypair},
-    Multiaddr, PeerId, Swarm, SwarmBuilder, noise, yamux, tcp,
+    noise, tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 
 use prometheus_client::registry::Registry;
@@ -24,32 +24,30 @@ use std::{
 };
 
 /// Main network worker. Must be polled in order for the network to advance.
-/// 
+///
 /// The worker is responsible for handling the network events and commands.
-/// 
+///
 pub struct NetworkWorker {
-
     /// Network service.
-    //service: NetworkService,
-    
+    service: Arc<NetworkService>,
+
     /// Addresses that the node is listening on.
     /// Updated by the `NetworkWorker` and loaded by the `NetworkService`.
-	listen_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
+    external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
 
     /// The libp2p swarm.
     swarm: Swarm<Behaviour>,
-    
-    /// The command sender.
-    command_sender: mpsc::Sender<Command>,
- 
+
     /// The command receiver.
     command_receiver: mpsc::Receiver<Command>,
 
+    /// The cancellation token.
+    cancel: CancellationToken,
 }
 
 impl NetworkWorker {
     /// Create a new `NetworkWorker`.
-    pub fn new(keys: KeyPair, config: Config) -> Result<Self, Error> {
+    pub fn new(keys: KeyPair, config: Config, cancel: CancellationToken) -> Result<Self, Error> {
         // Create channels to communicate events and commands
         let (command_sender, command_receiver) = mpsc::channel(10000);
 
@@ -69,28 +67,25 @@ impl NetworkWorker {
         // Create metrics registry.
         let mut bandwidth = Registry::default();
 
+        let node_type = config.node_type.clone();
         // Create the swarm.
-        let swarm = match config.node_type {
-
-            NodeType::Bootstrap { .. } => {
+        let swarm = match node_type {
+            NodeType::Bootstrap { external_addresses } => {
                 let tcp_config = tcp::Config::new().nodelay(true);
                 SwarmBuilder::with_existing_identity(key)
                     .with_tokio()
                     .with_tcp(tcp_config, noise::Config::new, yamux::Config::default)
-                        .map_err(|e| Error::Transport(format!("Failed to create TCP transport -> {}", e)))?
+                    .map_err(|e| {
+                        Error::Transport(format!("Failed to create TCP transport -> {}", e))
+                    })?
                     .with_quic()
                     .with_dns()
-                        .map_err(|e| Error::Dns(format!("{}", e)))?
+                    .map_err(|e| Error::Dns(format!("{}", e)))?
                     .with_bandwidth_metrics(&mut bandwidth)
                     .with_behaviour(|keypair| {
-                        Behaviour::new(
-                            &keypair.public(),
-                            config,
-                            ext_addr,
-                            None,
-                        )
+                        Behaviour::new(&keypair.public(), config, ext_addr, None)
                     })
-                        .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
+                    .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
                     .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
                     .build()
             }
@@ -99,35 +94,35 @@ impl NetworkWorker {
                 SwarmBuilder::with_existing_identity(key)
                     .with_tokio()
                     .with_tcp(tcp_config, noise::Config::new, yamux::Config::default)
-                        .map_err(|e| Error::Transport(format!("Failed to create TCP transport -> {}", e)))?
+                    .map_err(|e| {
+                        Error::Transport(format!("Failed to create TCP transport -> {}", e))
+                    })?
                     .with_quic()
                     .with_dns()
-                        .map_err(|e| Error::Dns(format!("{}", e)))?
+                    .map_err(|e| Error::Dns(format!("{}", e)))?
                     .with_relay_client(noise::Config::new, yamux::Config::default)
-                        .map_err(|e| Error::Relay(format!("Failed to build client -> {}", e)))?
+                    .map_err(|e| Error::Relay(format!("Failed to build client -> {}", e)))?
                     .with_bandwidth_metrics(&mut bandwidth)
                     .with_behaviour(|keypair, relay_behaviour| {
-                        Behaviour::new(
-                            &keypair.public(),
-                            config,
-                            ext_addr,
-                            Some(relay_behaviour),
-                        )
+                        Behaviour::new(&keypair.public(), config, ext_addr, Some(relay_behaviour))
                     })
-                        .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
+                    .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
                     .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
                     .build()
-
             }
         };
 
+        let service = Arc::new(NetworkService::new(
+            command_sender,
+            external_addresses.clone(),
+        )?);
 
         Ok(Self {
-            //service,
-            listen_addresses: external_addresses,
+            service,
+            external_addresses,
             swarm,
-            command_sender,
             command_receiver,
+            cancel,
         })
     }
 }

@@ -1,6 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use crate::Error;
 use libp2p::{Multiaddr, PeerId};
 use linked_hash_set::LinkedHashSet;
 
@@ -67,6 +68,31 @@ pub fn convert_boot_nodes(boot_nodes: Vec<(String, String)>) -> Vec<(PeerId, Mul
         .map(|(peer_id, addr)| (peer_id.unwrap(), addr.unwrap()))
         .collect::<Vec<_>>()
 }
+
+/// Gets the list of external (public) addresses for the node from string array.
+pub fn external_addresses(addresses: &[String]) -> Result<Vec<Multiaddr>, Error> {
+    let mut external_addresses: Vec<Multiaddr> = Vec::new();
+    for address in addresses {
+        if let Some(value) = multiaddr(address) {
+            external_addresses.push(value);
+        } else {
+            return Err(Error::Address(format!(
+                "Invalid MultiAddress conversion in External Address: {}",
+                address
+            )));
+        }
+    }
+    Ok(external_addresses)
+}
+
+/// Parses a string into a `Multiaddr` if possible.
+fn multiaddr(addr: &str) -> Option<Multiaddr> {
+    match addr.parse::<Multiaddr>() {
+        Ok(a) => Some(a),
+        Err(_) => None,
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

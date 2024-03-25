@@ -33,7 +33,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-
 /// The network composed behaviour.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
@@ -65,7 +64,6 @@ impl Behaviour {
         external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
         relay_client: Option<RelayClient>,
     ) -> Self {
-
         let peer_id = PeerId::from_public_key(&public_key);
         let protocols = iter::once((
             StreamProtocol::new(crate::NETWORK_PROTOCOL),
@@ -73,7 +71,7 @@ impl Behaviour {
         ));
 
         let (dcutr, relay_server) = match config.node_type {
-            NodeType::Bootstrap{..} => {
+            NodeType::Bootstrap { .. } => {
                 //let dcutr = dcutr::Behaviour::new(peer_id);
                 let relay_server = RelayServer::new(peer_id, Default::default());
                 (Toggle::from(None), Toggle::from(Some(relay_server)))
@@ -82,7 +80,7 @@ impl Behaviour {
                 let dcutr = dcutr::Behaviour::new(peer_id);
                 (Toggle::from(Some(dcutr)), Toggle::from(None))
             }
-            NodeType::Addressable{..} => {
+            NodeType::Addressable { .. } => {
                 let dcutr = dcutr::Behaviour::new(peer_id);
                 let relay_server = RelayServer::new(peer_id, Default::default());
                 (Toggle::from(Some(dcutr)), Toggle::from(Some(relay_server)))
@@ -162,8 +160,6 @@ impl Behaviour {
         self.routing
             .add_self_reported_address(peer_id, supported_protocols, addr);
     }
-
-
 }
 
 /// Network event.
