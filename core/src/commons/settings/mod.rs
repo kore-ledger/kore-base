@@ -25,6 +25,23 @@ pub struct NetworkSettings {
     #[serde(rename = "externaladdress")]
     /// List of bootstrap nodes to connect to.
     pub external_address: Vec<String>,
+    /// Maximum number of concurrent streams allowed.
+    #[serde(
+        rename = "maxConcurrentStreams",
+        default = "default_max_concurrent_streams"
+    )]
+    pub max_concurrent_streams: usize,
+    /// Timeout to be used for messages.
+    #[serde(rename = "messageTimeout", default = "default_message_timeout")]
+    pub message_timeout: u64,
+}
+
+fn default_max_concurrent_streams() -> usize {
+    100
+}
+
+fn default_message_timeout() -> u64 {
+    10
 }
 
 impl Default for NetworkSettings {
@@ -33,6 +50,8 @@ impl Default for NetworkSettings {
             listen_addr: vec![ListenAddr::default()],
             known_nodes: Vec::<String>::new(),
             external_address: vec![],
+            max_concurrent_streams: 100,
+            message_timeout: 10,
         }
     }
 }
@@ -248,7 +267,7 @@ pub struct NodeSettings {
     pub timeout: u32,
     #[doc(hidden)]
     pub passvotation: u8,
-    #[cfg(feature = "evaluation")]
+    //#[cfg(feature = "evaluation")]
     pub smartcontracts_directory: String,
 }
 

@@ -33,4 +33,6 @@ pub enum Error {
     SerializeError,
     #[error("DeSerialization Error")]
     DeSerializeError,
+    #[error("Network Error: {0}")]
+    NetworkError(String),
 }

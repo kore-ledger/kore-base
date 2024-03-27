@@ -1,0 +1,26 @@
+(
+    [
+        RoutingBehaviorEvent: ModeChanged { new_mode: Server }, 
+        RoutingBehaviorEvent: UnroutablePeer { peer: PeerId("12D3KooWCcb1XhEyLEVKsz219gAhajgZF7SKEWxvShXhtKPWbEVv") }, 
+        RoutingBehaviorEvent: Sent { peer_id: PeerId("12D3KooWCcb1XhEyLEVKsz219gAhajgZF7SKEWxvShXhtKPWbEVv") }, 
+        RoutingBehaviorEvent: InboundRequest { request: FindNode { num_closer_peers: 0 } },
+        RoutingBehaviorEvent: Received { peer_id: PeerId("12D3KooWCcb1XhEyLEVKsz219gAhajgZF7SKEWxvShXhtKPWbEVv"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 298e9c4f266ab7eb243d7340d84a88b167a76fe2779529d5bdece1b435fa3541) }, protocol_version: "/kore/1.0.0", agent_version: "rust-libp2p/0.44.1", listen_addrs: ["/memory/16669846613720639601"], protocols: ["/kore/1.0.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: "/memory/17551750613559781997/p2p/12D3KooWMGxGawLDBBvgABc4aGGAWvBAsHCt3UyXzGqw9RmsSDQG" } }
+    ], 
+    [
+        RoutingBehaviorEvent: ModeChanged { new_mode: Server }, 
+        RoutingBehaviorEvent: Sent { peer_id: PeerId("12D3KooWMGxGawLDBBvgABc4aGGAWvBAsHCt3UyXzGqw9RmsSDQG") }
+    ]
+)
+
+(
+    [
+        RoutingBehaviorEvent: ModeChanged { new_mode: Server }, 
+        RoutingBehaviorEvent: UnroutablePeer { peer: PeerId("12D3KooWN26cjouD5NzaT3QvDt8hDRz51tou1qtZT5XPwBy6Mw2E") }, 
+        RoutingBehaviorEvent: Sent { peer_id: PeerId("12D3KooWN26cjouD5NzaT3QvDt8hDRz51tou1qtZT5XPwBy6Mw2E") }, 
+        RoutingBehaviorEvent: Received { peer_id: PeerId("12D3KooWN26cjouD5NzaT3QvDt8hDRz51tou1qtZT5XPwBy6Mw2E"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): b54da0d9fe8043f4486b4c8ddc87ddb76261b81b24fcd5aeadf9c7884cf) }, protocol_version: "/kore/1.0.0", agent_version: "rust-libp2p/0.44.1", listen_addrs: ["/memory/6722420134324088988"], protocols: ["/ipfs/id/1.0.0", "/kore/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: "/memory/5015135017478405095/p2p/12D3KooWK9FsVagEvo7nPbBTatBrqR9guTQiKFcYi7g2yq1bUkKf" } }, 
+        RoutingBehaviorEvent: InboundRequest { request: FindNode { num_closer_peers: 0 } }
+    ], 
+        [RoutingBehaviorEvent: ModeChanged { new_mode: Server }, 
+        RoutingBehaviorEvent: Sent { peer_id: PeerId("12D3KooWK9FsVagEvo7nPbBTatBrqR9guTQiKFcYi7g2yq1bUkKf") }
+    ]
+)

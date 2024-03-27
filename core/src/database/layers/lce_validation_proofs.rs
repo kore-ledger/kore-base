@@ -14,15 +14,15 @@ pub(crate) struct LceValidationProofs<C: DatabaseCollection> {
 /// Last committed event validation proofs database implementation.
 impl<C: DatabaseCollection> LceValidationProofs<C> {
     /// Create a new last committed event validation proofs database.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `manager` - Database manager.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Self` - Returns last committed event validation proofs database.
-    /// 
+    ///
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
             collection: manager.create_collection("lce_validation_proofs"),
@@ -31,15 +31,15 @@ impl<C: DatabaseCollection> LceValidationProofs<C> {
     }
 
     /// Get the last committed event validation proof.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<ValidationProof, DbError>` - Returns the last committed event validation proof.
-    /// 
+    ///
     pub fn get_lce_validation_proof(
         &self,
         subject_id: &DigestIdentifier,
@@ -54,16 +54,16 @@ impl<C: DatabaseCollection> LceValidationProofs<C> {
     }
 
     /// Put the last committed event validation proof.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
     /// * `lce_validation_proof` - Last committed event validation proof.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), DbError>` - Returns Ok if the last committed event validation proof is put.
-    /// 
+    ///
     pub fn set_lce_validation_proof(
         &self,
         subject_id: &DigestIdentifier,
@@ -81,15 +81,15 @@ impl<C: DatabaseCollection> LceValidationProofs<C> {
     }
 
     /// Delete the last committed event validation proof.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), DbError>` - Returns Ok if the last committed event validation proof is deleted.
-    /// 
+    ///
     pub fn del_lce_validation_proof(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -105,7 +105,7 @@ mod tests {
 
     use super::*;
     use crate::database::MemoryManager;
-    
+
     #[test]
     fn test_lce_validation_proofs() {
         let manager = Arc::new(MemoryManager::new());
@@ -119,9 +119,10 @@ mod tests {
             .get_lce_validation_proof(&subject_id)
             .unwrap();
         assert_eq!(lce_validation_proof, lce_validation_proof);
-        lce_validation_proofs_db.del_lce_validation_proof(&subject_id).unwrap();
-        let lce_validation_proof = lce_validation_proofs_db
-            .get_lce_validation_proof(&subject_id);
+        lce_validation_proofs_db
+            .del_lce_validation_proof(&subject_id)
+            .unwrap();
+        let lce_validation_proof = lce_validation_proofs_db.get_lce_validation_proof(&subject_id);
         assert!(lce_validation_proof.is_err());
     }
 }

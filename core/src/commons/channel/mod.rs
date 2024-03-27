@@ -1,6 +1,5 @@
 /// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     oneshot::{self, Sender as OneshotSender},
