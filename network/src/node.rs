@@ -51,6 +51,8 @@ struct NodeInfo {
     client_version: Option<String>,
     /// Latest ping time with this node.
     latest_ping: Option<Duration>,
+    /// Whether the node is reachable.
+    reachable: bool,
 }
 
 impl NodeInfo {
@@ -62,6 +64,7 @@ impl NodeInfo {
             endpoints,
             client_version: None,
             latest_ping: None,
+            reachable: false,
         }
     }
 }
@@ -154,6 +157,10 @@ impl Behaviour {
     fn handle_identify_report(&mut self, peer_id: &PeerId, info: &IdentifyInfo) {
         trace!(target: TARGET_NODE, "Identified {:?} => {:?}", peer_id, info);
         if let Some(entry) = self.nodes_info.get_mut(peer_id) {
+            let reachable = info
+                .listen_addrs
+                .iter()
+                .any(|addr| crate::utils::is_reachable(addr));
             entry.client_version = Some(info.agent_version.clone());
         } else {
             error!(target: TARGET_NODE,
@@ -182,6 +189,11 @@ impl<'a> Node<'a> {
     /// pinged this node.
     pub fn latest_ping(&self) -> Option<Duration> {
         self.0.latest_ping
+    }
+
+    /// Returns whether the node is reachable.
+    pub fn reachable(&self) -> bool {
+        self.0.reachable
     }
 }
 

@@ -288,6 +288,7 @@ impl From<routing::Event> for Event {
             routing::Event::ValueNotFound(key, _) => Event::Dht(DhtValue::NotFound(key)),
             routing::Event::ValuePut(key, _) => Event::Dht(DhtValue::Put(key)),
             routing::Event::ValuePutFailed(key, _) => Event::Dht(DhtValue::PutFailed(key)),
+            routing::Event::ClosestPeers(key, peer_ids) => Event::None,
             routing::Event::UnroutablePeer(_) => Event::None,
         }
     }

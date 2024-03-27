@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::Error;
-use libp2p::{Multiaddr, PeerId};
+use ip_network::IpNetwork;
+use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
 use linked_hash_set::LinkedHashSet;
 
-use std::{hash::Hash, num::NonZeroUsize, str::FromStr};
+use std::{collections::HashSet, hash::Hash, num::NonZeroUsize, str::FromStr};
 
 /// Wrapper around `LinkedHashSet` with bounded growth.
 ///
@@ -70,11 +71,11 @@ pub fn convert_boot_nodes(boot_nodes: Vec<(String, String)>) -> Vec<(PeerId, Mul
 }
 
 /// Gets the list of external (public) addresses for the node from string array.
-pub fn external_addresses(addresses: &[String]) -> Result<Vec<Multiaddr>, Error> {
-    let mut external_addresses: Vec<Multiaddr> = Vec::new();
+pub fn convert_external_addresses(addresses: &[String]) -> Result<HashSet<Multiaddr>, Error> {
+    let mut external_addresses = HashSet::new();
     for address in addresses {
         if let Some(value) = multiaddr(address) {
-            external_addresses.push(value);
+            external_addresses.insert(value);
         } else {
             return Err(Error::Address(format!(
                 "Invalid MultiAddress conversion in External Address: {}",
@@ -93,6 +94,21 @@ fn multiaddr(addr: &str) -> Option<Multiaddr> {
     }
 }
 
+/// Check if the given `Multiaddr` is reachable.
+///
+/// This test is successful only for global IP addresses and DNS names.
+// NB: Currently all DNS names are allowed and no check for TLD suffixes is done
+// because the set of valid domains is highly dynamic and would require frequent
+// updates, for example by utilising publicsuffix.org or IANA.
+pub fn is_reachable(addr: &Multiaddr) -> bool {
+    let ip = match addr.iter().next() {
+        Some(Protocol::Ip4(ip)) => IpNetwork::from(ip),
+        Some(Protocol::Ip6(ip)) => IpNetwork::from(ip),
+        Some(Protocol::Dns(_)) | Some(Protocol::Dns4(_)) | Some(Protocol::Dns6(_)) => return true,
+        _ => return false,
+    };
+    ip.is_global()
+}
 
 #[cfg(test)]
 mod tests {

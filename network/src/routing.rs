@@ -1,7 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::utils::{convert_boot_nodes, LruHashSet};
+use crate::utils::{convert_boot_nodes, is_reachable, LruHashSet};
 
 use futures_timer::Delay;
 use ip_network::IpNetwork;
@@ -214,7 +214,7 @@ impl Behaviour {
         addr: Multiaddr,
     ) {
         if let Some(kademlia) = self.kademlia.as_mut() {
-            if !self.allow_non_globals_in_dht && !Self::can_add_to_dht(&addr) {
+            if !self.allow_non_globals_in_dht && !is_reachable(&addr) {
                 trace!(
                     target: TARGET_ROUTING,
                     "Ignoring self-reported non-global address {} from {}.", addr, peer_id
@@ -362,6 +362,9 @@ pub enum Event {
     ///
     /// Only happens if [`Config::with_dht_random_walk`] has been configured to `true`.
     RandomKademliaStarted,
+
+    /// Closest peers to a given key have been found
+    ClosestPeers(Vec<u8>, Vec<PeerId>),
 }
 
 impl NetworkBehaviour for Behaviour {
@@ -436,7 +439,7 @@ impl NetworkBehaviour for Behaviour {
             FromSwarm::ExternalAddrConfirmed(e @ ExternalAddrConfirmed { addr }) => {
                 let new_addr = addr.clone().with(Protocol::P2p(self.local_peer_id));
 
-                if Self::can_add_to_dht(addr) {
+                if is_reachable(addr) {
                     // NOTE: we might re-discover the same address multiple times
                     // in which case we just want to refrain from logging.
                     if self.known_external_addresses.insert(new_addr.clone()) {
@@ -583,6 +586,14 @@ impl NetworkBehaviour for Behaviour {
                                     target: TARGET_ROUTING,
                                     "Kademlia => Random Kademlia query has yielded empty results",
                                 );
+                            } else {
+                                trace!(
+                                    target: TARGET_ROUTING,
+                                    "Kademlia => Closest peers to {:?} are: {:?}",
+                                    hex::encode(&ok.key),
+                                    ok.peers,
+                                );
+                                return Poll::Ready(ToSwarm::GenerateEvent(Event::ClosestPeers(ok.key, ok.peers)));
                             }
                         }
                     },
