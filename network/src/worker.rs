@@ -26,11 +26,15 @@ use prometheus_client::registry::Registry;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use tracing::{error, warn, info, trace};
+
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
     time::Duration,
 };
+
+const TARGET_ROUTING: &str = "KoreNetwork-Worker";
 
 /// Main network worker. Must be polled in order for the network to advance.
 ///
@@ -90,6 +94,7 @@ impl NetworkWorker {
         // Create the swarm.
         let swarm = match node_type {
             NodeType::Bootstrap { .. } => {
+                trace!(TARGET_ROUTING, "Creating worker for bootstrap node");
                 let tcp_config = tcp::Config::new().nodelay(true);
                 SwarmBuilder::with_existing_identity(key)
                     .with_tokio()
@@ -109,6 +114,7 @@ impl NetworkWorker {
                     .build()
             }
             _ => {
+                trace!(TARGET_ROUTING, "Creating worker for addressable or ephemeral node");
                 let tcp_config = tcp::Config::new().nodelay(true).port_reuse(true);
                 SwarmBuilder::with_existing_identity(key)
                     .with_tokio()
@@ -165,6 +171,7 @@ impl NetworkWorker {
 
     /// Run network worker.
     pub async fn run(&mut self) {
+        trace!(TARGET_ROUTING, "Running main loop");
         loop {
             tokio::select! {
                 command = self.command_receiver.recv() => {
@@ -205,5 +212,46 @@ impl NetworkWorker {
         match event {
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    use libp2p::{
+        core::{upgrade, transport::Boxed, muxing::StreamMuxerBox},
+        identity,
+        plaintext,
+        yamux,
+        Multiaddr,
+        PeerId,
+        Transport,
+    };
+
+    use futures::io::{AsyncRead, AsyncWrite};
+    
+    fn build_relay() -> Swarm<Behaviour> {
+        unimplemented!("build_relay")
+    }
+
+    fn build_client() -> Swarm<Behaviour> {
+        unimplemented!("build_client")
+    }
+
+    // Upgrade the transport.
+    fn upgrade_transport<StreamSink>(
+        transport: Boxed<StreamSink>,
+        identity: &identity::Keypair,
+    ) -> Boxed<(PeerId, StreamMuxerBox)>
+    where
+        StreamSink: AsyncRead + AsyncWrite + Send + Unpin + 'static,
+    {
+        transport
+            .upgrade(upgrade::Version::V1)
+            .authenticate(plaintext::Config::new(identity))
+            .multiplex(yamux::Config::default())
+            .boxed()
     }
 }
