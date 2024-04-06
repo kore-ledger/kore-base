@@ -39,19 +39,15 @@ pub struct NetworkService {
     /// The command sender to communicate with the worker.
     command_sender: Sender<Command>,
 
-    /// The metrics registry.
-    registry: Arc<Mutex<Registry>>,
 }
 
 impl NetworkService {
     /// Create a new `NetworkService`.
     pub fn new(
         command_sender: Sender<Command>,
-        registry: Arc<Mutex<Registry>>,
     ) -> Result<Self, Error> {
         Ok(Self {
-            command_sender,
-            registry,
+            command_sender
         })
     }
 }

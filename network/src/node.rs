@@ -157,10 +157,8 @@ impl Behaviour {
     fn handle_identify_report(&mut self, peer_id: &PeerId, info: &IdentifyInfo) {
         trace!(target: TARGET_NODE, "Identified {:?} => {:?}", peer_id, info);
         if let Some(entry) = self.nodes_info.get_mut(peer_id) {
-            let reachable = info
-                .listen_addrs
-                .iter()
-                .any(|addr| crate::utils::is_reachable(addr));
+            entry.reachable = info.listen_addrs.iter().any(crate::utils::is_reachable);
+
             entry.client_version = Some(info.agent_version.clone());
         } else {
             error!(target: TARGET_NODE,

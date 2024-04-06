@@ -25,8 +25,6 @@ use tell::{
     ProtocolSupport, TellMessage,
 };
 
-use serde::{Deserialize, Serialize};
-
 use std::{
     collections::HashSet,
     iter,
@@ -50,7 +48,7 @@ pub struct Behaviour {
     relay_server: Toggle<RelayServer>,
 
     /// The `relay` client behaviour.
-    relay_client: Toggle<RelayClient>,
+    relay_client: RelayClient,
 
     /// The Direct Connection Upgrade through Relay (DCUTR) behaviour.
     dcutr: Toggle<Dcutr>,
@@ -62,9 +60,9 @@ impl Behaviour {
         public_key: &PublicKey,
         config: Config,
         external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
-        relay_client: Option<RelayClient>,
+        relay_client: RelayClient,
     ) -> Self {
-        let peer_id = PeerId::from_public_key(&public_key);
+        let peer_id = PeerId::from_public_key(public_key);
         let protocols = iter::once((
             StreamProtocol::new(crate::NETWORK_PROTOCOL),
             ProtocolSupport::InboundOutbound,
@@ -91,9 +89,14 @@ impl Behaviour {
             routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config.routing),
             node: node::Behaviour::new(&config.user_agent, public_key, external_addresses),
             relay_server,
-            relay_client: Toggle::from(relay_client),
+            relay_client,
             dcutr,
         }
+    }
+
+    /// Bootstrap the network.
+    pub fn bootstrap(&mut self) {
+        self.routing.bootstrap();
     }
 
     /// Known peers.
@@ -288,7 +291,7 @@ impl From<routing::Event> for Event {
             routing::Event::ValueNotFound(key, _) => Event::Dht(DhtValue::NotFound(key)),
             routing::Event::ValuePut(key, _) => Event::Dht(DhtValue::Put(key)),
             routing::Event::ValuePutFailed(key, _) => Event::Dht(DhtValue::PutFailed(key)),
-            routing::Event::ClosestPeers(key, peer_ids) => Event::None,
+            routing::Event::ClosestPeers(_, _) => Event::None,
             routing::Event::UnroutablePeer(_) => Event::None,
         }
     }
@@ -320,14 +323,27 @@ mod tests {
 
     use futures::prelude::*;
     use futures::{join, select};
-    use libp2p::{swarm::SwarmEvent, Multiaddr, Swarm};
+    use libp2p::{
+        core::transport::{upgrade::Version, MemoryTransport, Transport},
+        identity,
+        multiaddr::Protocol,
+        plaintext, relay,
+        swarm::{self, SwarmEvent},
+        tcp, yamux, Multiaddr, Swarm,
+    };
     use libp2p_swarm_test::SwarmExt;
     use std::{pin::pin, sync::Arc};
 
     #[tokio::test]
-    async fn test_behaviour() {
+    async fn test_basic_behaviour() {
         let mut boot_nodes = vec![];
-        let config = create_config(boot_nodes.clone());
+        let config = create_config(
+            boot_nodes.clone(),
+            true,
+            NodeType::Bootstrap {
+                external_addresses: vec![],
+            },
+        );
 
         let (mut boot_node, listen_addr) = build_node(config);
 
@@ -336,13 +352,15 @@ mod tests {
             listen_addr.to_string(),
         ));
 
-        let config = create_config(boot_nodes.clone());
+        let config = create_config(boot_nodes.clone(), true, NodeType::Ephemeral);
         let (mut node_a, _) = build_node(config);
         let node_a_peer_id = *node_a.local_peer_id();
+        node_a.behaviour_mut().bootstrap();
 
-        let config = create_config(boot_nodes.clone());
+        let config = create_config(boot_nodes.clone(), true, NodeType::Ephemeral);
         let (mut node_b, listen_addr) = build_node(config);
         let node_b_peer_id = *node_b.local_peer_id();
+        node_b.behaviour_mut().bootstrap();
 
         let loop_boot = async move {
             loop {
@@ -412,14 +430,92 @@ mod tests {
         };
     }
 
-    /// Build test swarm
+    #[tokio::test]
+    async fn test_relay() {
+        let mut boot_nodes = vec![];
+        let config = create_config(
+            boot_nodes.clone(),
+            false,
+            NodeType::Bootstrap {
+                external_addresses: vec![],
+            },
+        );
+
+        let mut boot_node = build_relay(config);
+        let (_, listen_addr) = boot_node.listen().await;
+        let boot_node_peer_id = *boot_node.local_peer_id();
+
+        boot_node.add_external_address(listen_addr.clone());
+
+        boot_nodes.push((
+            boot_node.local_peer_id().to_base58(),
+            listen_addr.to_string(),
+        ));
+
+        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
+        let mut node_a = build_client(config);
+        let node_a_peer_id = *node_a.local_peer_id();
+        let (_, node_a_addr) = node_a.listen().await;
+        assert!(node_a.external_addresses().next().is_none());
+
+        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
+        let mut node_b = build_client(config);
+        //let node_b_peer_id = *node_b.local_peer_id();
+        node_b.listen().await;
+        assert!(node_b.external_addresses().next().is_none());
+
+        tokio::task::spawn(boot_node.loop_on_next());
+
+        let relay_addr = listen_addr
+            .clone()
+            .with(Protocol::P2p(boot_node_peer_id))
+            .with(Protocol::P2pCircuit)
+            .with(Protocol::P2p(node_a_peer_id));
+        node_a.listen_on(relay_addr.clone()).unwrap();
+
+        wait_for_reservation(&mut node_a, relay_addr.clone(), boot_node_peer_id, false).await;
+
+        tokio::task::spawn(node_a.loop_on_next());
+        node_b.dial_and_wait(relay_addr.clone()).await;
+
+        let node_a_addr = node_a_addr.with(Protocol::P2p(node_a_peer_id));
+
+        let established_conn_id = node_b
+            .wait(move |e| match e {
+                SwarmEvent::ConnectionEstablished {
+                    endpoint,
+                    connection_id,
+                    ..
+                } => (*endpoint.get_remote_address() == node_a_addr).then_some(connection_id),
+                _ => None,
+            })
+            .await;
+
+        let reported_conn_id = node_b
+            .wait(move |e| match e {
+                SwarmEvent::Behaviour(Event::Dcutr(dcutr::Event {
+                    result: Ok(connection_id),
+                    ..
+                })) => Some(connection_id),
+                _ => None,
+            })
+            .await;
+
+        assert_eq!(established_conn_id, reported_conn_id);
+    }
+
+    // Build test swarm
     fn build_node(config: Config) -> (Swarm<Behaviour>, Multiaddr) {
+
         let mut swarm = Swarm::new_ephemeral(|key_pair| {
+            let local_peer_id = key_pair.public().to_peer_id();
+            let (_, client_behaviour) = relay::client::new(local_peer_id);
+
             Behaviour::new(
                 &key_pair.public(),
                 config,
                 Arc::new(Mutex::new(HashSet::new())),
-                None,
+                client_behaviour,
             )
         });
         let listen_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
@@ -432,20 +528,134 @@ mod tests {
         (swarm, listen_addr)
     }
 
+    // Build relay server.
+    fn build_relay(config: Config) -> Swarm<Behaviour> {
+        let local_key = identity::Keypair::generate_ed25519();
+        let local_peer_id = local_key.public().to_peer_id();
+
+        let (relay_transport, client_behaviour) = relay::client::new(local_peer_id);
+
+        let transport = relay_transport
+            .or_transport(MemoryTransport::default())
+            .or_transport(tcp::tokio::Transport::default())
+            .upgrade(Version::V1)
+            .authenticate(plaintext::Config::new(&local_key))
+            .multiplex(yamux::Config::default())
+            .boxed();
+        let behaviour = Behaviour::new(
+            &local_key.public(),
+            config,
+            Arc::new(Mutex::new(HashSet::new())),
+            client_behaviour,
+        );
+        Swarm::new(
+            transport,
+            behaviour,
+            local_peer_id,
+            swarm::Config::with_tokio_executor(),
+        )
+    }
+
+    // Build relay client.
+    fn build_client(config: Config) -> Swarm<Behaviour> {
+        let local_key = identity::Keypair::generate_ed25519();
+        let local_peer_id = local_key.public().to_peer_id();
+
+        let (relay_transport, client_behaviour) = relay::client::new(local_peer_id);
+
+        let transport = relay_transport
+            .or_transport(MemoryTransport::default())
+            .or_transport(tcp::tokio::Transport::default())
+            .upgrade(Version::V1)
+            .authenticate(plaintext::Config::new(&local_key))
+            .multiplex(yamux::Config::default())
+            .boxed();
+        let behaviour = Behaviour::new(
+            &local_key.public(),
+            config,
+            Arc::new(Mutex::new(HashSet::new())),
+            client_behaviour,
+        );
+        Swarm::new(
+            transport,
+            behaviour,
+            local_peer_id,
+            swarm::Config::with_tokio_executor(),
+        )
+    }
+
     // Create a config
-    fn create_config(boot_nodes: Vec<(String, String)>) -> Config {
+    fn create_config(
+        boot_nodes: Vec<(String, String)>,
+        random_walk: bool,
+        node_type: NodeType,
+    ) -> Config {
+        let private_addr = match node_type {
+            NodeType::Bootstrap { .. } => true,
+            _ => false,
+        };
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
-            .with_allow_private_ip(true)
+            .with_allow_private_ip(private_addr)
             .with_discovery_limit(50)
+            .with_dht_random_walk(random_walk)
             .set_protocol("/kore/1.0.0");
 
         Config {
             user_agent: "kore::node".to_owned(),
             transport: TransportType::Memory,
-            node_type: NodeType::Ephemeral,
+            node_type: node_type,
             tell: Default::default(),
             routing: config,
+        }
+    }
+
+    async fn wait_for_reservation(
+        client: &mut Swarm<Behaviour>,
+        client_addr: Multiaddr,
+        relay_peer_id: PeerId,
+        is_renewal: bool,
+    ) {
+        let mut new_listen_addr_for_relayed_addr = false;
+        let mut reservation_req_accepted = false;
+        let mut addr_observed = false;
+
+        loop {
+            if new_listen_addr_for_relayed_addr && reservation_req_accepted && addr_observed {
+                break;
+            }
+
+            match client.next_swarm_event().await {
+                SwarmEvent::NewListenAddr { address, .. } if address == client_addr => {
+                    new_listen_addr_for_relayed_addr = true;
+                }
+                SwarmEvent::Behaviour(Event::RelayClient(
+                    relay::client::Event::ReservationReqAccepted {
+                        relay_peer_id: peer_id,
+                        renewal,
+                        ..
+                    },
+                )) if relay_peer_id == peer_id && renewal == is_renewal => {
+                    reservation_req_accepted = true;
+                }
+                SwarmEvent::Dialing {
+                    peer_id: Some(peer_id),
+                    ..
+                } if peer_id == relay_peer_id => {}
+                SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == relay_peer_id => {}
+                SwarmEvent::Behaviour(Event::Identified { .. }) => {
+                    addr_observed = true;
+                }
+                SwarmEvent::Behaviour(Event::Discovered(_)) => {}
+                SwarmEvent::NewExternalAddrCandidate { .. } => {}
+                SwarmEvent::ExternalAddrConfirmed { address } if !is_renewal => {
+                    assert_eq!(address, client_addr);
+                }
+                SwarmEvent::ListenerClosed { .. } => {}
+                SwarmEvent::ConnectionClosed { .. } => {}
+                //SwarmEvent::NewExternalAddrOfPeer { .. } => {}
+                e => panic!("{e:?}"),
+            }
         }
     }
 }

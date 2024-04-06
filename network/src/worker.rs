@@ -7,6 +7,7 @@
 use crate::{
     behaviour::{Behaviour, Event},
     service::NetworkService,
+    transport::{KoreTransport, RelayClient, build_transport},
     utils::convert_external_addresses,
     Command, Config, Error, NodeType,
 };
@@ -17,7 +18,7 @@ use libp2p::{
     identity::{ed25519, Keypair},
     metrics::{Metrics, Recorder},
     noise,
-    swarm::SwarmEvent,
+    swarm::{self, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 
@@ -26,7 +27,7 @@ use prometheus_client::registry::Registry;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use tracing::{error, warn, info, trace};
+use tracing::{error, info, trace, warn};
 
 use std::{
     collections::HashSet,
@@ -34,7 +35,7 @@ use std::{
     time::Duration,
 };
 
-const TARGET_ROUTING: &str = "KoreNetwork-Worker";
+const TARGET_WORKER: &str = "KoreNetwork-Worker";
 
 /// Main network worker. Must be polled in order for the network to advance.
 ///
@@ -63,7 +64,7 @@ pub struct NetworkWorker {
 
 impl NetworkWorker {
     /// Create a new `NetworkWorker`.
-    pub fn new(keys: KeyPair, config: Config, cancel: CancellationToken) -> Result<Self, Error> {
+    pub fn new(registry: &mut Registry, keys: KeyPair, config: Config, cancel: CancellationToken) -> Result<Self, Error> {
         // Create channels to communicate events and commands
         let (command_sender, command_receiver) = mpsc::channel(10000);
 
@@ -74,6 +75,9 @@ impl NetworkWorker {
             let kp = ed25519::Keypair::from(sk);
             Keypair::from(kp)
         };
+
+        // Generate the `PeerId` from the public key.
+        let local_peer_id = key.public().to_peer_id();
 
         // Create the external addresses set.
         let external_addresses = match config.node_type.clone() {
@@ -86,62 +90,25 @@ impl NetworkWorker {
 
         let ext_addr = external_addresses.clone();
 
-        // Create metrics registry.
-        let mut registry = Registry::default();
-
-        let node_type = config.node_type.clone();
+        // Build transport.
+        let (transport, relay_client) = build_transport(registry, local_peer_id, &key)?;
 
         // Create the swarm.
-        let swarm = match node_type {
-            NodeType::Bootstrap { .. } => {
-                trace!(TARGET_ROUTING, "Creating worker for bootstrap node");
-                let tcp_config = tcp::Config::new().nodelay(true);
-                SwarmBuilder::with_existing_identity(key)
-                    .with_tokio()
-                    .with_tcp(tcp_config, noise::Config::new, yamux::Config::default)
-                    .map_err(|e| {
-                        Error::Transport(format!("Failed to create TCP transport -> {}", e))
-                    })?
-                    .with_quic()
-                    .with_dns()
-                    .map_err(|e| Error::Dns(format!("{}", e)))?
-                    .with_bandwidth_metrics(&mut registry)
-                    .with_behaviour(|keypair| {
-                        Behaviour::new(&keypair.public(), config, ext_addr, None)
-                    })
-                    .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
-                    .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-                    .build()
-            }
-            _ => {
-                trace!(TARGET_ROUTING, "Creating worker for addressable or ephemeral node");
-                let tcp_config = tcp::Config::new().nodelay(true).port_reuse(true);
-                SwarmBuilder::with_existing_identity(key)
-                    .with_tokio()
-                    .with_tcp(tcp_config, noise::Config::new, yamux::Config::default)
-                    .map_err(|e| {
-                        Error::Transport(format!("Failed to create TCP transport -> {}", e))
-                    })?
-                    .with_quic()
-                    .with_dns()
-                    .map_err(|e| Error::Dns(format!("{}", e)))?
-                    .with_relay_client(noise::Config::new, yamux::Config::default)
-                    .map_err(|e| Error::Relay(format!("Failed to build client -> {}", e)))?
-                    .with_bandwidth_metrics(&mut registry)
-                    .with_behaviour(|keypair, relay_behaviour| {
-                        Behaviour::new(&keypair.public(), config, ext_addr, Some(relay_behaviour))
-                    })
-                    .map_err(|e| Error::Behaviour(format!("Failed to build behaviour -> {}", e)))?
-                    .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-                    .build()
-            }
-        };
+        let swarm = Swarm::new(
+            transport, 
+            Behaviour::new(
+                &key.public(),
+                config,
+                external_addresses.clone(),
+                relay_client),
+            local_peer_id,
+            swarm::Config::with_tokio_executor()
+        );
 
-        let metrics = Metrics::new(&mut registry);
+        let metrics = Metrics::new(registry);
 
         let service = Arc::new(NetworkService::new(
             command_sender,
-            Arc::new(Mutex::new(registry)),
         )?);
 
         Ok(Self {
@@ -158,20 +125,20 @@ impl NetworkWorker {
     ///
     /// If the peer is reachable, it invokes it directly. Otherwise, it selects the closest
     /// accessible peer, to establish a relay circuit with the peer.
-    pub async fn send_message(&mut self, peer: PeerId, message: Vec<u8>)  {
+    pub async fn send_message(&mut self, peer: PeerId, message: Vec<u8>) {
         let behaviour = self.swarm.behaviour_mut();
         if let Some(node) = behaviour.node(&peer) {
-            if node.reachable() {
-                behaviour.send_message(&peer, message);
-            } else {
- 
+            trace!(TARGET_WORKER, "Sending message to known peer: {:?}", peer);
+            if !node.reachable() {
+                trace!(TARGET_WORKER, "Peer is not reachable: {:?}", peer);
             }
         }
+        behaviour.send_message(&peer, message);
     }
 
     /// Run network worker.
     pub async fn run(&mut self) {
-        trace!(TARGET_ROUTING, "Running main loop");
+        trace!(TARGET_WORKER, "Running main loop");
         loop {
             tokio::select! {
                 command = self.command_receiver.recv() => {
@@ -221,37 +188,16 @@ mod tests {
     use super::*;
 
     use libp2p::{
-        core::{upgrade, transport::Boxed, muxing::StreamMuxerBox},
-        identity,
-        plaintext,
-        yamux,
-        Multiaddr,
-        PeerId,
-        Transport,
+        core::{muxing::StreamMuxerBox, transport::Boxed, upgrade},
+        identity, plaintext, yamux, Multiaddr, PeerId, Transport,
     };
 
-    use futures::io::{AsyncRead, AsyncWrite};
-    
-    fn build_relay() -> Swarm<Behaviour> {
-        unimplemented!("build_relay")
+    use futures::{channel::mpsc::unbounded, io::{AsyncRead, AsyncWrite}};
+    use libp2p_swarm_test::SwarmExt;
+
+    // Build a relay server.
+    fn build_worker(config: Config) -> Swarm<Behaviour> {
+        unimplemented!()
     }
 
-    fn build_client() -> Swarm<Behaviour> {
-        unimplemented!("build_client")
-    }
-
-    // Upgrade the transport.
-    fn upgrade_transport<StreamSink>(
-        transport: Boxed<StreamSink>,
-        identity: &identity::Keypair,
-    ) -> Boxed<(PeerId, StreamMuxerBox)>
-    where
-        StreamSink: AsyncRead + AsyncWrite + Send + Unpin + 'static,
-    {
-        transport
-            .upgrade(upgrade::Version::V1)
-            .authenticate(plaintext::Config::new(identity))
-            .multiplex(yamux::Config::default())
-            .boxed()
-    }
 }

@@ -11,6 +11,7 @@ pub mod error;
 mod node;
 mod routing;
 mod service;
+mod transport;
 mod utils;
 mod worker;
 
@@ -66,7 +67,7 @@ pub enum TransportType {
 
         /// If true, allow connecting to private IPv4/IPv6 addresses (as defined in
         /// [RFC1918](https://tools.ietf.org/html/rfc1918)). Irrelevant for addresses that have
-        /// been passed in `::sc_network::config::NetworkConfiguration::boot_nodes`.
+        /// been passed in `network::routing::Config::boot_nodes`.
         allow_private_ip: bool,
     },
     /// Memory transport.

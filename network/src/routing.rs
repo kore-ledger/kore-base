@@ -33,7 +33,6 @@ use std::{
     cmp,
     collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     num::NonZeroUsize,
-    str::FromStr,
     task::Poll,
     time::Duration,
 };
@@ -129,9 +128,9 @@ impl Behaviour {
             let mut kad = Kademlia::with_config(peer_id, store, kad_config);
 
             // Add boot nodes to the Kademlia routing table.
-            for (peer_id, addr) in &boot_nodes {
+            /*for (peer_id, addr) in &boot_nodes {
                 kad.add_address(peer_id, addr.clone());
-            }
+            }*/
 
             Some(kad)
         } else {
@@ -167,6 +166,15 @@ impl Behaviour {
             known_external_addresses: LruHashSet::new(K_VALUE),
             records_to_publish: Default::default(),
             pending_events: VecDeque::new(),
+        }
+    }
+
+    /// Bootstrap nodes to connect to.
+    pub fn bootstrap(&mut self) {
+        if let Some(kad) = self.kademlia.as_mut() {
+            for (peer_id, addr) in &self.boot_nodes {
+                kad.add_address(peer_id, addr.clone());
+            }
         }
     }
 
@@ -593,7 +601,9 @@ impl NetworkBehaviour for Behaviour {
                                     hex::encode(&ok.key),
                                     ok.peers,
                                 );
-                                return Poll::Ready(ToSwarm::GenerateEvent(Event::ClosestPeers(ok.key, ok.peers)));
+                                return Poll::Ready(ToSwarm::GenerateEvent(Event::ClosestPeers(
+                                    ok.key, ok.peers,
+                                )));
                             }
                         }
                     },
@@ -1015,6 +1025,7 @@ mod tests {
             .with_allow_non_globals_in_dht(true)
             .with_allow_private_ip(true)
             .with_discovery_limit(50)
+            .with_dht_random_walk(true)
             .set_protocol("/kore/1.0.0");
 
         let (boot_swarm, addr) = build_node(config);
@@ -1080,6 +1091,7 @@ mod tests {
                                             to_discover[swarm_n].remove(&other);
                                         }
                                         Event::RandomKademliaStarted => {}
+                                        Event::ClosestPeers(_, _) => {}
                                         e => {
                                             panic!("Unexpected event: {:?}", e)
                                         }
@@ -1161,6 +1173,7 @@ mod tests {
         let _ = swarm.listen_on(listen_addr.clone()).unwrap();
 
         swarm.add_external_address(listen_addr.clone());
+        swarm.behaviour_mut().bootstrap();
 
         (swarm, listen_addr)
     }
