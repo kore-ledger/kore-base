@@ -38,16 +38,11 @@ use std::{
 pub struct NetworkService {
     /// The command sender to communicate with the worker.
     command_sender: Sender<Command>,
-
 }
 
 impl NetworkService {
     /// Create a new `NetworkService`.
-    pub fn new(
-        command_sender: Sender<Command>,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            command_sender
-        })
+    pub fn new(command_sender: Sender<Command>) -> Result<Self, Error> {
+        Ok(Self { command_sender })
     }
 }

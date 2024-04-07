@@ -506,7 +506,6 @@ mod tests {
 
     // Build test swarm
     fn build_node(config: Config) -> (Swarm<Behaviour>, Multiaddr) {
-
         let mut swarm = Swarm::new_ephemeral(|key_pair| {
             let local_peer_id = key_pair.public().to_peer_id();
             let (_, client_behaviour) = relay::client::new(local_peer_id);

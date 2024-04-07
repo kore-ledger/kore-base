@@ -5,16 +5,17 @@
 //!
 
 use crate::{
-    behaviour::{Behaviour, Event},
+    behaviour::{Behaviour, Event as BehaviourEvent},
     service::NetworkService,
-    transport::{KoreTransport, RelayClient, build_transport},
+    transport::{build_transport, KoreTransport, RelayClient},
     utils::convert_external_addresses,
-    Command, Config, Error, NodeType,
+    Command, Config, Error, Event as NetworkEvent, NodeType,
 };
 
 use identity::keys::{KeyMaterial, KeyPair};
 
 use libp2p::{
+    dcutr::Event as DcutrEvent,
     identity::{ed25519, Keypair},
     metrics::{Metrics, Recorder},
     noise,
@@ -30,7 +31,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, trace, warn};
 
 use std::{
-    collections::HashSet,
+    collections::{HashSet, HashMap, VecDeque},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -55,16 +56,28 @@ pub struct NetworkWorker {
     /// The command receiver.
     command_receiver: mpsc::Receiver<Command>,
 
+    /// The event sender.
+    event_sender: mpsc::Sender<NetworkEvent>,
+
     /// The cancellation token.
     cancel: CancellationToken,
 
     /// The metrics registry.
     metrics: Metrics,
+
+    /// Pendings messages to peer
+    pending_messages: HashMap<PeerId, VecDeque<Vec<u8>>>,
 }
 
 impl NetworkWorker {
     /// Create a new `NetworkWorker`.
-    pub fn new(registry: &mut Registry, keys: KeyPair, config: Config, cancel: CancellationToken) -> Result<Self, Error> {
+    pub fn new(
+        registry: &mut Registry,
+        keys: KeyPair,
+        config: Config,
+        event_sender: mpsc::Sender<NetworkEvent>,
+        cancel: CancellationToken,
+    ) -> Result<Self, Error> {
         // Create channels to communicate events and commands
         let (command_sender, command_receiver) = mpsc::channel(10000);
 
@@ -95,29 +108,30 @@ impl NetworkWorker {
 
         // Create the swarm.
         let swarm = Swarm::new(
-            transport, 
+            transport,
             Behaviour::new(
                 &key.public(),
                 config,
                 external_addresses.clone(),
-                relay_client),
+                relay_client,
+            ),
             local_peer_id,
-            swarm::Config::with_tokio_executor()
+            swarm::Config::with_tokio_executor(),
         );
 
         let metrics = Metrics::new(registry);
 
-        let service = Arc::new(NetworkService::new(
-            command_sender,
-        )?);
+        let service = Arc::new(NetworkService::new(command_sender)?);
 
         Ok(Self {
             service,
             external_addresses,
             swarm,
             command_receiver,
+            event_sender,
             cancel,
             metrics,
+            pending_messages: HashMap::default(),
         })
     }
 
@@ -164,7 +178,8 @@ impl NetworkWorker {
                 //self.swarm.send_message(peer, message);
             }
             Command::Bootstrap => {
-                //self.swarm.bootstrap(boot_nodes);
+                trace!(TARGET_WORKER, "Bootstrap en la red kore");
+                self.swarm.behaviour_mut().bootstrap();
             }
             Command::StartProviding { keys } => {
                 //self.swarm.start_providing(keys);
@@ -175,8 +190,45 @@ impl NetworkWorker {
         }
     }
 
-    async fn handle_event(&mut self, event: SwarmEvent<Event>) {
+    async fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
+            SwarmEvent::Behaviour(BehaviourEvent::Dcutr(DcutrEvent {
+                remote_peer_id,
+                result,
+            })) => {
+                if result.is_ok() {
+                    // Send pending messages for ephemeral peer.
+                    trace!(TARGET_WORKER, "Sending pending messages to peer {} via dcutr.", remote_peer_id);
+                    let pending_messages = self.pending_messages.remove(&remote_peer_id);
+                    if let Some(pending_messages) = pending_messages {
+                        for message in pending_messages.into_iter() {
+                            self.swarm.behaviour_mut().send_message(&remote_peer_id, message);
+                        }
+                    } else {
+                        trace!(TARGET_WORKER, "");
+                    }
+            
+                } else {
+                    error!(TARGET_WORKER, "Error in dcutr connection to peer {}.", remote_peer_id);
+                }
+            }
+            SwarmEvent::Behaviour(BehaviourEvent::Message { peer_id, message }) => {
+                let result = self
+                    .event_sender
+                    .send(NetworkEvent::MessageReceived {
+                        message: message.message,
+                    })
+                    .await;
+                if result.is_err() {
+                    error!(
+                        TARGET_WORKER,
+                        "Could not receive message from peer {}", peer_id
+                    );
+                } else {
+                    trace!(TARGET_WORKER, "Message received from peer {}", peer_id);
+                    
+                }
+            }
             _ => {}
         }
     }
@@ -192,12 +244,14 @@ mod tests {
         identity, plaintext, yamux, Multiaddr, PeerId, Transport,
     };
 
-    use futures::{channel::mpsc::unbounded, io::{AsyncRead, AsyncWrite}};
+    use futures::{
+        channel::mpsc::unbounded,
+        io::{AsyncRead, AsyncWrite},
+    };
     use libp2p_swarm_test::SwarmExt;
 
     // Build a relay server.
     fn build_worker(config: Config) -> Swarm<Behaviour> {
         unimplemented!()
     }
-
 }
