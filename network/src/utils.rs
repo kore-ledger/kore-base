@@ -110,6 +110,14 @@ pub fn is_reachable(addr: &Multiaddr) -> bool {
     ip.is_global()
 }
 
+/// Check if the given `Multiaddr` is a relay circuit address.
+///
+/// A relay circuit address is a `Multiaddr` that contains a `P2pCircuit` protocol.
+///
+pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
+    addr.iter().any(|p| matches!(p, Protocol::P2pCircuit))
+}
+
 #[cfg(test)]
 mod tests {
 

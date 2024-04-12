@@ -18,7 +18,6 @@ mod worker;
 pub use error::Error;
 pub use service::NetworkService;
 
-use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 
 /// The maximum allowed number of established connections per peer.
@@ -35,7 +34,7 @@ const MAX_CONNECTIONS_ESTABLISHED_INCOMING: u32 = 10_000;
 
 /// The network protocol version.
 /// This is used to identify the protocol version of the network.
-const NETWORK_PROTOCOL: &str = "/kore/network/1.0.0";
+const NETWORK_PROTOCOL: &str = "/kore/1.0.0";
 
 /// The network configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,9 +44,6 @@ pub struct Config {
 
     /// The node type.
     node_type: NodeType,
-
-    /// Transport type.
-    transport: TransportType,
 
     /// Message telling configuration.
     tell: tell::Config,

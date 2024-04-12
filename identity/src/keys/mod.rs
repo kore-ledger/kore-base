@@ -60,6 +60,12 @@ impl KeyPair {
     }
 }
 
+impl Default for KeyPair {
+    fn default() -> Self {
+        KeyPair::Ed25519(Ed25519KeyPair::new())
+    }
+}
+
 /// Generate key pair
 #[allow(dead_code)]
 pub fn generate<T: KeyGenerator + DSA + Into<KeyPair>>(seed: Option<&[u8]>) -> KeyPair {
@@ -181,10 +187,9 @@ impl Clone for KeyPair {
             #[cfg(feature = "secp256k1")]
             KeyPair::Secp256k1(kp) => {
                 KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_key(&kp.secret_key_bytes()))
-            }
-            // KeyPair::X25519(kp) => KeyPair::X25519(
-            //     X25519KeyPair::from_secret_key(&kp.secret_key_bytes()),
-            // ),
+            } // KeyPair::X25519(kp) => KeyPair::X25519(
+              //     X25519KeyPair::from_secret_key(&kp.secret_key_bytes()),
+              // ),
         }
     }
 }

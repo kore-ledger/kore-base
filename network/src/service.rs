@@ -4,35 +4,9 @@
 //! # Network service
 //!
 
-use crate::{
-    behaviour::Behaviour, utils::convert_boot_nodes, Command, Config, Error, Event, NodeType,
-    TransportType,
-};
+use crate::{Command, Error};
 
-use identity::keys::{KeyMaterial, KeyPair};
-
-use libp2p::{
-    core::{
-        muxing::StreamMuxerBox,
-        transport::{Boxed, OptionalTransport},
-        upgrade,
-    },
-    dns,
-    identity::{ed25519, Keypair},
-    noise,
-    swarm::NetworkBehaviour,
-    tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
-};
-
-use either::Either;
-use prometheus_client::registry::Registry;
 use tokio::sync::mpsc::Sender;
-use tokio_util::sync::CancellationToken;
-
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
 
 /// The network service.
 pub struct NetworkService {
@@ -44,5 +18,13 @@ impl NetworkService {
     /// Create a new `NetworkService`.
     pub fn new(command_sender: Sender<Command>) -> Result<Self, Error> {
         Ok(Self { command_sender })
+    }
+
+    /// Send command to the network worker.
+    pub async fn send_command(&mut self, command: Command) -> Result<(), Error> {
+        self.command_sender
+            .send(command)
+            .await
+            .map_err(|e| Error::Command(e.to_string()))
     }
 }

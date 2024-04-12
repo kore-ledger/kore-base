@@ -19,4 +19,6 @@ pub enum Error {
     Behaviour(String),
     #[error("Address error: {0}")]
     Address(String),
+    #[error("Command error: {0}")]
+    Command(String),
 }

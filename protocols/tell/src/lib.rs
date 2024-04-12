@@ -216,7 +216,7 @@ impl Config {
     }
 }
 
-/// A request/response protocol for some message codec.
+/// A tell protocol for some message codec.
 pub struct Behaviour<TCodec>
 where
     TCodec: Codec + Clone + Send + 'static,
@@ -231,12 +231,11 @@ where
     next_inbound_request_id: Arc<AtomicU64>,
     /// The protocol configuration.
     config: Config,
-    /// The protocol codec for reading and writing requests and responses.
+    /// The protocol codec for reading and writing messages.
     codec: TCodec,
     /// Pending events to return from `poll`.
     pending_events: VecDeque<ToSwarm<Event<TCodec::Message>, OutboundMessage<TCodec>>>,
-    /// The currently connected peers, their pending outbound and inbound responses and their known,
-    /// reachable addresses, if any.
+    /// The currently connected peers.
     connected: HashMap<PeerId, SmallVec<[Connection; 2]>>,
     /// Externally managed addresses via `add_address` and `remove_address`.
     addresses: PeerAddresses,
@@ -689,7 +688,7 @@ where
 struct Connection {
     id: ConnectionId,
     remote_address: Option<Multiaddr>,
-    /// Pending outbound message.
+    /// Pending outbound messages.
     pending_outbound_messages: HashSet<OutboundTellId>,
 }
 

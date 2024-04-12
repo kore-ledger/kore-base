@@ -177,10 +177,9 @@ impl Clone for KeyPair {
             }
             KeyPair::Secp256k1(kp) => {
                 KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_key(&kp.secret_key_bytes()))
-            }
-            // KeyPair::X25519(kp) => KeyPair::X25519(
-            //     X25519KeyPair::from_secret_key(&kp.secret_key_bytes()),
-            // ),
+            } // KeyPair::X25519(kp) => KeyPair::X25519(
+              //     X25519KeyPair::from_secret_key(&kp.secret_key_bytes()),
+              // ),
         }
     }
 }
