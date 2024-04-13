@@ -153,7 +153,6 @@ impl NetworkWorker {
     /// accessible peer, to establish a relay circuit with the peer.
     pub async fn send_message(&mut self, peer: PeerId, message: Vec<u8>) {
         if self.ephemeral_node {
-            
             // Send message
             self.swarm.behaviour_mut().send_message(&peer, message);
         }

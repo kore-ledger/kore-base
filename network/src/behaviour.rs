@@ -35,9 +35,6 @@ use std::{
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 pub struct Behaviour {
-    /// The `tell` behaviour.
-    tell: binary::Behaviour,
-
     /// The `routing` behaviour.
     routing: routing::Behaviour,
 
@@ -52,6 +49,10 @@ pub struct Behaviour {
 
     /// The Direct Connection Upgrade through Relay (DCUTR) behaviour.
     dcutr: Toggle<Dcutr>,
+    /// The `tell` behaviour.
+    tell: binary::Behaviour,
+
+
 }
 
 impl Behaviour {
@@ -162,19 +163,12 @@ impl Behaviour {
         self.routing.put_value(key, value);
     }
 
-    /// Get closest peers to a key.
-    /// The `ValueFound` event will be produced with the result.
-
-    /// Add a self-reported address of a remote peer to the k-buckets of the supported
-    /// DHTs (`supported_protocols`).    
-    pub fn add_self_reported_address(
-        &mut self,
-        peer_id: &PeerId,
-        supported_protocols: &[StreamProtocol],
-        addr: Multiaddr,
-    ) {
-        self.routing
-            .add_self_reported_address(peer_id, supported_protocols, addr);
+    /// Add identified peer to routing table.
+    pub fn add_identified_peer(&mut self, peer_id: PeerId, info: IdentifyInfo) {
+        for addr in info.listen_addrs {
+            self.routing
+                .add_self_reported_address(&peer_id, &info.protocols, addr);
+        }
     }
 }
 
@@ -683,18 +677,115 @@ mod tests {
         };
     }
 
-    // Build test swarm
-    /*fn build_node(config: Config) -> (Swarm<Behaviour>, Multiaddr) {
-        let mut swarm = build_relay(config);
-        let listen_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
+    #[tokio::test]
+    async fn test_full_behaviour() {
+        let mut boot_nodes = vec![];
+
+        // Build bootstrap node.
+        let boot_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
             .parse()
             .unwrap();
-        let _ = swarm.listen_on(listen_addr.clone()).unwrap();
+        let config = create_config(
+            boot_nodes.clone(),
+            true,
+            NodeType::Bootstrap {
+                external_addresses: vec![boot_addr.to_string()],
+            },
+        );
+        let mut boot_node = build_relay(config);
+        boot_node.listen_on(boot_addr.clone()).unwrap();
+        boot_node.add_external_address(boot_addr.clone());
+        let boot_node_peer_id = *boot_node.local_peer_id();
 
-        swarm.add_external_address(listen_addr.clone());
+        println!("Boot node peer: {:?}", boot_node_peer_id);
 
-        (swarm, listen_addr)
-    }*/
+        boot_nodes.push((boot_node.local_peer_id().to_base58(), boot_addr.to_string()));
+
+        // Build node a.
+        let node_a_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
+            .parse()
+            .unwrap();
+        let config = create_config(
+            boot_nodes.clone(),
+            true,
+            NodeType::Addressable {
+                external_addresses: vec![node_a_addr.to_string()],
+            },
+        );
+        let mut node_a = build_relay(config);
+        node_a.listen_on(node_a_addr.clone()).unwrap();
+        node_a.add_external_address(node_a_addr.clone());
+        let node_a_peer_id = *node_a.local_peer_id();
+        node_a.behaviour_mut().bootstrap();
+
+        // Build node b.
+        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
+        let mut node_b = build_relay(config);
+        let node_b_peer_id = *node_b.local_peer_id();
+        let (node_b_addr, _) = node_b.listen().await;
+
+        // Dial to boot node.
+        node_b.dial(boot_addr.clone()).unwrap();
+
+        let loop_boot = async move {
+            loop {
+                match boot_node.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
+                         boot_node.behaviour_mut().add_identified_peer(peer_id, *info);
+                    }
+                    e => {
+                       //println!("Bootstrap *{:?}*", e);
+                    }
+                }
+            }
+        };
+
+        let loop_a = async move {
+            loop {
+                match node_a.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
+                        node_a.behaviour_mut().add_identified_peer(peer_id, *info);
+                    }
+                    e => {
+                        //println!("Node A *{:?}*", e);
+                    }
+                }
+            }
+        };
+
+        let loop_b = async move {
+            loop {
+                match node_b.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Discovered(peer)) => {
+                        //println!("Node B: Discovered peer.");
+                    }
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
+                        println!("Node B: Identified peer.");
+                        node_b.behaviour_mut().add_identified_peer(peer_id, *info);
+
+                        node_b.behaviour_mut().send_message(&node_a_peer_id, b"Hello Node A".to_vec());
+                    }
+                    SwarmEvent::Behaviour(Event::MessageSent { peer_id, outbound_id }) => {
+                        println!("Node B: Message sent to peer A.");
+                        assert_eq!(peer_id, node_a_peer_id);
+                    }
+                    e => {
+                        println!("Node B *{:?}*", e);
+                    }
+                }
+            }
+        };
+
+        let loop_boot = loop_boot.fuse();
+        let future = async { join!(loop_a, loop_b) }.fuse();
+        let mut future = pin!(future);
+        let mut loop_boot = pin!(loop_boot);
+
+        select! {
+            (_, _) = future => {},
+            () = loop_boot => {},
+        };
+    }
 
     // Build relay server.
     fn build_relay(config: Config) -> Swarm<Behaviour> {

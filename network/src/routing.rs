@@ -1040,7 +1040,6 @@ mod tests {
 
     use std::pin::pin;
 
-
     #[tokio::test]
     async fn test_routing() {
         let mut boot_nodes = vec![];
@@ -1088,12 +1087,13 @@ mod tests {
                         Poll::Ready(Some(e)) => {
                             match e {
                                 SwarmEvent::ConnectionEstablished {
-                                    peer_id,                             
-                                    endpoint,
-                                    ..
+                                    peer_id, endpoint, ..
                                 } => {
                                     let local_peer_id = swarms[swarm_n].0.local_peer_id();
-                                    println!("Peer {} connection established with {}: Endpoint {:?}", local_peer_id, peer_id, endpoint);
+                                    println!(
+                                        "Peer {} connection established with {}: Endpoint {:?}",
+                                        local_peer_id, peer_id, endpoint
+                                    );
                                 }
                                 SwarmEvent::Behaviour(behavior) => {
                                     match behavior {
@@ -1268,7 +1268,6 @@ mod tests {
             (_, _) = future => {},
             () = loop_boot => {},
         };
-
     }
 
     // Make configuration for the test swarm
