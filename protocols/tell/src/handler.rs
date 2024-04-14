@@ -97,8 +97,8 @@ where
         }
     }
 
-    /// Returns the next inbound request ID.
-    fn next_inbound_request_id(&mut self) -> InboundTellId {
+    /// Returns the next inbound tell ID.
+    fn next_inbound_tell_id(&mut self) -> InboundTellId {
         InboundTellId(self.inbound_tell_id.fetch_add(1, Ordering::Relaxed))
     }
 
@@ -113,8 +113,9 @@ where
             <Self as ConnectionHandler>::InboundOpenInfo,
         >,
     ) {
+        
         let mut codec = self.codec.clone();
-        let tell_id = self.next_inbound_request_id();
+        let tell_id = self.next_inbound_tell_id();
         let mut sender = self.inbound_sender.clone();
 
         let recv = async move {
@@ -362,8 +363,8 @@ where
             self.pending_events.shrink_to_fit();
         }
 
-        // Check for inbound requests.
-        if let Poll::Ready(Some((id, msg))) = self.inbound_receiver.poll_next_unpin(cx) {
+        // Check for inbound tell message.
+        if let Poll::Ready(Some((id, msg))) = self.inbound_receiver.poll_next_unpin(cx) {            
             // We received an inbound request.
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                 TellEvent::TellReceived {
@@ -371,6 +372,7 @@ where
                     data: msg,
                 },
             ));
+
         }
 
         // Emit outbound requests.

@@ -65,7 +65,7 @@ impl Behaviour {
     ) -> Self {
         let peer_id = PeerId::from_public_key(public_key);
         let protocols = iter::once((
-            StreamProtocol::new(crate::NETWORK_PROTOCOL),
+            StreamProtocol::new("/kore/tell/1.0.0"),
             ProtocolSupport::InboundOutbound,
         ));
 
@@ -244,7 +244,15 @@ pub enum Event {
 impl From<TellEvent<Vec<u8>>> for Event {
     fn from(event: TellEvent<Vec<u8>>) -> Self {
         match event {
-            TellEvent::Message { peer_id, message } => Event::Message { peer_id, message },
+            TellEvent::Message { peer_id, message } => {
+                // Ignore messages that starts with the following bytes. This is a workaround to
+                // avoid processing messages that are not intended for the network. We should find 
+                // a better way to handle this.
+                if message.message.as_slice().starts_with(&[40, 8, 4, 80, 10, 18, 34, 0, 32]) {
+                    return Event::None;
+                }
+                Event::Message { peer_id, message }
+            }
             TellEvent::MessageProcessed {
                 peer_id,
                 inbound_id,
@@ -347,110 +355,6 @@ mod tests {
     use libp2p_swarm_test::SwarmExt;
     use std::{pin::pin, sync::Arc};
 
-    /*     #[tokio::test]
-        async fn test_basic_behaviour() {
-            let mut boot_nodes = vec![];
-            let config = create_config(
-                boot_nodes.clone(),
-                true,
-                NodeType::Bootstrap {
-                    external_addresses: vec![],
-                },
-            );
-
-            let (mut boot_node, listen_addr) = build_node(config);
-
-            boot_nodes.push((
-                boot_node.local_peer_id().to_base58(),
-                listen_addr.to_string(),
-            ));
-
-            let config = create_config(
-                boot_nodes.clone(),
-                true,
-                NodeType::Addressable {
-                    external_addresses: vec![],
-                },
-            );
-            let (mut node_a, _) = build_node(config.clone());
-            let node_a_peer_id = *node_a.local_peer_id();
-            node_a.behaviour_mut().bootstrap();
-
-            let (mut node_b, _) = build_node(config);
-            //let node_b_peer_id = *node_b.local_peer_id();
-            node_b.behaviour_mut().bootstrap();
-
-            let loop_boot = async move {
-                loop {
-                    match boot_node.select_next_some().await {
-                        SwarmEvent::Behaviour(event) => match event {
-                            behaviour::Event::Identified { peer_id, info } => {
-                                println!("info: {:?}", info);
-                                let addr = info.listen_addrs.first().unwrap();
-                                boot_node.behaviour_mut().add_self_reported_address(
-                                    &peer_id,
-                                    &info.protocols,
-                                    addr.clone(),
-                                );
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    }
-                }
-            };
-
-            let loop_a = async move {
-                loop {
-                    match node_a.select_next_some().await {
-                        SwarmEvent::Behaviour(event) => match event {
-                            behaviour::Event::Message { peer_id, message } => {
-                                //assert_eq!(peer_id, node_b_peer_id);
-                                let message = message.message.as_slice();
-                                //assert_eq!(message, b"Hello Node A");
-
-                                break;
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    }
-                }
-            };
-
-            let loop_b = async move {
-                loop {
-                    match node_b.select_next_some().await {
-                        SwarmEvent::Behaviour(event) => match event {
-                            behaviour::Event::Identified { peer_id, .. } => {
-                                if peer_id == node_a_peer_id {
-                                    node_b
-                                        .behaviour_mut()
-                                        .send_message(&peer_id, b"Hello Node A".to_vec());
-                                }
-                            }
-                            behaviour::Event::MessageSent { peer_id, .. } => {
-                                assert_eq!(peer_id, node_a_peer_id);
-                                break;
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    }
-                }
-            };
-
-            let loop_boot = loop_boot.fuse();
-            let future = async { join!(loop_a, loop_b) }.fuse();
-            let mut future = pin!(future);
-            let mut loop_boot = pin!(loop_boot);
-
-            select! {
-                (_, _) = future => {},
-                () = loop_boot => {},
-            };
-        }
-    */
 
     #[tokio::test]
     async fn test_relay() {
@@ -542,8 +446,6 @@ mod tests {
         let (_, listen_addr) = boot_node.listen().await;
         let boot_node_peer_id = *boot_node.local_peer_id();
 
-        println!("Boot node peer: {:?}", boot_node_peer_id);
-
         boot_node.add_external_address(listen_addr.clone());
 
         boot_nodes.push((
@@ -557,7 +459,6 @@ mod tests {
         let node_a_peer_id = *node_a.local_peer_id();
         node_a.listen().await;
         assert!(node_a.external_addresses().next().is_none());
-        //node_a.behaviour_mut().bootstrap();
 
         // Build node b.
         let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
@@ -590,15 +491,13 @@ mod tests {
                     SwarmEvent::Behaviour(Event::Discovered(peer)) => {
                         if peer == boot_node_peer_id {
                             // **** Discovered boot node ****
-                            println!("Boot node discovered");
                             node_a.behaviour_mut().discover(&peer);
                         }
                     }
                     SwarmEvent::Behaviour(Event::PeersFounded(peer, peers_founded)) => {
-                        println!("Peers founded: {:?}", peers_founded);
                         if peers_founded.is_empty() {
                             let result = node_a.dial(boot_node_addr.clone());
-                            println!("Dial to boot node: {:?}", result);
+                            assert!(result.is_ok());
                         }
                     }
                     SwarmEvent::Behaviour(Event::RelayClient(
@@ -606,7 +505,6 @@ mod tests {
                     )) => {
                         // **** Reservation request accepted ****
                         assert_eq!(relay_peer_id, boot_node_peer_id);
-                        println!("Reservation request accepted - Dial node b");
                         node_a.dial(node_b_addr.clone()).unwrap();
                     }
                     SwarmEvent::Behaviour(Event::Message { peer_id, message }) => {
@@ -630,11 +528,6 @@ mod tests {
                             // **** Peer Identified ****
                             for addr in info.listen_addrs {
                                 if is_relay_circuit(&addr) {
-                                    // Dial to open dcutr connection.
-                                    /*println!("Node A identified with relay");
-                                    let result = node_b.dial(addr);
-                                    assert!(result.is_ok());*/
-                                    println!("Node A identified with relay");
                                     node_b.behaviour_mut().add_relay_node(peer_id, addr.clone());
                                     let result = node_b.dial(addr);
                                     assert!(result.is_ok());
@@ -642,7 +535,6 @@ mod tests {
                             }
                         } else {
                             // **** Peer Identified ****
-                            println!("Bootstrap identified");
                             assert_eq!(boot_node_peer_id, peer_id);
                         }
                     }
@@ -659,9 +551,7 @@ mod tests {
                         assert_eq!(peer_id, node_a_peer_id);
                     }
                     SwarmEvent::OutgoingConnectionError { .. } => break,
-                    e => {
-                        //println!("{:?}", e);
-                    }
+                    _ => {}
                 }
             }
         };
@@ -719,11 +609,14 @@ mod tests {
         node_a.behaviour_mut().bootstrap();
 
         // Build node b.
+        let node_b_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
+            .parse()
+            .unwrap();
         let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
         let mut node_b = build_relay(config);
+        node_b.listen_on(node_b_addr.clone()).unwrap();
         let node_b_peer_id = *node_b.local_peer_id();
-        let (node_b_addr, _) = node_b.listen().await;
-
+        
         // Dial to boot node.
         node_b.dial(boot_addr.clone()).unwrap();
 
@@ -731,7 +624,13 @@ mod tests {
             loop {
                 match boot_node.select_next_some().await {
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
-                         boot_node.behaviour_mut().add_identified_peer(peer_id, *info);
+                        if peer_id == node_a_peer_id {
+                            //println!("Bootstrap: node a identified");
+                        }
+                        if peer_id == node_b_peer_id {
+                            //println!("Bootstrap: node b identified");
+                        }
+                        boot_node.behaviour_mut().add_identified_peer(peer_id, *info);
                     }
                     e => {
                        //println!("Bootstrap *{:?}*", e);
@@ -760,8 +659,9 @@ mod tests {
                         //println!("Node B: Discovered peer.");
                     }
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
-                        println!("Node B: Identified peer.");
+                        //println!("Node B: Identified peer. {}", peer_id);
                         node_b.behaviour_mut().add_identified_peer(peer_id, *info);
+
 
                         node_b.behaviour_mut().send_message(&node_a_peer_id, b"Hello Node A".to_vec());
                     }
@@ -821,13 +721,13 @@ mod tests {
         random_walk: bool,
         node_type: NodeType,
     ) -> Config {
-        let private_addr = match node_type {
+        /*let private_addr = match node_type {
             NodeType::Bootstrap { .. } => true,
             _ => false,
-        };
+        };*/
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
-            .with_allow_private_ip(private_addr)
+            .with_allow_private_ip(true)
             .with_discovery_limit(50)
             .with_dht_random_walk(random_walk);
 
