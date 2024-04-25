@@ -16,7 +16,11 @@ mod utils;
 mod worker;
 
 pub use error::Error;
+pub use routing::Config as RoutingConfig;
 pub use service::NetworkService;
+pub use worker::NetworkWorker;
+
+use libp2p::swarm::StreamProtocol;
 
 use serde::{Deserialize, Serialize};
 
@@ -32,9 +36,15 @@ const MAX_CONNECTIONS_PER_PEER: usize = 2;
 /// The maximum number of concurrent established connections that were incoming.
 const MAX_CONNECTIONS_ESTABLISHED_INCOMING: u32 = 10_000;
 
-/// The network protocol version.
-/// This is used to identify the protocol version of the network.
-const NETWORK_PROTOCOL: &str = "/kore/1.0.0";
+/// Required protocols for the network.
+const REQUIRED_PROTOCOLS: [StreamProtocol; 6] = [
+    StreamProtocol::new("/kore/routing/1.0.0"),
+    StreamProtocol::new("/kore/tell/1.0.0"),
+    StreamProtocol::new("/libp2p/circuit/relay/0.2.0/stop"),
+    StreamProtocol::new("/ipfs/id/1.0.0"),
+    StreamProtocol::new("/ipfs/id/push/1.0.0"),
+    StreamProtocol::new("/ipfs/ping/1.0.0"),
+];
 
 /// The network configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,4 +104,5 @@ pub enum Command {
 /// Event enumeration for the network service.
 pub enum Event {
     MessageReceived { message: Vec<u8> },
+    PeerDisconnected { peer: Vec<u8> },
 }

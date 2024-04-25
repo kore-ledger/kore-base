@@ -7,6 +7,7 @@
 use crate::{
     node,
     routing::{self, DhtValue},
+    utils::is_relay_circuit,
     Config, NodeType,
 };
 
@@ -14,7 +15,6 @@ use libp2p::{
     dcutr::{self, Behaviour as Dcutr},
     identify::Info as IdentifyInfo,
     identity::PublicKey,
-    kad::RecordKey,
     relay::{self, client::Behaviour as RelayClient, Behaviour as RelayServer},
     swarm::behaviour::toggle::Toggle,
     swarm::NetworkBehaviour,
@@ -30,6 +30,8 @@ use std::{
     iter,
     sync::{Arc, Mutex},
 };
+
+//const TARGET_BEHAVIOUR: &str = "KoreNetwork-Behaviour";
 
 /// The network composed behaviour.
 #[derive(NetworkBehaviour)]
@@ -49,10 +51,9 @@ pub struct Behaviour {
 
     /// The Direct Connection Upgrade through Relay (DCUTR) behaviour.
     dcutr: Toggle<Dcutr>,
+
     /// The `tell` behaviour.
     tell: binary::Behaviour,
-
-
 }
 
 impl Behaviour {
@@ -100,34 +101,15 @@ impl Behaviour {
         self.routing.bootstrap();
     }
 
-    /// Known peers.
-    pub fn known_peers(&mut self) -> HashSet<PeerId> {
-        self.routing.known_peers()
+    /// Bootstrap node list.
+    pub fn boot_nodes(&mut self) -> Vec<(PeerId, Multiaddr)> {
+        self.routing.boot_nodes()
     }
 
-    /// Add known address.
-    pub fn add_known_address(&mut self, peer_id: PeerId, address: Multiaddr) {
-        self.routing.add_known_address(peer_id, address);
-    }
-
-    /// Add ephemeral node.
-    pub fn add_relay_node(&mut self, peer_id: PeerId, address: Multiaddr) {
-        self.routing.add_relay_node(peer_id, address);
-    }
-
-    /// Returns the number of nodes in each Kademlia kbucket.
-    pub fn num_entries_per_kbucket(&mut self) -> Option<Vec<(u32, usize)>> {
-        self.routing.num_entries_per_kbucket()
-    }
-
-    /// Returns the number of records in the Kademlia record stores.
-    pub fn num_kademlia_records(&mut self) -> Option<usize> {
-        self.routing.num_kademlia_records()
-    }
-
-    /// Returns the total size in bytes of all the records in the Kademlia record stores.
-    pub fn kademlia_records_total_size(&mut self) -> Option<usize> {
-        self.routing.kademlia_records_total_size()
+    /// Get relay node.
+    #[cfg(test)]
+    pub fn get_relay_node(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
+        self.routing.get_relay_node(peer_id)
     }
 
     /// Borrows `self` and returns a struct giving access to the information about a node.
@@ -149,6 +131,25 @@ impl Behaviour {
         self.routing.discover(peer_id);
     }
 
+    /// Sets random walk delay.
+    #[cfg(test)]
+    pub fn set_random_walk(&mut self, seconds: u64) {
+        use std::time::Duration;
+        self.routing.set_random_walk(Duration::from_secs(seconds));
+    }
+
+    /// Gets addresses of a known peer.
+    #[cfg(test)]
+    pub fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
+        self.routing.addresses_of_peer(peer_id)
+    }
+
+    /// Returns true if the given `PeerId` is known.
+    pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
+        self.routing.is_known_peer(peer_id)
+    }
+
+    /* 
     /// Start querying a record from the DHT. Will later produce either a `ValueFound` or a
     /// `ValueNotFound` event.
     pub fn get_value(&mut self, key: &str) {
@@ -162,13 +163,27 @@ impl Behaviour {
         let key = RecordKey::from(key.as_bytes().to_vec());
         self.routing.put_value(key, value);
     }
+    */
 
     /// Add identified peer to routing table.
     pub fn add_identified_peer(&mut self, peer_id: PeerId, info: IdentifyInfo) {
         for addr in info.listen_addrs {
-            self.routing
-                .add_self_reported_address(&peer_id, &info.protocols, addr);
+            // Add node with relay address.
+            if is_relay_circuit(&addr) {
+                self.routing.add_relay_node(peer_id, addr.clone());
+            } else {
+                // Add node with self reported address to DHT.
+                self.routing
+                    .add_self_reported_address(&peer_id, &info.protocols, addr.clone());
+                // Add known address.
+                self.routing.add_known_address(peer_id, addr.clone());
+            }
         }
+    }
+
+    /// Node protocols supported.
+    pub fn protocol_names(&self) -> Vec<StreamProtocol> {
+        self.routing.protocol_names()
     }
 }
 
@@ -245,12 +260,12 @@ impl From<TellEvent<Vec<u8>>> for Event {
     fn from(event: TellEvent<Vec<u8>>) -> Self {
         match event {
             TellEvent::Message { peer_id, message } => {
-                // Ignore messages that starts with the following bytes. This is a workaround to
-                // avoid processing messages that are not intended for the network. We should find 
+                /*// Ignore messages that starts with the following bytes. This is a workaround to
+                // avoid processing messages that are not intended for the network. We should find
                 // a better way to handle this.
                 if message.message.as_slice().starts_with(&[40, 8, 4, 80, 10, 18, 34, 0, 32]) {
                     return Event::None;
-                }
+                 }*/
                 Event::Message { peer_id, message }
             }
             TellEvent::MessageProcessed {
@@ -309,10 +324,7 @@ impl From<routing::Event> for Event {
             routing::Event::ValueNotFound(key, _) => Event::Dht(DhtValue::NotFound(key)),
             routing::Event::ValuePut(key, _) => Event::Dht(DhtValue::Put(key)),
             routing::Event::ValuePutFailed(key, _) => Event::Dht(DhtValue::PutFailed(key)),
-            routing::Event::ClosestPeers(key, peers) => match PeerId::from_bytes(&key) {
-                Ok(key) => Event::PeersFounded(key, peers.into_iter().collect()),
-                Err(_) => Event::None,
-            },
+            routing::Event::ClosestPeers(key, peers) => Event::PeersFounded(key, peers),
             routing::Event::UnroutablePeer(_) => Event::None,
         }
     }
@@ -353,8 +365,8 @@ mod tests {
         tcp, yamux, Multiaddr, Swarm,
     };
     use libp2p_swarm_test::SwarmExt;
+    use std::str::FromStr;
     use std::{pin::pin, sync::Arc};
-
 
     #[tokio::test]
     async fn test_relay() {
@@ -494,7 +506,7 @@ mod tests {
                             node_a.behaviour_mut().discover(&peer);
                         }
                     }
-                    SwarmEvent::Behaviour(Event::PeersFounded(peer, peers_founded)) => {
+                    SwarmEvent::Behaviour(Event::PeersFounded(_, peers_founded)) => {
                         if peers_founded.is_empty() {
                             let result = node_a.dial(boot_node_addr.clone());
                             assert!(result.is_ok());
@@ -528,7 +540,6 @@ mod tests {
                             // **** Peer Identified ****
                             for addr in info.listen_addrs {
                                 if is_relay_circuit(&addr) {
-                                    node_b.behaviour_mut().add_relay_node(peer_id, addr.clone());
                                     let result = node_b.dial(addr);
                                     assert!(result.is_ok());
                                 }
@@ -568,86 +579,125 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_full_behaviour() {
+    async fn test_full() {
         let mut boot_nodes = vec![];
 
         // Build bootstrap node.
-        let boot_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
-            .parse()
-            .unwrap();
         let config = create_config(
             boot_nodes.clone(),
-            true,
+            false,
             NodeType::Bootstrap {
-                external_addresses: vec![boot_addr.to_string()],
+                external_addresses: vec![],
             },
         );
         let mut boot_node = build_relay(config);
-        boot_node.listen_on(boot_addr.clone()).unwrap();
-        boot_node.add_external_address(boot_addr.clone());
+        let (_, boot_addr) = boot_node.listen().await;
         let boot_node_peer_id = *boot_node.local_peer_id();
 
-        println!("Boot node peer: {:?}", boot_node_peer_id);
+        boot_node.add_external_address(boot_addr.clone());
 
         boot_nodes.push((boot_node.local_peer_id().to_base58(), boot_addr.to_string()));
+        boot_node
+            .behaviour_mut()
+            .set_random_walk(1);
 
         // Build node a.
-        let node_a_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
-            .parse()
-            .unwrap();
-        let config = create_config(
-            boot_nodes.clone(),
-            true,
-            NodeType::Addressable {
-                external_addresses: vec![node_a_addr.to_string()],
-            },
-        );
+        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
         let mut node_a = build_relay(config);
-        node_a.listen_on(node_a_addr.clone()).unwrap();
-        node_a.add_external_address(node_a_addr.clone());
         let node_a_peer_id = *node_a.local_peer_id();
-        node_a.behaviour_mut().bootstrap();
+        node_a.listen().await;
+        assert!(node_a.external_addresses().next().is_none());
+        node_a.dial(boot_addr.clone()).unwrap();
 
         // Build node b.
-        let node_b_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
-            .parse()
-            .unwrap();
-        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
+        let config = create_config(
+            boot_nodes.clone(),
+            false,
+            NodeType::Addressable {
+                external_addresses: vec![],
+            },
+        );
         let mut node_b = build_relay(config);
-        node_b.listen_on(node_b_addr.clone()).unwrap();
         let node_b_peer_id = *node_b.local_peer_id();
-        
-        // Dial to boot node.
+        let (_, node_b_addr) = node_b.listen().await;
+        node_b.add_external_address(node_b_addr.clone());
+        node_b
+            .behaviour_mut()
+            .set_random_walk(1);
         node_b.dial(boot_addr.clone()).unwrap();
 
         let loop_boot = async move {
             loop {
                 match boot_node.select_next_some().await {
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
-                        if peer_id == node_a_peer_id {
-                            //println!("Bootstrap: node a identified");
-                        }
-                        if peer_id == node_b_peer_id {
-                            //println!("Bootstrap: node b identified");
-                        }
-                        boot_node.behaviour_mut().add_identified_peer(peer_id, *info);
+                        boot_node
+                            .behaviour_mut()
+                            .add_identified_peer(peer_id, *info);
                     }
-                    e => {
-                       //println!("Bootstrap *{:?}*", e);
-                    }
+                    _ => {}
                 }
             }
         };
 
         let loop_a = async move {
+            let mut pending_message = true;
+            let mut reservation = None;
             loop {
                 match node_a.select_next_some().await {
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
                         node_a.behaviour_mut().add_identified_peer(peer_id, *info);
+                        // If node b identified, send message.
+                        if peer_id == node_b_peer_id && pending_message {
+                            node_a
+                                .behaviour_mut()
+                                .send_message(&node_b_peer_id, b"Hello Node B".to_vec());
+                            pending_message = false;
+                        } else if pending_message {
+                            // Discover node b.
+                            node_a.behaviour_mut().discover(&node_b_peer_id);
+                        }
                     }
-                    e => {
-                        //println!("Node A *{:?}*", e);
+                    SwarmEvent::Behaviour(Event::RelayClient(
+                        relay::client::Event::ReservationReqAccepted { relay_peer_id, .. },
+                    )) => {
+                        // Reservation request accepted.
+                        assert_eq!(relay_peer_id, boot_node_peer_id);
                     }
+
+                    SwarmEvent::Behaviour(Event::MessageSent { peer_id, .. }) => {
+                        // If message sent, make reservation to response.
+                        assert_eq!(peer_id, node_b_peer_id);
+                        if reservation.is_none() {
+                            // Message to node b. Get node b addresses.
+                            let addresses =
+                                node_a.behaviour_mut().addresses_of_peer(&boot_node_peer_id);
+                            if addresses.is_empty() {
+                                // Discover node b.
+                                node_a.behaviour_mut().discover(&boot_node_peer_id)
+                            } else {
+                                if let Some(base_addr) = addresses.iter().next() {
+                                    // Create reservation request
+                                    let addr = base_addr.clone();
+                                    if let Ok(addr) = addr.with_p2p(boot_node_peer_id) {
+                                        let listen_addr = addr.with(Protocol::P2pCircuit);
+                                        node_a.listen_on(listen_addr.clone()).unwrap();
+                                        reservation = Some(base_addr.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    SwarmEvent::Behaviour(Event::Message { peer_id, message }) => {
+                        // Message received from unreachable node b
+                        assert_eq!(peer_id, node_b_peer_id);
+                        assert_eq!(message.message.as_slice(), b"Hello Node A");
+                    }
+                    SwarmEvent::Behaviour(Event::MessageProcessed { peer_id, .. }) => {
+                        // Message processed. End test.
+                        assert_eq!(peer_id, node_b_peer_id);
+                        break;
+                    }
+                    _ => {}
                 }
             }
         };
@@ -655,23 +705,51 @@ mod tests {
         let loop_b = async move {
             loop {
                 match node_b.select_next_some().await {
-                    SwarmEvent::Behaviour(Event::Discovered(peer)) => {
-                        //println!("Node B: Discovered peer.");
-                    }
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
-                        //println!("Node B: Identified peer. {}", peer_id);
                         node_b.behaviour_mut().add_identified_peer(peer_id, *info);
+                        // If node a identified from relay address, dial node a.
+                        if peer_id == node_a_peer_id {
+                            let node = node_b.behaviour_mut().node(&node_a_peer_id);
+                            if let Some(node) = node {
+                                assert!(!node.reachable())
+                            }
+                        }
+                        if let Some(relay_addr) = node_b.behaviour().get_relay_node(&peer_id) {
 
-
-                        node_b.behaviour_mut().send_message(&node_a_peer_id, b"Hello Node A".to_vec());
+                            assert_eq!(peer_id, node_a_peer_id);
+                            node_b.dial(relay_addr.clone()).unwrap();
+                        }
                     }
-                    SwarmEvent::Behaviour(Event::MessageSent { peer_id, outbound_id }) => {
-                        println!("Node B: Message sent to peer A.");
+                    SwarmEvent::Behaviour(Event::Message { peer_id, message }) => {
+                        // Message received from node a.
+                        assert_eq!(peer_id, node_a_peer_id);
+                        assert_eq!(message.message.as_slice(), b"Hello Node B");
+                    }
+                    SwarmEvent::Behaviour(Event::Dcutr(dcutr::Event {
+                        remote_peer_id,
+                        result,
+                    })) => {
+                        // DCUTR event. Send message to unreachable node a.
+                        if result.is_ok() {
+                            assert_eq!(remote_peer_id, node_a_peer_id);
+                            node_b
+                                .behaviour_mut()
+                                .send_message(&node_a_peer_id, b"Hello Node A".to_vec());
+                        }
+                    }
+                    SwarmEvent::Behaviour(Event::MessageSent { peer_id, .. }) => {
+                        // Message sent to node a.
                         assert_eq!(peer_id, node_a_peer_id);
                     }
-                    e => {
-                        println!("Node B *{:?}*", e);
+                    SwarmEvent::OutgoingConnectionError { peer_id, .. } => {
+                        // Connection error with node a. End test.
+                        if let Some(peer) = peer_id {
+                            if peer == node_a_peer_id {
+                                break;
+                            }
+                        }
                     }
+                    _ => {}
                 }
             }
         };
@@ -685,6 +763,41 @@ mod tests {
             (_, _) = future => {},
             () = loop_boot => {},
         };
+    }
+
+    #[tokio::test]
+    async fn test_reservation_error() {
+        // Build node.
+        let config = create_config(vec![], false, NodeType::Ephemeral);
+        let mut node = build_relay(config);
+        let node_peer_id = *node.local_peer_id();
+        node.listen().await;
+        assert!(node.external_addresses().next().is_none());
+
+        let fake_addr = Multiaddr::from_str("/ip4/127.0.0.1/tcp/11111").unwrap();
+        let fake_peer = PeerId::random();
+        let relay_addr = fake_addr
+            .with(Protocol::P2p(fake_peer))
+            .with(Protocol::P2pCircuit)
+            .with(Protocol::P2p(node_peer_id));
+
+        node.listen_on(relay_addr.clone()).unwrap();
+
+        async move {
+            loop {
+                match node.select_next_some().await {
+                    SwarmEvent::Dialing { peer_id, .. } => {
+                        assert_eq!(peer_id, Some(fake_peer));
+                    }
+                    SwarmEvent::OutgoingConnectionError { peer_id, .. } => {
+                        assert_eq!(peer_id, Some(fake_peer));
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        .await;
     }
 
     // Build relay server.
@@ -711,7 +824,8 @@ mod tests {
             transport,
             behaviour,
             local_peer_id,
-            swarm::Config::with_tokio_executor(),
+            swarm::Config::with_tokio_executor()
+                .with_idle_connection_timeout(std::time::Duration::from_secs(2)),
         )
     }
 
@@ -728,6 +842,7 @@ mod tests {
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
             .with_allow_private_ip(true)
+            .with_mdns(false)
             .with_discovery_limit(50)
             .with_dht_random_walk(random_walk);
 

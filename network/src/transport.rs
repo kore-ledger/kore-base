@@ -47,7 +47,7 @@ pub fn build_transport(
     let (transport, relay_client) = new(peer_id);
 
     // Build the noise authentication.
-    let noise = noise::Config::new(&keys)
+    let noise = noise::Config::new(keys)
         .map_err(|e| Error::Transport(format!("Noise authentication {:?}", e)))?;
 
     // Allow Memory transport for testing

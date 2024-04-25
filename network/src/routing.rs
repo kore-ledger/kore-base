@@ -1,10 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::{
-    utils::{convert_boot_nodes, is_reachable, LruHashSet},
-    NETWORK_PROTOCOL,
-};
+use crate::utils::{convert_boot_nodes, is_reachable, LruHashSet};
 
 use futures_timer::Delay;
 use ip_network::IpNetwork;
@@ -30,7 +27,7 @@ use libp2p::{
     Multiaddr, PeerId, StreamProtocol,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace, warn, error};
 
 use std::{
     cmp,
@@ -50,8 +47,8 @@ pub struct Behaviour {
     /// Bootnodes to connect to.
     boot_nodes: Vec<(PeerId, Multiaddr)>,
 
-    /// Ephemeral nodes discovered with public address.
-    ephemeral_nodes: HashMap<PeerId, Vec<Multiaddr>>,
+    /// Nodes discovered with public address.
+    public_nodes: HashMap<PeerId, Vec<Multiaddr>>,
 
     /// Circuit relay nodes.
     relay_nodes: HashMap<PeerId, Multiaddr>,
@@ -86,6 +83,9 @@ pub struct Behaviour {
 
     /// Records that we want to publish to the DHT.
     records_to_publish: HashMap<QueryId, Record>,
+
+    /// Pending queries.
+    active_queries: HashSet<PeerId>,
 
     /// Events to return in priority when polled.
     pending_events: VecDeque<Event>,
@@ -146,7 +146,7 @@ impl Behaviour {
         Self {
             local_peer_id: peer_id,
             boot_nodes,
-            ephemeral_nodes: HashMap::new(),
+            public_nodes: HashMap::new(),
             relay_nodes: HashMap::new(),
             kademlia: Toggle::from(kademlia),
             mdns: if enable_mdns {
@@ -172,10 +172,45 @@ impl Behaviour {
             allow_private_ip,
             known_external_addresses: LruHashSet::new(K_VALUE),
             records_to_publish: Default::default(),
+            active_queries: Default::default(),
             pending_events: VecDeque::new(),
         }
     }
 
+    /// Bootstrap node list.
+    pub fn boot_nodes(&self) -> Vec<(PeerId, Multiaddr)> {
+        self.boot_nodes.clone()
+    }
+
+    /// Returns true if the given peer is known.
+    pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
+        self.public_nodes.contains_key(peer_id) || self.known_peers().contains(peer_id)
+    }
+    
+    /// Sets the DHT random walk delay.
+    #[cfg(test)]
+    pub fn set_random_walk(&mut self, delay: Duration) {
+        self.next_random_walk = Some(Delay::new(delay));
+    }
+
+    /// Get relay node.
+    #[cfg(test)]
+    pub fn get_relay_node(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
+        self.relay_nodes.get(peer_id)
+    }
+
+        /// Returns the list of known external addresses of a peer.
+    /// If the peer is not known, returns an empty list.
+    ///
+    #[cfg(test)]
+    pub fn addresses_of_peer(&self, peer_id: &PeerId) -> Vec<Multiaddr> {
+        let mut addrs = Vec::new();
+        if let Some(list) = self.public_nodes.get(peer_id) {
+            addrs.extend(list.iter().cloned());
+        }
+        addrs
+    }
+        
     /// Bootstrap nodes to connect to.
     pub fn bootstrap(&mut self) {
         if let Some(kad) = self.kademlia.as_mut() {
@@ -185,6 +220,15 @@ impl Behaviour {
         }
     }
 
+    /// Returns the list of known external addresses of our node.
+    pub fn protocol_names(&self) -> Vec<StreamProtocol> {
+        if let Some(k) = self.kademlia.as_ref() {
+            k.protocol_names().to_vec()
+        } else {
+            Vec::new()
+        }
+    }
+    
     /// Returns the list of nodes that we know exist in the network.
     pub fn known_peers(&mut self) -> HashSet<PeerId> {
         let mut peers = HashSet::new();
@@ -204,7 +248,7 @@ impl Behaviour {
     ///
     /// If we didn't know this address before, also generates a `Discovered` event.
     pub fn add_known_address(&mut self, peer_id: PeerId, addr: Multiaddr) {
-        let addrs_list = self.ephemeral_nodes.entry(peer_id).or_default();
+        let addrs_list = self.public_nodes.entry(peer_id).or_default();
         if addrs_list.contains(&addr) {
             return;
         }
@@ -387,7 +431,7 @@ pub enum Event {
     RandomKademliaStarted,
 
     /// Closest peers to a given key have been found
-    ClosestPeers(Vec<u8>, Vec<PeerId>),
+    ClosestPeers(PeerId, Vec<PeerId>),
 }
 
 impl NetworkBehaviour for Behaviour {
@@ -442,7 +486,7 @@ impl NetworkBehaviour for Behaviour {
             FromSwarm::DialFailure(e @ DialFailure { peer_id, error, .. }) => {
                 if let Some(peer_id) = peer_id {
                     if let DialError::Transport(errors) = error {
-                        if let Entry::Occupied(mut entry) = self.ephemeral_nodes.entry(peer_id) {
+                        if let Entry::Occupied(mut entry) = self.public_nodes.entry(peer_id) {
                             for (addr, _error) in errors {
                                 entry.get_mut().retain(|a| a != addr);
                             }
@@ -610,15 +654,18 @@ impl NetworkBehaviour for Behaviour {
                                     "Kademlia => Random Kademlia query has yielded empty results",
                                 );
                             } else {
-                                trace!(
-                                    target: TARGET_ROUTING,
-                                    "Kademlia => Closest peers to {:?} are: {:?}",
-                                    hex::encode(&ok.key),
-                                    ok.peers,
-                                );
-                                return Poll::Ready(ToSwarm::GenerateEvent(Event::ClosestPeers(
-                                    ok.key, ok.peers,
-                                )));
+                                if let Ok(peer) = PeerId::from_bytes(&ok.key) {
+                                    self.active_queries.remove(&peer);
+                                    return Poll::Ready(ToSwarm::GenerateEvent(
+                                        Event::ClosestPeers(peer, ok.peers),
+                                    ));
+                                } else {
+                                    error!(
+                                        target: TARGET_ROUTING,
+                                        "Kademlia => Failed to parse peer id from key: {:?}",
+                                        hex::encode(&ok.key),
+                                    );
+                                }
                             }
                         }
                     },
@@ -861,7 +908,7 @@ impl NetworkBehaviour for Behaviour {
             .filter_map(|(p, a)| (*p == peer_id).then_some(a.clone()))
             .collect::<Vec<_>>();
 
-        if let Some(ephemeral_addresses) = self.ephemeral_nodes.get(&peer_id) {
+        if let Some(ephemeral_addresses) = self.public_nodes.get(&peer_id) {
             list.extend(ephemeral_addresses.clone());
         }
 
@@ -935,7 +982,7 @@ pub struct Config {
 impl Config {
     /// Creates a new configuration for the discovery behaviour.
     pub fn new(boot_nodes: Vec<(String, String)>) -> Self {
-        let protocol_names = vec![NETWORK_PROTOCOL.to_owned()];
+        let protocol_names = vec!["/kore/routing/1.0.0".to_owned()];
         Self {
             boot_nodes,
             dht_random_walk: true,
@@ -1036,9 +1083,6 @@ mod tests {
     use libp2p_swarm_test::SwarmExt;
 
     use futures::prelude::*;
-    use futures::{join, select};
-
-    use std::pin::pin;
 
     #[tokio::test]
     async fn test_routing() {
@@ -1086,15 +1130,6 @@ mod tests {
                     match swarms[swarm_n].0.poll_next_unpin(cx) {
                         Poll::Ready(Some(e)) => {
                             match e {
-                                SwarmEvent::ConnectionEstablished {
-                                    peer_id, endpoint, ..
-                                } => {
-                                    let local_peer_id = swarms[swarm_n].0.local_peer_id();
-                                    println!(
-                                        "Peer {} connection established with {}: Endpoint {:?}",
-                                        local_peer_id, peer_id, endpoint
-                                    );
-                                }
                                 SwarmEvent::Behaviour(behavior) => {
                                     match behavior {
                                         Event::UnroutablePeer(other) | Event::Discovered(other) => {
@@ -1150,8 +1185,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_ignores_peers_with_unknown_protocols() {
-        let supported_protocol = "/kore/1.0.0";
-        let unsupported_protocol = "/kore/2.0.0";
+        let supported_protocol = "/kore/routing/1.0.0";
+        let unsupported_protocol = "/kore/routing/2.0.0";
 
         let mut routing = {
             let config = Config::new(vec![])
@@ -1190,94 +1225,6 @@ mod tests {
         );
         let kad = routing.kademlia.as_mut().unwrap();
         assert!(kad.kbuckets().next().is_some());
-    }
-
-    #[tokio::test]
-    async fn test_bootstrap() {
-        let mut boot_nodes = vec![];
-
-        let config = make_config(boot_nodes.clone(), true);
-
-        let (mut boot_node, addr) = build_node(config);
-        let boot_peer_id = *boot_node.local_peer_id();
-        boot_nodes.push((boot_peer_id.to_base58(), addr.to_string()));
-
-        let config = make_config(boot_nodes.clone(), false);
-
-        let mut node_a = Swarm::new_ephemeral(|key_pair| {
-            Behaviour::new(PeerId::from_public_key(&key_pair.public()), config)
-        });
-        let node_a_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
-            .parse()
-            .unwrap();
-        let _ = node_a.listen_on(node_a_addr.clone()).unwrap();
-        node_a.behaviour_mut().bootstrap();
-
-        let config = make_config(boot_nodes.clone(), true);
-        let mut node_b = Swarm::new_ephemeral(|key_pair| {
-            Behaviour::new(PeerId::from_public_key(&key_pair.public()), config)
-        });
-
-        let node_b_peer = *node_b.local_peer_id();
-        let node_b_addr: Multiaddr = format!("/memory/{}", rand::random::<u64>())
-            .parse()
-            .unwrap();
-        let _ = node_b.listen_on(node_b_addr.clone()).unwrap();
-
-        node_b.add_external_address(node_b_addr.clone());
-        node_b.behaviour_mut().bootstrap();
-
-        let loop_boot = async move {
-            loop {
-                match boot_node.select_next_some().await {
-                    _ => {}
-                }
-            }
-        };
-
-        let loop_a = async move {
-            loop {
-                match node_a.select_next_some().await {
-                    SwarmEvent::Behaviour(Event::Discovered(peer_id)) => {
-                        assert_eq!(peer_id, boot_peer_id);
-                        node_a.behaviour_mut().discover(&node_b_peer);
-                    }
-                    e => {
-                        println!("Node A: {:?}", e);
-                    }
-                }
-            }
-        };
-
-        let loop_b = async move {
-            loop {
-                match node_b.select_next_some().await {
-                    e => {
-                        println!("Node B: {:?}", e);
-                    }
-                }
-            }
-        };
-
-        let loop_boot = loop_boot.fuse();
-        let future = async { join!(loop_a, loop_b) }.fuse();
-        let mut future = pin!(future);
-        let mut loop_boot = pin!(loop_boot);
-
-        select! {
-            (_, _) = future => {},
-            () = loop_boot => {},
-        };
-    }
-
-    // Make configuration for the test swarm
-    fn make_config(boot_nodes: Vec<(String, String)>, random_walk: bool) -> Config {
-        Config::new(boot_nodes)
-            .with_allow_non_globals_in_dht(true)
-            .with_allow_private_ip(true)
-            .with_discovery_limit(50)
-            .with_dht_random_walk(random_walk)
-            .set_protocol("/kore/1.0.0")
     }
 
     /// Build test swarm

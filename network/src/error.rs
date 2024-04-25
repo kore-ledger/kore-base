@@ -9,6 +9,8 @@ use thiserror::Error;
 /// Network errors.
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Worker error: {0}")]
+    Worker(String),
     #[error("Transport error: {0}")]
     Transport(String),
     #[error("DNS error: {0}")]

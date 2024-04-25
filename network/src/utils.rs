@@ -33,7 +33,7 @@ impl<T: Hash + Eq> LruHashSet<T> {
     /// Inserting the same element will update its LRU position.
     pub fn insert(&mut self, e: T) -> bool {
         if self.set.insert(e) {
-            if self.set.len() == usize::from(self.limit) {
+            if self.len() == usize::from(self.limit) {
                 self.set.pop_front(); // remove oldest entry
             }
             return true;
@@ -110,12 +110,37 @@ pub fn is_reachable(addr: &Multiaddr) -> bool {
     ip.is_global()
 }
 
+pub fn is_memory(addr: &Multiaddr) -> bool {
+    if let Some(Protocol::Memory(_)) = addr.iter().next() {
+        return true;
+    }
+    false
+}
+
 /// Check if the given `Multiaddr` is a relay circuit address.
 ///
 /// A relay circuit address is a `Multiaddr` that contains a `P2pCircuit` protocol.
 ///
 pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
     addr.iter().any(|p| matches!(p, Protocol::P2pCircuit))
+}
+
+/// Compare generic arrays.
+///
+/// If `b_subset` is `true`, then `b` is a subset of `a`.
+/// Otherwise, `a` and `b` are equal.
+///
+pub fn compare_arrays<T>(a: &[T], b: &[T], b_subset: bool) -> bool
+where
+    T: Eq + Hash,
+{
+    let a: HashSet<_> = a.iter().collect();
+    let b: HashSet<_> = b.iter().collect();
+    if b_subset {
+        b.is_subset(&a)
+    } else {
+        a == b
+    }
 }
 
 #[cfg(test)]
@@ -130,5 +155,19 @@ mod tests {
         assert_eq!(cache.len(), 1);
         cache.insert("value2");
         assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_compare_arrays() {
+        let a = vec![1, 2, 3];
+        let b = vec![2, 1, 3];
+        let c = vec![1, 2, 3, 4];
+        let d = vec![1, 2];
+        let e = vec![1, 2, 3, 4, 5];
+        assert!(compare_arrays(&a, &b, false));
+        assert!(!compare_arrays(&a, &c, false));
+        assert!(compare_arrays(&a, &d, true));
+        assert!(!compare_arrays(&a, &e, true));
+        assert!(compare_arrays(&e, &a, true));
     }
 }

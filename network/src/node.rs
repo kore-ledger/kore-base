@@ -8,7 +8,7 @@ use libp2p::{
         Info as IdentifyInfo,
     },
     identity::PublicKey,
-    ping::{Behaviour as Ping, Event as PingEvent},
+    ping::{Behaviour as Ping, Config as PingConfig, Event as PingEvent},
     swarm::{
         behaviour::{ConnectionClosed, ConnectionEstablished, ListenFailure},
         ConnectionDenied, ConnectionHandler, ConnectionHandlerSelect, ConnectionId, DialFailure,
@@ -114,14 +114,14 @@ impl Behaviour {
         external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
     ) -> Self {
         let identify = {
-            let identify_config =
-                IdentifyConfig::new(crate::NETWORK_PROTOCOL.to_owned(), public_key.clone())
-                    .with_agent_version(user_agent.to_owned())
-                    .with_cache_size(0); // We don't need to cache anything.
+            let identify_config = IdentifyConfig::new("ipfs/1.0.0".to_owned(), public_key.clone())
+                .with_agent_version(user_agent.to_owned())
+                .with_cache_size(0); // We don't need to cache anything.
             Identify::new(identify_config)
         };
+        let ping_config = PingConfig::new();
         Self {
-            ping: Ping::new(Default::default()),
+            ping: Ping::new(ping_config),
             identify,
             nodes_info: FnvHashMap::default(),
             garbage_collect: Box::pin(interval(GARBAGE_COLLECT_INTERVAL)),
@@ -583,4 +583,47 @@ impl NetworkBehaviour for Behaviour {
 /// Creates a stream that returns a new value every `duration`.
 fn interval(duration: Duration) -> impl Stream<Item = ()> + Unpin {
     unfold((), move |_| Delay::new(duration).map(|_| Some(((), ())))).map(drop)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libp2p::Swarm;
+    use libp2p_swarm_test::SwarmExt;
+
+    #[tokio::test]
+    async fn test_node_info() {
+        // Node 1.
+        let mut node1 = Swarm::new_ephemeral(|key_pair| {
+            Behaviour::new(
+                "kore::network",
+                &key_pair.public(),
+                Arc::new(Mutex::new(HashSet::new())),
+            )
+        });
+        node1.listen().with_memory_addr_external().await;
+        let node1_peer_id = *node1.local_peer_id();
+
+        // Node 2.
+        let mut node2 = Swarm::new_ephemeral(|key_pair| {
+            Behaviour::new(
+                "kore::network",
+                &key_pair.public(),
+                Arc::new(Mutex::new(HashSet::new())),
+            )
+        });
+        node2.listen().with_memory_addr_external().await;
+        //let node2_peer_id = *node2.local_peer_id();
+
+        // Connect node 1 to node 2.
+        node1.connect(&mut node2).await;
+
+        match node2.next_behaviour_event().await {
+            Event::Identified { peer_id, .. } => {
+                assert_eq!(peer_id, node1_peer_id);
+                let node_info = node2.behaviour_mut().node(&peer_id).unwrap();
+                assert!(node_info.endpoint().is_some());
+            }
+        }
+    }
 }

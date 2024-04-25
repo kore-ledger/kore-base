@@ -113,7 +113,6 @@ where
             <Self as ConnectionHandler>::InboundOpenInfo,
         >,
     ) {
-        
         let mut codec = self.codec.clone();
         let tell_id = self.next_inbound_tell_id();
         let mut sender = self.inbound_sender.clone();
@@ -364,7 +363,7 @@ where
         }
 
         // Check for inbound tell message.
-        if let Poll::Ready(Some((id, msg))) = self.inbound_receiver.poll_next_unpin(cx) {            
+        if let Poll::Ready(Some((id, msg))) = self.inbound_receiver.poll_next_unpin(cx) {
             // We received an inbound request.
             return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
                 TellEvent::TellReceived {
@@ -372,7 +371,6 @@ where
                     data: msg,
                 },
             ));
-
         }
 
         // Emit outbound requests.
