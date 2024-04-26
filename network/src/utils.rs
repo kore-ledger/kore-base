@@ -110,7 +110,8 @@ pub fn is_reachable(addr: &Multiaddr) -> bool {
     ip.is_global()
 }
 
-pub fn is_memory(addr: &Multiaddr) -> bool {
+/// Chech if the given `Multiaddr` is a memory address.
+pub fn _is_memory(addr: &Multiaddr) -> bool {
     if let Some(Protocol::Memory(_)) = addr.iter().next() {
         return true;
     }
@@ -130,7 +131,7 @@ pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
 /// If `b_subset` is `true`, then `b` is a subset of `a`.
 /// Otherwise, `a` and `b` are equal.
 ///
-pub fn compare_arrays<T>(a: &[T], b: &[T], b_subset: bool) -> bool
+pub fn _compare_arrays<T>(a: &[T], b: &[T], b_subset: bool) -> bool
 where
     T: Eq + Hash,
 {
@@ -164,10 +165,10 @@ mod tests {
         let c = vec![1, 2, 3, 4];
         let d = vec![1, 2];
         let e = vec![1, 2, 3, 4, 5];
-        assert!(compare_arrays(&a, &b, false));
-        assert!(!compare_arrays(&a, &c, false));
-        assert!(compare_arrays(&a, &d, true));
-        assert!(!compare_arrays(&a, &e, true));
-        assert!(compare_arrays(&e, &a, true));
+        assert!(_compare_arrays(&a, &b, false));
+        assert!(!_compare_arrays(&a, &c, false));
+        assert!(_compare_arrays(&a, &d, true));
+        assert!(!_compare_arrays(&a, &e, true));
+        assert!(_compare_arrays(&e, &a, true));
     }
 }

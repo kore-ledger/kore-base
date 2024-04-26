@@ -9,6 +9,7 @@ use crate::{Command, Error};
 use tokio::sync::mpsc::Sender;
 
 /// The network service.
+#[derive(Debug, Clone)]
 pub struct NetworkService {
     /// The command sender to communicate with the worker.
     command_sender: Sender<Command>,

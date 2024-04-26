@@ -9,10 +9,9 @@ use libp2p::{
     core::Endpoint,
     futures::FutureExt,
     kad::{
-        store::{MemoryStore, RecordStore},
-        Behaviour as Kademlia, Config as KademliaConfig, Event as KademliaEvent,
-        GetClosestPeersError, GetRecordOk, QueryId, QueryResult, Quorum, Record, RecordKey,
-        K_VALUE,
+        store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig,
+        Event as KademliaEvent, GetClosestPeersError, GetRecordOk, QueryId, QueryResult, Quorum,
+        Record, RecordKey, K_VALUE,
     },
     mdns::{self, tokio::Behaviour as MdnsTokio, Config as MdnsConfig},
     multiaddr::Protocol,
@@ -27,7 +26,7 @@ use libp2p::{
     Multiaddr, PeerId, StreamProtocol,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace, warn, error};
+use tracing::{debug, error, info, trace, warn};
 
 use std::{
     cmp,
@@ -134,9 +133,9 @@ impl Behaviour {
             let mut kad = Kademlia::with_config(peer_id, store, kad_config);
 
             // Add boot nodes to the Kademlia routing table.
-            /*for (peer_id, addr) in &boot_nodes {
+            for (peer_id, addr) in &boot_nodes {
                 kad.add_address(peer_id, addr.clone());
-            }*/
+            }
 
             Some(kad)
         } else {
@@ -186,7 +185,7 @@ impl Behaviour {
     pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
         self.public_nodes.contains_key(peer_id) || self.known_peers().contains(peer_id)
     }
-    
+
     /// Sets the DHT random walk delay.
     #[cfg(test)]
     pub fn set_random_walk(&mut self, delay: Duration) {
@@ -199,7 +198,7 @@ impl Behaviour {
         self.relay_nodes.get(peer_id)
     }
 
-        /// Returns the list of known external addresses of a peer.
+    /// Returns the list of known external addresses of a peer.
     /// If the peer is not known, returns an empty list.
     ///
     #[cfg(test)]
@@ -210,7 +209,7 @@ impl Behaviour {
         }
         addrs
     }
-        
+
     /// Bootstrap nodes to connect to.
     pub fn bootstrap(&mut self) {
         if let Some(kad) = self.kademlia.as_mut() {
@@ -221,14 +220,14 @@ impl Behaviour {
     }
 
     /// Returns the list of known external addresses of our node.
-    pub fn protocol_names(&self) -> Vec<StreamProtocol> {
+    pub fn _protocol_names(&self) -> Vec<StreamProtocol> {
         if let Some(k) = self.kademlia.as_ref() {
             k.protocol_names().to_vec()
         } else {
             Vec::new()
         }
     }
-    
+
     /// Returns the list of nodes that we know exist in the network.
     pub fn known_peers(&mut self) -> HashSet<PeerId> {
         let mut peers = HashSet::new();
@@ -315,68 +314,68 @@ impl Behaviour {
             k.get_closest_peers(peer_id.clone());
         }
     }
-
-    /// Start fetching a record from the DHT.
-    ///
-    /// A corresponding `ValueFound` or `ValueNotFound` event will later be generated.
-    pub fn get_value(&mut self, key: RecordKey) {
-        if let Some(k) = self.kademlia.as_mut() {
-            k.get_record(key.clone());
-        }
-    }
-
-    /// Start putting a record into the DHT. Other nodes can later fetch that value with
-    /// `get_value`.
-    ///
-    /// A corresponding `ValuePut` or `ValuePutFailed` event will later be generated.
-    pub fn put_value(&mut self, key: RecordKey, value: Vec<u8>) {
-        if let Some(k) = self.kademlia.as_mut() {
-            if let Err(e) = k.put_record(Record::new(key.clone(), value.clone()), Quorum::All) {
-                warn!(target: TARGET_ROUTING, "Kademlia => Failed to put record: {:?}", e);
-                self.pending_events
-                    .push_back(Event::ValuePutFailed(key.clone(), Duration::from_secs(0)));
+    /*
+        /// Start fetching a record from the DHT.
+        ///
+        /// A corresponding `ValueFound` or `ValueNotFound` event will later be generated.
+        pub fn get_value(&mut self, key: RecordKey) {
+            if let Some(k) = self.kademlia.as_mut() {
+                k.get_record(key.clone());
             }
         }
-    }
 
-    /// Returns the number of nodes in each Kademlia kbucket for each Kademlia instance.
-    ///
-    /// Identifies Kademlia instances by their [`ProtocolId`] and kbuckets by the base 2 logarithm
-    /// of their lower bound.
-    pub fn num_entries_per_kbucket(&mut self) -> Option<Vec<(u32, usize)>> {
-        self.kademlia.as_mut().map(|kad| {
-            kad.kbuckets()
-                .map(|bucket| (bucket.range().0.ilog2().unwrap_or(0), bucket.iter().count()))
-                .collect()
-        })
-    }
+        /// Start putting a record into the DHT. Other nodes can later fetch that value with
+        /// `get_value`.
+        ///
+        /// A corresponding `ValuePut` or `ValuePutFailed` event will later be generated.
+        pub fn put_value(&mut self, key: RecordKey, value: Vec<u8>) {
+            if let Some(k) = self.kademlia.as_mut() {
+                if let Err(e) = k.put_record(Record::new(key.clone(), value.clone()), Quorum::All) {
+                    warn!(target: TARGET_ROUTING, "Kademlia => Failed to put record: {:?}", e);
+                    self.pending_events
+                        .push_back(Event::ValuePutFailed(key.clone(), Duration::from_secs(0)));
+                }
+            }
+        }
 
-    /// Returns the number of records in the Kademlia record stores.
-    pub fn num_kademlia_records(&mut self) -> Option<usize> {
-        // Note that this code is ok only because we use a `MemoryStore`.
-        self.kademlia
-            .as_mut()
-            .map(|kad| kad.store_mut().records().count())
-    }
+        /// Returns the number of nodes in each Kademlia kbucket for each Kademlia instance.
+        ///
+        /// Identifies Kademlia instances by their [`ProtocolId`] and kbuckets by the base 2 logarithm
+        /// of their lower bound.
+        pub fn num_entries_per_kbucket(&mut self) -> Option<Vec<(u32, usize)>> {
+            self.kademlia.as_mut().map(|kad| {
+                kad.kbuckets()
+                    .map(|bucket| (bucket.range().0.ilog2().unwrap_or(0), bucket.iter().count()))
+                    .collect()
+            })
+        }
 
-    /// Returns the total size in bytes of all the records in the Kademlia record stores.
-    pub fn kademlia_records_total_size(&mut self) -> Option<usize> {
-        // Note that this code is ok only because we use a `MemoryStore`. If the records were
-        // for example stored on disk, this would load every single one of them every single time.
-        self.kademlia.as_mut().map(|kad| {
-            kad.store_mut()
-                .records()
-                .fold(0, |tot, rec| tot + rec.value.len())
-        })
-    }
+        /// Returns the number of records in the Kademlia record stores.
+        pub fn num_kademlia_records(&mut self) -> Option<usize> {
+            // Note that this code is ok only because we use a `MemoryStore`.
+            self.kademlia
+                .as_mut()
+                .map(|kad| kad.store_mut().records().count())
+        }
 
+        /// Returns the total size in bytes of all the records in the Kademlia record stores.
+        pub fn kademlia_records_total_size(&mut self) -> Option<usize> {
+            // Note that this code is ok only because we use a `MemoryStore`. If the records were
+            // for example stored on disk, this would load every single one of them every single time.
+            self.kademlia.as_mut().map(|kad| {
+                kad.store_mut()
+                    .records()
+                    .fold(0, |tot, rec| tot + rec.value.len())
+            })
+        }
+    */
     /// Can the given `Multiaddr` be put into the DHT?
     ///
     /// This test is successful only for global IP addresses and DNS names.
     // NB: Currently all DNS names are allowed and no check for TLD suffixes is done
     // because the set of valid domains is highly dynamic and would require frequent
     // updates, for example by utilising publicsuffix.org or IANA.
-    fn can_add_to_dht(addr: &Multiaddr) -> bool {
+    fn _can_add_to_dht(addr: &Multiaddr) -> bool {
         let ip = match addr.iter().next() {
             Some(Protocol::Ip4(ip)) => IpNetwork::from(ip),
             Some(Protocol::Ip6(ip)) => IpNetwork::from(ip),
@@ -612,9 +611,9 @@ impl NetworkBehaviour for Behaviour {
         while let Poll::Ready(ev) = self.kademlia.poll(cx) {
             match ev {
                 ToSwarm::GenerateEvent(ev) => match ev {
-                    KademliaEvent::RoutingUpdated { peer, .. } => {
-                        let ev = Event::Discovered(peer);
-                        return Poll::Ready(ToSwarm::GenerateEvent(ev));
+                    KademliaEvent::RoutingUpdated { .. } => {
+                        //let ev = Event::Discovered(peer);
+                        //return Poll::Ready(ToSwarm::GenerateEvent(ev));
                     }
                     KademliaEvent::UnroutablePeer { peer, .. } => {
                         let ev = Event::UnroutablePeer(peer);
@@ -653,19 +652,18 @@ impl NetworkBehaviour for Behaviour {
                                     target: TARGET_ROUTING,
                                     "Kademlia => Random Kademlia query has yielded empty results",
                                 );
+                            }
+                            if let Ok(peer) = PeerId::from_bytes(&ok.key) {
+                                self.active_queries.remove(&peer);
+                                return Poll::Ready(ToSwarm::GenerateEvent(
+                                    Event::ClosestPeers(peer, ok.peers),
+                                ));
                             } else {
-                                if let Ok(peer) = PeerId::from_bytes(&ok.key) {
-                                    self.active_queries.remove(&peer);
-                                    return Poll::Ready(ToSwarm::GenerateEvent(
-                                        Event::ClosestPeers(peer, ok.peers),
-                                    ));
-                                } else {
-                                    error!(
-                                        target: TARGET_ROUTING,
-                                        "Kademlia => Failed to parse peer id from key: {:?}",
-                                        hex::encode(&ok.key),
-                                    );
-                                }
+                                error!(
+                                    target: TARGET_ROUTING,
+                                    "Kademlia => Failed to parse peer id from key: {:?}",
+                                    hex::encode(&ok.key),
+                                );
                             }
                         }
                     },

@@ -136,6 +136,7 @@ impl Behaviour {
     /// Returns `None` if we don't know anything about this node. Always returns `Some` for nodes
     /// we're connected to, meaning that if `None` is returned then we're not connected to that
     /// node.
+    #[allow(dead_code)]
     pub fn node(&self, peer_id: &PeerId) -> Option<Node> {
         self.nodes_info.get(peer_id).map(Node)
     }
@@ -158,7 +159,6 @@ impl Behaviour {
         trace!(target: TARGET_NODE, "Identified {:?} => {:?}", peer_id, info);
         if let Some(entry) = self.nodes_info.get_mut(peer_id) {
             entry.reachable = info.listen_addrs.iter().any(crate::utils::is_reachable);
-
             entry.client_version = Some(info.agent_version.clone());
         } else {
             error!(target: TARGET_NODE,
@@ -168,8 +168,10 @@ impl Behaviour {
 }
 
 /// Gives access to the information about a node.
+#[allow(dead_code)]
 pub struct Node<'a>(&'a NodeInfo);
 
+#[allow(dead_code)]
 impl<'a> Node<'a> {
     /// Returns the endpoint of an established connection to the peer.
     ///
