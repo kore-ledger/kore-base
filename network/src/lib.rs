@@ -16,6 +16,7 @@ mod utils;
 mod worker;
 
 pub use error::Error;
+//use libp2p::StreamProtocol;
 pub use routing::Config as RoutingConfig;
 pub use service::NetworkService;
 pub use worker::NetworkWorker;
@@ -35,9 +36,9 @@ const MAX_CONNECTIONS_PER_PEER: usize = 2;
 //const MAX_CONNECTIONS_ESTABLISHED_INCOMING: u32 = 10_000;
 
 /// Required protocols for the network.
-/*const REQUIRED_PROTOCOLS: [StreamProtocol; 6] = [
+/*const REQUIRED_PROTOCOLS: [StreamProtocol; 5] = [
     StreamProtocol::new("/kore/routing/1.0.0"),
-    StreamProtocol::new("/kore/tell/1.0.0"),
+    //StreamProtocol::new("/kore/tell/1.0.0"),
     StreamProtocol::new("/libp2p/circuit/relay/0.2.0/stop"),
     StreamProtocol::new("/ipfs/id/1.0.0"),
     StreamProtocol::new("/ipfs/id/push/1.0.0"),

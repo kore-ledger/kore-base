@@ -112,6 +112,7 @@ impl Behaviour {
             let mut kad_config = KademliaConfig::default();
 
             // Set the supported protocols.
+            //kad_config.set_protocol_names(crate::REQUIRED_PROTOCOLS.to_vec());
             kad_config.set_protocol_names(
                 protocol_names
                     .into_iter()
@@ -287,7 +288,9 @@ impl Behaviour {
                 );
                 return;
             }
-
+            println!("Supported protocols: {:?}", supported_protocols);
+            println!("Kademlia protocols: {:?}", kademlia.protocol_names());
+            //kademlia.add_address(peer_id, addr.clone());
             if let Some(matching_protocol) = supported_protocols
                 .iter()
                 .find(|p| kademlia.protocol_names().iter().any(|k| &k == p))
@@ -297,6 +300,8 @@ impl Behaviour {
                     "Adding self-reported address {} from {} to Kademlia DHT {}.",
                     addr, peer_id, matching_protocol,
                 );
+                println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
+                    addr, peer_id, matching_protocol);
                 kademlia.add_address(peer_id, addr.clone());
             } else {
                 trace!(
@@ -304,16 +309,20 @@ impl Behaviour {
                     "Ignoring self-reported address {} from {} as remote node is not part of the \
                      Kademlia DHT supported by the local node.", addr, peer_id,
                 );
+                println!("Ignoring self-reported address {} from {} as remote node is not part of the \
+                    Kademlia DHT supported by the local node.", addr, peer_id,);
             }
         }
     }
 
     /// Discover closet peers to the given `PeerId`.
     pub fn discover(&mut self, peer_id: &PeerId) {
-        if let Some(k) = self.kademlia.as_mut() {
-            k.get_closest_peers(peer_id.clone());
+        if !self.active_queries.contains(peer_id) {
+            if let Some(k) = self.kademlia.as_mut() {
+                k.get_closest_peers(peer_id.clone());
+            }    
         }
-    }
+   }
     /*
         /// Start fetching a record from the DHT.
         ///
@@ -1091,7 +1100,7 @@ mod tests {
             .with_allow_private_ip(true)
             .with_discovery_limit(50)
             .with_dht_random_walk(true)
-            .set_protocol("/kore/1.0.0");
+            .set_protocol("/kad/tell/1.0.0");
 
         let (boot_swarm, addr) = build_node(config);
 
@@ -1148,7 +1157,7 @@ mod tests {
                                                 .behaviour_mut()
                                                 .add_self_reported_address(
                                                     &other,
-                                                    &[StreamProtocol::new("/kore/1.0.0")],
+                                                    &[StreamProtocol::new("/kore/routing/1.0.0")],
                                                     addr,
                                                 );
 

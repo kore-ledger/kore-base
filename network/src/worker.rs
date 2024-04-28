@@ -117,7 +117,7 @@ impl NetworkWorker {
         let external_addresses = convert_external_addresses(&config.listen_addresses)?;
 
         // Is Ephemeral?
-        let ephemeral_node = config.node_type == NodeType::Ephemeral;
+        let ephemeral_node = config.node_type.clone() == NodeType::Ephemeral;
 
         // Build transport.
         let (transport, relay_client) = build_transport(registry, local_peer_id, &key)?;
@@ -126,17 +126,27 @@ impl NetworkWorker {
         let shared_external_addresses = Arc::new(Mutex::new(external_addresses.clone()));
 
         // Create the swarm.
-        let swarm = Swarm::new(
+        let mut swarm = Swarm::new(
             transport,
             Behaviour::new(
                 &key.public(),
-                config,
+                config.clone(),
                 shared_external_addresses.clone(),
                 relay_client,
             ),
             local_peer_id,
             swarm::Config::with_tokio_executor(),
         );
+
+        // Add confirmed external addresses.
+        match config.node_type {
+            NodeType::Bootstrap | NodeType::Addressable => {
+                for addr in external_addresses.iter() {
+                    swarm.add_external_address(addr.clone());
+                }
+            }
+            _ => {}
+        }
 
         // Register metrics
         let messages_metric = Family::default();
@@ -581,6 +591,7 @@ mod tests {
             token.clone(),
             &addressable_addr,
         );
+        let addressable_service = addressable.service();
         let addressable_peer_id = addressable.local_peer_id();
         println!("Addressable node: {:?}", addressable_peer_id);
 
@@ -599,22 +610,25 @@ mod tests {
             addressable.run().await;
         });
 
-        // Send a message from the ephemeral node to the addressable node
-        let mut service = ephemeral_service.write().unwrap();
-        service
-            .send_command(Command::SendMessage {
-                peer: addressable_peer_id.to_bytes(),
-                message: b"Hello Addresable".to_vec(),
-            })
-            .await
-            .unwrap();
-        
+        let mut ephemeral_service = ephemeral_service.write().unwrap();        
+        let mut addressable_service = addressable_service.write().unwrap();
+
+        let mut ephemeral_identified = false;
+        let mut addressable_identified = false;
+
         // loop to receive events
         loop {
             tokio::select! {
                 event = boot_receiver.recv() => {
                     if let Some(event) = event {
                         match event {
+                            NetworkEvent::PeerIdentified { peer, .. } => {
+                                if peer == ephemeral_peer_id.to_string() {
+                                    ephemeral_identified = true;
+                                } else if peer == addressable_peer_id.to_string() {
+                                    addressable_identified = true;
+                                }
+                            }
                             NetworkEvent::MessageReceived { peer, message } => {
                                 println!("Message from peer {} received: {:?}", peer , message);
                                 break;
@@ -624,8 +638,23 @@ mod tests {
                     }
                 }
                 event = ephemeral_receiver.recv() => {
+                    if ephemeral_identified && addressable_identified {
+                        println!("Ephemeral and addressable nodes identified");
+                        ephemeral_service
+                            .send_command(Command::SendMessage {
+                                peer: addressable_peer_id.to_bytes(),
+                                message: b"Hello Addresable".to_vec(),
+                            })
+                            .await
+                            .unwrap();
+                        //break;
+                    }
                     if let Some(event) = event {
                         match event {
+                            NetworkEvent::PeerIdentified { peer, addresses } => {
+                                println!("Peer: {} identified with addresses: {:?}", peer, addresses);
+                                
+                            }
                             NetworkEvent::PeersFounded { key, peers } => {
                                 println!("Peers founded for key {}: {:?}", key, peers);
                                 break;
@@ -642,7 +671,7 @@ mod tests {
                     if let Some(event) = event {
                         match event {
                             NetworkEvent::PeerIdentified { peer, addresses } => {
-                                println!("Peer {} identified with addresses {:?}", peer, addresses);
+                                println!("Peer: {} identified with addresses: {:?}", peer, addresses);
                             }
                             NetworkEvent::MessageReceived { peer, message } => {
                                 println!("Message from peer {} received: {:?}", peer , message);
@@ -696,7 +725,7 @@ mod tests {
         };
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
-            .with_allow_private_ip(private_addr)
+            .with_allow_private_ip(true)
             .with_discovery_limit(50)
             .with_dht_random_walk(random_walk);
 
