@@ -8,7 +8,7 @@ use crate::{
     behaviour::{Behaviour, Event as BehaviourEvent},
     service::NetworkService,
     transport::build_transport,
-    utils::{convert_external_addresses, is_relay_circuit},
+    utils::{convert_external_addresses, is_relay_circuit, relay_address},
     Command, Config, Error, Event as NetworkEvent, NodeType,
 };
 
@@ -21,7 +21,7 @@ use libp2p::{
     multiaddr::Protocol,
     relay::client::Event as RelayClientEvent,
     swarm::{self, SwarmEvent},
-    Multiaddr, PeerId, Swarm, 
+    Multiaddr, PeerId, Swarm,
 };
 
 use futures::StreamExt;
@@ -49,9 +49,6 @@ const TARGET_WORKER: &str = "KoreNetwork-Worker";
 pub struct NetworkWorker {
     /// Local Peer ID.
     local_peer_id: PeerId,
-
-    /// Node type.
-    node_type: NodeType,
 
     /// Network service.
     service: Arc<RwLock<NetworkService>>,
@@ -99,8 +96,6 @@ impl NetworkWorker {
     ) -> Result<Self, Error> {
         // Create channels to communicate events and commands
         let (command_sender, command_receiver) = mpsc::channel(10000);
-
-        let node_type = config.node_type.clone();
 
         // Prepare the network crypto key.
         let key = {
@@ -156,7 +151,6 @@ impl NetworkWorker {
 
         Ok(Self {
             local_peer_id,
-            node_type,
             service,
             listen_addresses: external_addresses,
             swarm,
@@ -180,6 +174,10 @@ impl NetworkWorker {
     ///
     ///
     async fn send_message(&mut self, peer: PeerId, message: Vec<u8>) {
+        // If the node is ephemeral?
+        if self.ephemeral_node {
+
+        }
         // If the peer is known, send the message.
         if self.swarm.behaviour_mut().is_known_peer(&peer) {
             self.swarm.behaviour_mut().send_message(&peer, message);
@@ -199,10 +197,12 @@ impl NetworkWorker {
                 return;
             }
         };
+        //println!("Relay: {} - {:?}", relay_peer, relay_addr);
         let listen_addr = relay_addr
             .with(Protocol::P2p(relay_peer))
-            .with(Protocol::P2pCircuit)
-            .with(Protocol::P2p(*self.swarm.local_peer_id()));
+            .with(Protocol::P2pCircuit);
+        //.with(Protocol::P2p(*self.swarm.local_peer_id()));
+        //println!("Relay: {} - {:?}", relay_peer, listen_addr);
         if self.swarm.listen_on(listen_addr.clone()).is_err() {
             error!(
                 TARGET_WORKER,
@@ -324,51 +324,41 @@ impl NetworkWorker {
                 info!(TARGET_WORKER, "Listening on {:?}", address);
             }
             SwarmEvent::ConnectionEstablished {
-                peer_id,
-                endpoint,
-                ..
-            } => {
-                match endpoint {
-                    ConnectedPoint::Dialer { address, ..} => {
-                        info!(
-                            TARGET_WORKER,
-                            "Connection established to peer {} with address {}.", peer_id, address
-                        );
-                        let result = self
-                            .event_sender
-                            .send(NetworkEvent::OutboundConnection {
-                                peer: peer_id.to_string(),
-                                address: address.to_string(),
+                peer_id, endpoint, ..
+            } => match endpoint {
+                ConnectedPoint::Dialer { address, .. } => {
+                    info!(
+                        TARGET_WORKER,
+                        "Connection established to peer {} with address {}.", peer_id, address
+                    );
+                    let result = self
+                        .event_sender
+                        .send(NetworkEvent::OutboundConnection {
+                            peer: peer_id.to_string(),
+                            address: address.to_string(),
                         })
-                            .await;
-                        if result.is_err() {
-                            error!(
-                                TARGET_WORKER,
-                                "Error sending `OutboundConnection` event"
-                            );
-                        } 
-                    }
-                    ConnectedPoint::Listener { send_back_addr, .. } => {
-                        info!(
-                            TARGET_WORKER,
-                            "Connection established from address {}.", send_back_addr, 
-                        );
-                        let result = self
-                            .event_sender
-                            .send(NetworkEvent::InboundConnection {
-                                peer: peer_id.to_string(),
-                                address: send_back_addr.to_string()
-                            })
-                            .await;
-                        if result.is_err() {
-                            error!(
-                                TARGET_WORKER,
-                                "Error sending `OutboundConnection` event"
-                            );
-                        } 
+                        .await;
+                    if result.is_err() {
+                        error!(TARGET_WORKER, "Error sending `OutboundConnection` event");
                     }
                 }
-            }
+                ConnectedPoint::Listener { send_back_addr, .. } => {
+                    info!(
+                        TARGET_WORKER,
+                        "Connection established from address {}.", send_back_addr,
+                    );
+                    let result = self
+                        .event_sender
+                        .send(NetworkEvent::InboundConnection {
+                            peer: peer_id.to_string(),
+                            address: send_back_addr.to_string(),
+                        })
+                        .await;
+                    if result.is_err() {
+                        error!(TARGET_WORKER, "Error sending `OutboundConnection` event");
+                    }
+                }
+            },
             SwarmEvent::Behaviour(BehaviourEvent::PeersFounded(key, peers)) => {
                 info!(TARGET_WORKER, "Peers founded {:?}", peers);
                 let result = self
@@ -379,26 +369,25 @@ impl NetworkWorker {
                     })
                     .await;
                 if result.is_err() {
-                    error!(
-                        TARGET_WORKER,
-                        "Error sending `PeersFounded` event"
-                    );
+                    error!(TARGET_WORKER, "Error sending `PeersFounded` event");
                 }
             }
             SwarmEvent::Behaviour(BehaviourEvent::Identified { peer_id, info }) => {
                 // Send identified peer event.
-                let addresses = info.listen_addrs.iter().map(|addr| addr.to_string()).collect();
+                let addresses = info
+                    .listen_addrs
+                    .iter()
+                    .map(|addr| addr.to_string())
+                    .collect();
                 let result = self
                     .event_sender
                     .send(NetworkEvent::PeerIdentified {
                         peer: peer_id.to_string(),
                         addresses,
-                    }).await;
+                    })
+                    .await;
                 if result.is_err() {
-                    error!(
-                        TARGET_WORKER,
-                        "Error sending `PeerIdentified` event"
-                    );
+                    error!(TARGET_WORKER, "Error sending `PeerIdentified` event");
                 }
 
                 // Add identified  peer to the behaviour.
@@ -418,11 +407,12 @@ impl NetworkWorker {
                 }
 
                 // If identified peer has relay address, dial it.
-                if let Some(relay_addr) = info
-                    .listen_addrs
-                    .iter()
-                    .find(|addr| is_relay_circuit(*addr))
+                if let Some(relay_addr) =
+                    relay_address(self.local_peer_id(), info.listen_addrs.clone())
                 {
+                    info!(TARGET_WORKER, "Dialing relay node {}", relay_addr);
+                    println!("Dialing relay node {}", relay_addr);
+
                     if self.swarm.dial(relay_addr.clone()).is_err() {
                         error!(
                             TARGET_WORKER,
@@ -482,6 +472,18 @@ impl NetworkWorker {
                         peer_id: peer_id.to_string(),
                     })
                     .inc();
+                let result = self
+                    .event_sender
+                    .send(NetworkEvent::MessageSent {
+                        peer: peer_id.to_string(),
+                    })
+                    .await;
+                if result.is_err() {
+                    error!(
+                        TARGET_WORKER,
+                        "Error with message sent event to {}", peer_id
+                    );
+                }
 
                 if self.ephemeral_node {
                     // Request circuit reservation from boot nodes
@@ -518,6 +520,13 @@ impl NetworkWorker {
                     }
                 }
             }
+            SwarmEvent::Behaviour(other) => {
+                trace!(TARGET_WORKER, "Behaviour event {:?}", other);
+                let _ = self
+                    .event_sender
+                    .send(NetworkEvent::BehaviourEvent { event: other })
+                    .await;
+            }
             _ => {}
         }
     }
@@ -545,6 +554,8 @@ enum Fact {
 mod tests {
 
     use super::*;
+
+    use crate::behaviour::Event;
 
     use identity::keys::KeyPair;
 
@@ -610,60 +621,110 @@ mod tests {
             addressable.run().await;
         });
 
-        let mut ephemeral_service = ephemeral_service.write().unwrap();        
+        let mut ephemeral_service = ephemeral_service.write().unwrap();
         let mut addressable_service = addressable_service.write().unwrap();
 
         let mut ephemeral_identified = false;
         let mut addressable_identified = false;
+        let mut sent = false;
+        let mut reserved = false;
+        let mut count = 0;
 
         // loop to receive events
         loop {
+            if count >= 1 {
+                count += 1;
+            }
+            if count > 3 {
+                break;
+            }
+            if ephemeral_identified && addressable_identified && !sent {
+                ephemeral_service
+                    .send_command(Command::SendMessage {
+                        peer: addressable_peer_id.to_bytes().to_vec(),
+                        message: b"Hello Addressable".to_vec(),
+                    })
+                    .await
+                    .unwrap();
+                sent = true;
+            }
             tokio::select! {
                 event = boot_receiver.recv() => {
                     if let Some(event) = event {
                         match event {
-                            NetworkEvent::PeerIdentified { peer, .. } => {
+                            NetworkEvent::PeerIdentified { peer, addresses } => {
+                                //println!("Boot peer identified: {} - {:?}", peer, addresses);
                                 if peer == ephemeral_peer_id.to_string() {
                                     ephemeral_identified = true;
                                 } else if peer == addressable_peer_id.to_string() {
                                     addressable_identified = true;
                                 }
                             }
-                            NetworkEvent::MessageReceived { peer, message } => {
-                                println!("Message from peer {} received: {:?}", peer , message);
-                                break;
+                            NetworkEvent::BehaviourEvent { event } => {
+                                match event {
+                                    Event::Discovered(_) => {}
+                                    Event::RelayServer(e) => {
+                                        //println!("Relay server event {:?}", e);
+                                        count  = 1;
+                                        reserved = true;
+                                        //break;
+                                    }
+                                    e => {
+                                        //println!("Boot behaviour: {:?}", e);
+                                        if reserved {
+                                            break;
+                                        }
+                                    }
+                                }
+                                //println!("Behaviour event: {:?}", event);
+
                             }
-                            _ => {}
+                            e => {
+                                //println!("Boot event: {:?}", e);
+                                if reserved {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
                 event = ephemeral_receiver.recv() => {
-                    if ephemeral_identified && addressable_identified {
-                        println!("Ephemeral and addressable nodes identified");
-                        ephemeral_service
-                            .send_command(Command::SendMessage {
-                                peer: addressable_peer_id.to_bytes(),
-                                message: b"Hello Addresable".to_vec(),
-                            })
-                            .await
-                            .unwrap();
-                        //break;
-                    }
+
                     if let Some(event) = event {
                         match event {
                             NetworkEvent::PeerIdentified { peer, addresses } => {
-                                println!("Peer: {} identified with addresses: {:?}", peer, addresses);
-                                
+                                //println!("Ephemeral peer identified: {} - {:?}", peer, addresses);
                             }
-                            NetworkEvent::PeersFounded { key, peers } => {
-                                println!("Peers founded for key {}: {:?}", key, peers);
-                                break;
-                            }   
+                            NetworkEvent::MessageSent { peer } => {
+                                assert_eq!(peer, addressable_peer_id.to_string());
+                            }
                             NetworkEvent::MessageReceived { peer, message } => {
-                                println!("Message from peer {} received: {:?}", peer , message);
+                                //println!("Message from peer {} received: {:?}", peer , message);
                                 break;
                             }
-                            _ => {}
+                            NetworkEvent::BehaviourEvent { event } => {
+                                match event {
+                                    Event::Discovered(_) => {}
+                                    Event::RelayClient(e) => {
+                                        println!("Relay client event {:?}", e);
+                                        break;
+                                    }
+                                    e => {
+                                        //println!("Ephemeral behaviour: {:?}", e);
+                                        if reserved {
+                                            break;
+                                        }
+                                    }
+                                }
+                                //println!("Behaviour event: {:?}", event);
+
+                            }
+                            e => {
+                                //println!("Ephemeral event: {:?}", e);
+                                if reserved {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -671,13 +732,29 @@ mod tests {
                     if let Some(event) = event {
                         match event {
                             NetworkEvent::PeerIdentified { peer, addresses } => {
-                                println!("Peer: {} identified with addresses: {:?}", peer, addresses);
+                                // dprintln!("Addressable peer identified: {} - {:?}", peer, addresses);
                             }
                             NetworkEvent::MessageReceived { peer, message } => {
-                                println!("Message from peer {} received: {:?}", peer , message);
-                                break;
+                                assert_eq!(peer, ephemeral_peer_id.to_string());
+                                assert_eq!(message, b"Hello Addressable".to_vec());
                             }
-                            _ => {}
+                            NetworkEvent::BehaviourEvent { event } => {
+                                match event {
+                                    Event::Discovered(_) => {}
+                                    e => {
+                                        //println!("Addressable behaviour: {:?}", e);
+                                        if reserved {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            e => {
+                                //println!("Addressable event: {:?}", e);
+                                if reserved {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -698,12 +775,11 @@ mod tests {
         token: CancellationToken,
         tcp_addr: &str,
     ) -> (NetworkWorker, Receiver<NetworkEvent>) {
-        let listen_addr = format!("/memory/{}", rand::random::<u64>());
         let config = create_config(
             boot_nodes,
             random_walk,
             node_type,
-            vec![listen_addr, tcp_addr.to_owned()],
+            vec![tcp_addr.to_owned()],
         );
         let keys = KeyPair::default();
         let mut registry = Registry::default();

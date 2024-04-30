@@ -86,24 +86,35 @@ pub enum Command {
 }
 
 /// Event enumeration for the network service.
+#[derive(Debug)]
 pub enum Event {
-
     /// Inbound connection established.
-    InboundConnection{ peer: String, address: String},
+    InboundConnection { peer: String, address: String },
 
     /// Outbound connection established.
     OutboundConnection { peer: String, address: String },
 
     /// A message was received.
-    MessageReceived {peer: String, message: Vec<u8>},
+    MessageReceived { peer: String, message: Vec<u8> },
+
+    /// A message was sent.
+    MessageSent { peer: String },
 
     /// A peer was disconnected.
     PeerDisconnected { peer: Vec<u8> },
 
     /// A peer was identified.
-    PeerIdentified { peer: String, addresses: Vec<String> },
+    PeerIdentified {
+        peer: String,
+        addresses: Vec<String>,
+    },
 
     /// Peers founded.
     PeersFounded { key: String, peers: Vec<String> },
 
+    /// Behaviour event.
+    BehaviourEvent { event: behaviour::Event },
+
+    /// Relay address.
+    RelayAddress { address: String },
 }

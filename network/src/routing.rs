@@ -244,6 +244,20 @@ impl Behaviour {
         peers
     }
 
+    /// Get known peer address.
+    pub fn known_peer_addresses(&mut self, peer_id: &PeerId) -> Option<Vec<Multiaddr>> {
+        if let Some(k) = self.kademlia.as_mut() {
+            for b in k.kbuckets() {
+                for e in b.iter() {
+                    if e.node.key.preimage() == peer_id {
+                        return Some(e.node.value.iter().map(|a| a.clone()).collect());
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Adds a hard-coded address for the given peer, that never expires.
     ///
     /// If we didn't know this address before, also generates a `Discovered` event.
@@ -288,8 +302,8 @@ impl Behaviour {
                 );
                 return;
             }
-            println!("Supported protocols: {:?}", supported_protocols);
-            println!("Kademlia protocols: {:?}", kademlia.protocol_names());
+            //println!("Supported protocols: {:?}", supported_protocols);
+            //println!("Kademlia protocols: {:?}", kademlia.protocol_names());
             //kademlia.add_address(peer_id, addr.clone());
             if let Some(matching_protocol) = supported_protocols
                 .iter()
@@ -300,8 +314,8 @@ impl Behaviour {
                     "Adding self-reported address {} from {} to Kademlia DHT {}.",
                     addr, peer_id, matching_protocol,
                 );
-                println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
-                    addr, peer_id, matching_protocol);
+                //println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
+                //addr, peer_id, matching_protocol);
                 kademlia.add_address(peer_id, addr.clone());
             } else {
                 trace!(
@@ -309,8 +323,8 @@ impl Behaviour {
                     "Ignoring self-reported address {} from {} as remote node is not part of the \
                      Kademlia DHT supported by the local node.", addr, peer_id,
                 );
-                println!("Ignoring self-reported address {} from {} as remote node is not part of the \
-                    Kademlia DHT supported by the local node.", addr, peer_id,);
+                //println!("Ignoring self-reported address {} from {} as remote node is not part of the \
+                //Kademlia DHT supported by the local node.", addr, peer_id,);
             }
         }
     }
@@ -320,9 +334,9 @@ impl Behaviour {
         if !self.active_queries.contains(peer_id) {
             if let Some(k) = self.kademlia.as_mut() {
                 k.get_closest_peers(peer_id.clone());
-            }    
+            }
         }
-   }
+    }
     /*
         /// Start fetching a record from the DHT.
         ///
@@ -664,9 +678,9 @@ impl NetworkBehaviour for Behaviour {
                             }
                             if let Ok(peer) = PeerId::from_bytes(&ok.key) {
                                 self.active_queries.remove(&peer);
-                                return Poll::Ready(ToSwarm::GenerateEvent(
-                                    Event::ClosestPeers(peer, ok.peers),
-                                ));
+                                return Poll::Ready(ToSwarm::GenerateEvent(Event::ClosestPeers(
+                                    peer, ok.peers,
+                                )));
                             } else {
                                 error!(
                                     target: TARGET_ROUTING,

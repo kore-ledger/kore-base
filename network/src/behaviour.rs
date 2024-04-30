@@ -7,7 +7,7 @@
 use crate::{
     node,
     routing::{self, DhtValue},
-    utils::is_relay_circuit,
+    utils::{is_memory, is_relay_circuit},
     Config, NodeType,
 };
 
@@ -72,9 +72,9 @@ impl Behaviour {
 
         let (dcutr, relay_server) = match config.node_type {
             NodeType::Bootstrap { .. } => {
-                //let dcutr = dcutr::Behaviour::new(peer_id);
+                let dcutr = dcutr::Behaviour::new(peer_id);
                 let relay_server = RelayServer::new(peer_id, Default::default());
-                (Toggle::from(None), Toggle::from(Some(relay_server)))
+                (Toggle::from(Some(dcutr)), Toggle::from(Some(relay_server)))
             }
             NodeType::Ephemeral => {
                 let dcutr = dcutr::Behaviour::new(peer_id);
@@ -169,6 +169,9 @@ impl Behaviour {
     /// Add identified peer to routing table.
     pub fn add_identified_peer(&mut self, peer_id: PeerId, info: IdentifyInfo) {
         for addr in info.listen_addrs {
+            if is_memory(&addr) {
+                continue;
+            }
             // Add node with relay address.
             if is_relay_circuit(&addr) {
                 self.routing.add_relay_node(peer_id, addr.clone());
@@ -180,6 +183,11 @@ impl Behaviour {
                 self.routing.add_known_address(peer_id, addr.clone());
             }
         }
+    }
+
+    /// Get known peer addresses.
+    pub fn known_peer_addresses(&mut self, peer_id: &PeerId) -> Option<Vec<Multiaddr>> {
+        self.routing.known_peer_addresses(peer_id)
     }
 
     /// Node protocols supported.

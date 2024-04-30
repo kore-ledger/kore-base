@@ -111,7 +111,7 @@ pub fn is_reachable(addr: &Multiaddr) -> bool {
 }
 
 /// Chech if the given `Multiaddr` is a memory address.
-pub fn _is_memory(addr: &Multiaddr) -> bool {
+pub fn is_memory(addr: &Multiaddr) -> bool {
     if let Some(Protocol::Memory(_)) = addr.iter().next() {
         return true;
     }
@@ -124,6 +124,22 @@ pub fn _is_memory(addr: &Multiaddr) -> bool {
 ///
 pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
     addr.iter().any(|p| matches!(p, Protocol::P2pCircuit))
+}
+
+/// Get the relay address, if available, to build a relay circuit in this peer.
+/// If unavailable or can not build a relay circuit, return None.
+pub fn relay_address(peer: PeerId, addresses: Vec<Multiaddr>) -> Option<Multiaddr> {
+    if let Some(relay_addr) = addresses.iter().find(|addr| is_relay_circuit(addr)) {
+        let p2p = relay_addr.iter().find(|p| matches!(p, Protocol::P2p(_)));
+        if let Some(Protocol::P2p(relay_peer)) = p2p {
+            if relay_peer == peer {
+                return None;
+            } else {
+                return Some(relay_addr.clone());
+            }
+        }
+    }
+    None
 }
 
 /// Compare generic arrays.
@@ -170,5 +186,23 @@ mod tests {
         assert!(_compare_arrays(&a, &d, true));
         assert!(!_compare_arrays(&a, &e, true));
         assert!(_compare_arrays(&e, &a, true));
+    }
+
+    #[test]
+    fn test_relay_address() {
+        let peer =
+            PeerId::from_str("12D3KooWS4U6riBCLYc1Evs6vJ4cJhBGcXB1soXQ61CnW6upqKNr").unwrap();
+        let relay_addr: Multiaddr = "/ip4/127.0.0.1/tcp/50001/p2p/12D3KooWS4U6riBCLYc1Ev\
+        s6vJ4cJhBGcXB1soXQ61CnW6upqKNr/p2p-circuit/p2p/12D3KooWBsXknzy2Tsa1TkbLHmnxAe8wYMYcD2zTqm1\
+        YKF2aqb3H"
+            .parse()
+            .unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/tcp/50002".parse().unwrap();
+        let mut addresses = vec![addr.clone()];
+        assert_eq!(relay_address(peer, addresses.clone()), None);
+        addresses.push(relay_addr.clone());
+        assert_eq!(relay_address(peer, addresses.clone()), None);
+        let new_peer = PeerId::random();
+        assert_eq!(relay_address(new_peer, addresses), Some(relay_addr));
     }
 }

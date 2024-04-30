@@ -50,10 +50,6 @@ pub fn build_transport(
     let noise = noise::Config::new(keys)
         .map_err(|e| Error::Transport(format!("Noise authentication {:?}", e)))?;
 
-    // Allow Memory transport for testing
-    #[cfg(test)]
-    let transport = transport.or_transport(libp2p::core::transport::MemoryTransport::default());
-
     // Allow TCP transport.
     let transport = transport.or_transport(tcp::tokio::Transport::default());
 
