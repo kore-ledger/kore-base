@@ -174,7 +174,7 @@ impl NetworkWorker {
     ///
     ///
     async fn send_message(&mut self, peer: PeerId, message: Vec<u8>) {
-        // If the node is ephemeral?
+        // If the node is ephemeral?  
         if self.ephemeral_node {
 
         }
