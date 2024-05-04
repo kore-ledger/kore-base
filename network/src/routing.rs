@@ -1,7 +1,10 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::utils::{convert_boot_nodes, is_reachable, LruHashSet};
+use crate::{
+    utils::{convert_boot_nodes, is_reachable, LruHashSet},
+    Error,
+};
 
 use futures_timer::Delay;
 use ip_network::IpNetwork;
@@ -184,7 +187,9 @@ impl Behaviour {
 
     /// Returns true if the given peer is known.
     pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
-        self.public_nodes.contains_key(peer_id) || self.known_peers().contains(peer_id)
+        self.public_nodes.contains_key(peer_id)
+            || self.known_peers().contains(peer_id)
+            || self.relay_nodes.contains_key(peer_id)
     }
 
     /// Sets the DHT random walk delay.
@@ -194,7 +199,6 @@ impl Behaviour {
     }
 
     /// Get relay node.
-    #[cfg(test)]
     pub fn get_relay_node(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
         self.relay_nodes.get(peer_id)
     }
@@ -211,12 +215,15 @@ impl Behaviour {
         addrs
     }
 
-    /// Bootstrap nodes to connect to.
-    pub fn bootstrap(&mut self) {
+    /// Bootstrap node.
+    pub fn bootstrap(&mut self) -> Result<(), Error> {
         if let Some(kad) = self.kademlia.as_mut() {
-            for (peer_id, addr) in &self.boot_nodes {
-                kad.add_address(peer_id, addr.clone());
-            }
+            let _ = kad
+                .bootstrap()
+                .map_err(|_| Error::Network("No known bootstrap nodes.".to_owned()))?;
+            Ok(())
+        } else {
+            Err(Error::Network("Kademlia is not supported.".to_owned()))
         }
     }
 
@@ -245,6 +252,7 @@ impl Behaviour {
     }
 
     /// Get known peer address.
+    #[allow(dead_code)]
     pub fn known_peer_addresses(&mut self, peer_id: &PeerId) -> Option<Vec<Multiaddr>> {
         if let Some(k) = self.kademlia.as_mut() {
             for b in k.kbuckets() {
@@ -426,6 +434,12 @@ pub enum Event {
     /// [`DiscoveryBehaviour::add_self_reported_address`], e.g. obtained through
     /// the `identify` protocol.
     UnroutablePeer(PeerId),
+
+    /// Bootstrap to the network, ok.
+    BootstrapOk,
+
+    /// It cannot bootstrap to the network.
+    BootstrapErr,
 
     /// The DHT yielded results for the record request.
     ///
@@ -653,6 +667,13 @@ impl NetworkBehaviour for Behaviour {
                     KademliaEvent::ModeChanged { .. } => {
                         // We are not interested in this event at the moment.
                     }
+                    KademliaEvent::OutboundQueryProgressed {
+                        result: QueryResult::Bootstrap(res),
+                        ..
+                    } => match res {
+                        Ok(_) => return Poll::Ready(ToSwarm::GenerateEvent(Event::BootstrapOk)),
+                        Err(_) => return Poll::Ready(ToSwarm::GenerateEvent(Event::BootstrapErr)),
+                    },
                     KademliaEvent::OutboundQueryProgressed {
                         result: QueryResult::GetClosestPeers(res),
                         ..
@@ -1259,7 +1280,7 @@ mod tests {
         let _ = swarm.listen_on(listen_addr.clone()).unwrap();
 
         swarm.add_external_address(listen_addr.clone());
-        swarm.behaviour_mut().bootstrap();
+        let _ = swarm.behaviour_mut().bootstrap();
 
         (swarm, listen_addr)
     }

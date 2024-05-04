@@ -19,7 +19,7 @@ pub use error::Error;
 //use libp2p::StreamProtocol;
 pub use routing::Config as RoutingConfig;
 pub use service::NetworkService;
-pub use worker::NetworkWorker;
+pub use worker::{NetworkError, NetworkState, NetworkWorker};
 
 use serde::{Deserialize, Serialize};
 
@@ -101,7 +101,7 @@ pub enum Event {
     MessageSent { peer: String },
 
     /// A peer was disconnected.
-    PeerDisconnected { peer: Vec<u8> },
+    PeerDisconnected { peer: String },
 
     /// A peer was identified.
     PeerIdentified {
@@ -112,9 +112,12 @@ pub enum Event {
     /// Peers founded.
     PeersFounded { key: String, peers: Vec<String> },
 
-    /// Behaviour event.
-    BehaviourEvent { event: behaviour::Event },
+    /// Network state changed.
+    StateChanged(NetworkState),
 
-    /// Relay address.
-    RelayAddress { address: String },
+    /// Network error.
+    Error(Error),
+
+    /// Break.
+    Break,
 }

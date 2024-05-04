@@ -8,7 +8,7 @@ use crate::{
     node,
     routing::{self, DhtValue},
     utils::{is_memory, is_relay_circuit},
-    Config, NodeType,
+    Config, Error, NodeType,
 };
 
 use libp2p::{
@@ -97,8 +97,8 @@ impl Behaviour {
     }
 
     /// Bootstrap the network.
-    pub fn bootstrap(&mut self) {
-        self.routing.bootstrap();
+    pub fn bootstrap(&mut self) -> Result<(), Error> {
+        self.routing.bootstrap()
     }
 
     /// Bootstrap node list.
@@ -107,7 +107,7 @@ impl Behaviour {
     }
 
     /// Get relay node.
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn get_relay_node(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
         self.routing.get_relay_node(peer_id)
     }
@@ -226,6 +226,12 @@ pub enum Event {
         outbound_id: OutboundTellId,
     },
 
+    /// Bootstrap to the network, ok.
+    BootstrapOk,
+
+    /// It cannot bootstrap to the network.
+    BootstrapErr,
+
     /// Inbound failure.
     InboundFailure {
         peer_id: PeerId,
@@ -327,6 +333,8 @@ impl From<routing::Event> for Event {
             routing::Event::ValuePutFailed(key, _) => Event::Dht(DhtValue::PutFailed(key)),
             routing::Event::ClosestPeers(key, peers) => Event::PeersFounded(key, peers),
             routing::Event::UnroutablePeer(peer) => Event::UnreachablePeer(peer),
+            routing::Event::BootstrapOk => Event::BootstrapOk,
+            routing::Event::BootstrapErr => Event::BootstrapErr,
         }
     }
 }
@@ -468,7 +476,7 @@ mod tests {
         let (node_b_addr, _) = node_b.listen().await;
         node_b.add_external_address(node_b_addr.clone());
 
-        node_b.behaviour_mut().bootstrap();
+        let _ = node_b.behaviour_mut().bootstrap();
 
         let boot_node_addr = listen_addr.clone();
 

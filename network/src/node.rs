@@ -114,7 +114,7 @@ impl Behaviour {
         external_addresses: Arc<Mutex<HashSet<Multiaddr>>>,
     ) -> Self {
         let identify = {
-            let identify_config = IdentifyConfig::new("ipfs/1.0.0".to_owned(), public_key.clone())
+            let identify_config = IdentifyConfig::new("/kore/1.0.0".to_owned(), public_key.clone())
                 .with_agent_version(user_agent.to_owned())
                 .with_cache_size(0); // We don't need to cache anything.
             Identify::new(identify_config)

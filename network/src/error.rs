@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("Worker error: {0}")]
     Worker(String),
+    #[error("Network error: {0}")]
+    Network(String),
     #[error("Transport error: {0}")]
     Transport(String),
     #[error("DNS error: {0}")]
