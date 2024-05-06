@@ -19,7 +19,7 @@ homepage = "https://www.kore-ledger.net"
 repository = "https://github.com/kore-ledger/kore-base"
 license = "AGPL-3.0-only"
 keywords = ["traceability", "distributed-ledger", "kore", "sustainability"]
-rust-version = "1.73"
+rust-version = "1.75"
 
 [workspace.dependencies]
 serde = "1.0"

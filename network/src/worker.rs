@@ -415,18 +415,21 @@ impl NetworkWorker {
         match event {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!(TARGET_WORKER, "Listening on {:?}", address);
-                trace!(TARGET_WORKER, "Bootstrap to the kore network");
-                if let Err(error) = self.swarm.behaviour_mut().bootstrap() {
-                    if self
-                        .event_sender
-                        .send(NetworkEvent::Error(error))
-                        .await
-                        .is_err()
-                    {
-                        error!(TARGET_WORKER, "Error sending bootstrap error event.");
+                if self.state == NetworkState::Start {
+                    trace!(TARGET_WORKER, "Bootstrap to the kore network");
+                    self.change_state(NetworkState::Bootstrapping).await;
+                    if let Err(error) = self.swarm.behaviour_mut().bootstrap() {
+                        if self
+                            .event_sender
+                            .send(NetworkEvent::Error(error))
+                            .await
+                            .is_err()
+                        {
+                            error!(TARGET_WORKER, "Error sending bootstrap error event.");
+                        }
+                        self.change_state(NetworkState::Disconnected).await;
                     }
                 }
-                self.change_state(NetworkState::Disconnected).await;
             }
             SwarmEvent::Behaviour(BehaviourEvent::BootstrapOk) => {
                 self.change_state(NetworkState::Running).await;
@@ -663,7 +666,7 @@ pub enum NetworkState {
     /// Start.
     Start,
     /// Dialing boot nodes.
-    Dialing,
+    Bootstrapping,
     /// Running.
     Running,
     /// Disconnected.
@@ -710,13 +713,13 @@ mod tests {
     use tracing_test::traced_test;
 
     #[tokio::test]
-    async fn test_no_bootnodes() {
+    async fn test_no_boot_nodes() {
         let mut boot_nodes = vec![];
         let token = CancellationToken::new();
 
         // Build a fake bootstrap node.
         let fake_boot_peer = PeerId::random();
-        let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
+        let fake_boot_addr = "/ip4/50.0.0.1/tcp/54999";
         boot_nodes.push((fake_boot_peer.to_string(), fake_boot_addr.to_owned()));
 
         // Build a node.
@@ -745,10 +748,7 @@ mod tests {
                             NetworkEvent::StateChanged(NetworkState::Disconnected) => {
                                 break;
                             }
-                            _ => {
-                                println!("Event: {:?}", event);
-                                break;
-                            }
+                            _ => {}
                         }
                     }
                 }
@@ -760,7 +760,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_no_more_attempts() {
+    async fn test_fake_boot_node() {
         let mut boot_nodes = vec![];
         let token = CancellationToken::new();
 
@@ -788,7 +788,11 @@ mod tests {
                 event = node_receiver.recv() => {
                     if let Some(event) = event {
                         match event {
-                            _ => {}
+                            NetworkEvent::StateChanged(NetworkState::Bootstrapping) => {}
+                            event => {
+                                println!("Event: {:?}", event);
+                                break;
+                            }
                         }
                     }
                 }
@@ -860,7 +864,7 @@ mod tests {
                         match event {
                             NetworkEvent::StateChanged(state) => {
                                 match state {
-                                    NetworkState::Dialing => {
+                                    NetworkState::Bootstrapping => {
                                         println!("**** Addressable dialing");
                                     }
 
