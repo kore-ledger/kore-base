@@ -591,7 +591,7 @@ impl NetworkWorker {
                 }
 
                 // Send pending messages.
-                if !is_relay && self.pending_outbound_messages.get(&peer_id).is_some() {
+                if !is_relay && self.pending_outbound_messages.contains_key(&peer_id) {
                     trace!(
                         TARGET_WORKER,
                         "Sending pending messages to peer {}.",
@@ -637,7 +637,7 @@ impl NetworkWorker {
                     trace!(TARGET_WORKER, "Message received from peer {}.", peer_id);
                     self.messages_metric
                         .get_or_create(&MetricLabels {
-                            fact: Fact::RECEIVED,
+                            fact: Fact::Received,
                             peer_id: peer_id.to_string(),
                         })
                         .inc();
@@ -647,7 +647,7 @@ impl NetworkWorker {
                 trace!(TARGET_WORKER, "Message sent to peer {}", peer_id);
                 self.messages_metric
                     .get_or_create(&MetricLabels {
-                        fact: Fact::SENT,
+                        fact: Fact::Sent,
                         peer_id: peer_id.to_string(),
                     })
                     .inc();
@@ -703,26 +703,22 @@ impl NetworkWorker {
                     );
                 }
             }
-            SwarmEvent::OutgoingConnectionError { peer_id, .. } => {
-                if let Some(peer) = peer_id {
-                    if self.pending_reservations.contains_key(&peer) {
-                        // We must retry with another relay node when we have an error due to a pending
-                        // reservation.
+            SwarmEvent::OutgoingConnectionError { peer_id: Some(peer), .. } =>  {
+                if self.pending_reservations.contains_key(&peer) {
+                    // We must retry with another relay node when we have an error due to a pending
+                    // reservation.
+                    warn!(
+                        TARGET_WORKER,
+                        "Error connecting to peer {} for circuit reservation", peer
+                    );
+                    self.request_circuit_reservation(peer);
+                } else if self.relay_circuits.remove(&peer).is_some() {
                         warn!(
                             TARGET_WORKER,
-                            "Error connecting to peer {} for circuit reservation", peer
+                            "Error connecting to dctur to node {}. Removing relay circuit.", peer
                         );
-                        self.request_circuit_reservation(peer);
-                    } else {
-                        if let Some(_) = self.relay_circuits.remove(&peer) {
-                            warn!(
-                                TARGET_WORKER,
-                                "Error connecting to dctur to node {}. Removing relay circuit.", peer
-                            );
-                            self.send_event(NetworkEvent::Error(Error::Relay("Dctur error".to_owned()))).await;
-                        }
-                    }
-                }
+                        self.send_event(NetworkEvent::Error(Error::Relay("Dctur error".to_owned()))).await;
+                }    
             }
             _ => {}
         }
@@ -768,9 +764,9 @@ struct MetricLabels {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelValue)]
 enum Fact {
     /// Message sent.
-    SENT,
+    Sent,
     /// Message received.
-    RECEIVED,
+    Received,
 }
 
 #[cfg(test)]

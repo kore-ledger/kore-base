@@ -258,7 +258,7 @@ impl Behaviour {
             for b in k.kbuckets() {
                 for e in b.iter() {
                     if e.node.key.preimage() == peer_id {
-                        return Some(e.node.value.iter().map(|a| a.clone()).collect());
+                        return Some(e.node.value.iter().cloned().collect());
                     }
                 }
             }
@@ -341,7 +341,7 @@ impl Behaviour {
     pub fn discover(&mut self, peer_id: &PeerId) {
         if !self.active_queries.contains(peer_id) {
             if let Some(k) = self.kademlia.as_mut() {
-                k.get_closest_peers(peer_id.clone());
+                k.get_closest_peers(*peer_id);
             }
         }
     }
