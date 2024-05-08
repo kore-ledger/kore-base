@@ -186,8 +186,13 @@ impl Behaviour {
     }
 
     /// Get known peer addresses.
-    pub fn known_peer_addresses(&mut self, peer_id: &PeerId) -> Option<Vec<Multiaddr>> {
+    pub fn _known_peer_addresses(&mut self, peer_id: &PeerId) -> Option<Vec<Multiaddr>> {
         self.routing.known_peer_addresses(peer_id)
+    }
+
+    /// Remove node from routing table.
+    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Multiaddr) {
+        self.routing.remove_node(peer_id, address);
     }
 
     /// Node protocols supported.
@@ -225,12 +230,6 @@ pub enum Event {
         peer_id: PeerId,
         outbound_id: OutboundTellId,
     },
-
-    /// Bootstrap to the network, ok.
-    BootstrapOk,
-
-    /// It cannot bootstrap to the network.
-    BootstrapErr,
 
     /// Inbound failure.
     InboundFailure {
@@ -333,8 +332,6 @@ impl From<routing::Event> for Event {
             routing::Event::ValuePutFailed(key, _) => Event::Dht(DhtValue::PutFailed(key)),
             routing::Event::ClosestPeers(key, peers) => Event::PeersFounded(key, peers),
             routing::Event::UnroutablePeer(peer) => Event::UnreachablePeer(peer),
-            routing::Event::BootstrapOk => Event::BootstrapOk,
-            routing::Event::BootstrapErr => Event::BootstrapErr,
         }
     }
 }

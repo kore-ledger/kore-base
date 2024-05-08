@@ -345,6 +345,13 @@ impl Behaviour {
             }
         }
     }
+
+    /// Remove node from the DHT.
+    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Multiaddr) {
+        if let Some(k) = self.kademlia.as_mut() {
+            k.remove_address(peer_id, address);
+        }
+    }
     /*
         /// Start fetching a record from the DHT.
         ///
@@ -434,12 +441,6 @@ pub enum Event {
     /// [`DiscoveryBehaviour::add_self_reported_address`], e.g. obtained through
     /// the `identify` protocol.
     UnroutablePeer(PeerId),
-
-    /// Bootstrap to the network, ok.
-    BootstrapOk,
-
-    /// It cannot bootstrap to the network.
-    BootstrapErr,
 
     /// The DHT yielded results for the record request.
     ///
@@ -667,13 +668,6 @@ impl NetworkBehaviour for Behaviour {
                     KademliaEvent::ModeChanged { .. } => {
                         // We are not interested in this event at the moment.
                     }
-                    KademliaEvent::OutboundQueryProgressed {
-                        result: QueryResult::Bootstrap(res),
-                        ..
-                    } => match res {
-                        Ok(_) => return Poll::Ready(ToSwarm::GenerateEvent(Event::BootstrapOk)),
-                        Err(_) => return Poll::Ready(ToSwarm::GenerateEvent(Event::BootstrapErr)),
-                    },
                     KademliaEvent::OutboundQueryProgressed {
                         result: QueryResult::GetClosestPeers(res),
                         ..
@@ -990,6 +984,7 @@ impl NetworkBehaviour for Behaviour {
     }
 }
 
+/// Configuration for the routing behaviour.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Bootnodes to connect to.
