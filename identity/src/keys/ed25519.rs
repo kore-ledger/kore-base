@@ -12,7 +12,6 @@ use ed25519_dalek::{
 use base64::{engine::general_purpose, Engine as _};
 use serde::{de::Deserializer, Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
-use std::convert::TryInto;
 
 /// Ed25519 cryptographic key pair
 pub type Ed25519KeyPair = BaseKeyPair<VerifyingKey>;
@@ -39,7 +38,7 @@ impl KeyGenerator for Ed25519KeyPair {
 
     fn from_secret_key(secret_key: &[u8]) -> Ed25519KeyPair {
         let sk = SigningKey::try_from(secret_key).expect("cannot generate secret key");
-        let pk = (&sk).try_into().expect("cannot generate public key");
+        let pk = (&sk).into();
 
         let mut kp = Ed25519KeyPair {
             secret_key: None,
