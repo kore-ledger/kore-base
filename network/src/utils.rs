@@ -1,7 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::Error;
+use crate::{routing::RoutingNode, Error};
 use ip_network::IpNetwork;
 use libp2p::{multiaddr::Protocol, Multiaddr, PeerId};
 use linked_hash_set::LinkedHashSet;
@@ -48,18 +48,18 @@ impl<T: Hash + Eq> LruHashSet<T> {
 }
 
 /// Convert boot nodes to `PeerId` and `Multiaddr`.
-pub fn convert_boot_nodes(boot_nodes: Vec<(String, String)>) -> Vec<(PeerId, Multiaddr)> {
+pub fn convert_boot_nodes(boot_nodes: Vec<RoutingNode>) -> Vec<(PeerId, Multiaddr)> {
     boot_nodes
         .iter()
-        .map(|(peer_id, addr)| {
-            let peer = match bs58::decode(peer_id).into_vec() {
+        .map(|node| {
+            let peer = match bs58::decode(node.peer_id.clone()).into_vec() {
                 Ok(peer) => match PeerId::from_bytes(peer.as_slice()) {
                     Ok(peer) => Some(peer),
                     Err(_) => None,
                 },
                 Err(_) => None,
             };
-            let addr = match Multiaddr::from_str(addr) {
+            let addr = match Multiaddr::from_str(&node.address) {
                 Ok(addr) => Some(addr),
                 Err(_) => None,
             };

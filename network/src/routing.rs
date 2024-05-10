@@ -28,7 +28,7 @@ use libp2p::{
     },
     Multiaddr, PeerId, StreamProtocol,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::{debug, error, info, trace, warn};
 
 use std::{
@@ -985,10 +985,10 @@ impl NetworkBehaviour for Behaviour {
 }
 
 /// Configuration for the routing behaviour.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     /// Bootnodes to connect to.
-    boot_nodes: Vec<(String, String)>,
+    boot_nodes: Vec<RoutingNode>,
 
     /// Whether to enable random walks in the Kademlia DHT.
     dht_random_walk: bool,
@@ -999,8 +999,7 @@ pub struct Config {
     /// Whether to allow non-global addresses in the DHT.
     allow_non_globals_in_dht: bool,
 
-    /// If false, `addresses_of_peer` won't return any private IPv4/IPv6 address, except for the
-    /// ones stored in `permanent_addresses` or `ephemeral_addresses`.
+    /// If false, `addresses_of_peer` won't return any private IPv4/IPv6 address.
     allow_private_ip: bool,
 
     /// Whether to enable mDNS.
@@ -1018,7 +1017,7 @@ pub struct Config {
 
 impl Config {
     /// Creates a new configuration for the discovery behaviour.
-    pub fn new(boot_nodes: Vec<(String, String)>) -> Self {
+    pub fn new(boot_nodes: Vec<RoutingNode>) -> Self {
         let protocol_names = vec!["/kore/routing/1.0.0".to_owned()];
         Self {
             boot_nodes,
@@ -1087,12 +1086,22 @@ impl Config {
     }
 
     /// Returns the boot nodes.
-    pub fn boot_nodes(&self) -> Vec<(String, String)> {
+    pub fn boot_nodes(&self) -> Vec<RoutingNode> {
         self.boot_nodes.clone()
     }
 }
 
+/// A node in the routing table.
+#[derive(Clone, Debug, Deserialize)]
+pub struct RoutingNode {
+    /// Peer ID.
+    pub peer_id: String,
+    /// Address.
+    pub address: String,
+}
+
 #[derive(Debug, Clone)]
+/// DHT value.
 pub enum DhtValue {
     /// The value was found.
     Found(Vec<(RecordKey, Vec<u8>)>),
@@ -1135,7 +1144,11 @@ mod tests {
         let (boot_swarm, addr) = build_node(config);
 
         let peer_id = *boot_swarm.local_peer_id();
-        boot_nodes.push((peer_id.to_base58(), addr.to_string()));
+        let boot_node = RoutingNode {
+            peer_id: peer_id.to_base58(),
+            address: addr.to_string(),
+        };
+        boot_nodes.push(boot_node);
 
         let mut swarms = (1..25)
             .map(|_| {

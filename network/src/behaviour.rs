@@ -358,7 +358,7 @@ impl From<relay::Event> for Event {
 mod tests {
     use super::*;
 
-    use crate::{utils::is_relay_circuit, Config, NodeType};
+    use crate::{utils::is_relay_circuit, Config, NodeType, RoutingNode};
 
     use futures::prelude::*;
     use futures::{join, select};
@@ -385,10 +385,12 @@ mod tests {
 
         boot_node.add_external_address(listen_addr.clone());
 
-        boot_nodes.push((
-            boot_node.local_peer_id().to_base58(),
-            listen_addr.to_string(),
-        ));
+        let routing_node = RoutingNode {
+            peer_id: boot_node_peer_id.to_base58(),
+            address: listen_addr.to_string(),
+        };
+
+        boot_nodes.push(routing_node);
 
         let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
         let mut node_a = build_relay(config);
@@ -454,10 +456,12 @@ mod tests {
 
         boot_node.add_external_address(listen_addr.clone());
 
-        boot_nodes.push((
-            boot_node.local_peer_id().to_base58(),
-            listen_addr.to_string(),
-        ));
+        let routing_node = RoutingNode {
+            peer_id: boot_node_peer_id.to_base58(),
+            address: listen_addr.to_string(),
+        };
+
+        boot_nodes.push(routing_node);
 
         // Build node a.
         let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
@@ -584,7 +588,12 @@ mod tests {
 
         boot_node.add_external_address(boot_addr.clone());
 
-        boot_nodes.push((boot_node.local_peer_id().to_base58(), boot_addr.to_string()));
+        let routing_node = RoutingNode {
+            peer_id: boot_node_peer_id.to_base58(),
+            address: boot_addr.to_string(),
+        };
+
+        boot_nodes.push(routing_node);
         boot_node.behaviour_mut().set_random_walk(1);
 
         // Build node a.
@@ -802,7 +811,7 @@ mod tests {
 
     // Create a config
     fn create_config(
-        boot_nodes: Vec<(String, String)>,
+        boot_nodes: Vec<RoutingNode>,
         random_walk: bool,
         node_type: NodeType,
     ) -> Config {

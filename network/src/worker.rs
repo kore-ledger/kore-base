@@ -365,13 +365,16 @@ impl NetworkWorker {
 
     /// Wait for connection to bootstrap node.
     pub async fn wait_for_connection(&mut self) -> Result<(), Error> {
-        info!(TARGET_WORKER, "Running connection loop"); 
-        let mut result = Ok(());  
+        info!(TARGET_WORKER, "Running connection loop");
+        let mut result = Ok(());
         loop {
             match self.state {
                 NetworkState::Dial => {
                     // Dial boot node.
                     if let Some((peer_id, addr)) = self.next_boot_node() {
+                        if self.local_peer_id == peer_id {
+                            continue;
+                        }
                         if self.swarm.dial(addr.clone()).is_err() {
                             error!(TARGET_WORKER, "Error dialing boot node {}", peer_id);
                         } else {
@@ -382,7 +385,9 @@ impl NetworkWorker {
                         error!(TARGET_WORKER, "No more bootstrap nodes.");
                         if self
                             .event_sender
-                            .send(NetworkEvent::Error(Error::Network("No more bootstrap nodes.".to_owned())))
+                            .send(NetworkEvent::Error(Error::Network(
+                                "No more bootstrap nodes.".to_owned(),
+                            )))
                             .await
                             .is_err()
                         {
@@ -417,7 +422,6 @@ impl NetworkWorker {
             }
         }
         result
-
     }
 
     /// Handle connection events.
@@ -441,7 +445,11 @@ impl NetworkWorker {
                     }
                 }
             }
-            SwarmEvent::IncomingConnection { local_addr, send_back_addr, .. } => {
+            SwarmEvent::IncomingConnection {
+                local_addr,
+                send_back_addr,
+                ..
+            } => {
                 info!(
                     TARGET_WORKER,
                     "Incoming connection from {} to {}.", send_back_addr, local_addr
@@ -459,7 +467,8 @@ impl NetworkWorker {
                         trace!(TARGET_WORKER, "Connected to bootstrap node {}", peer_id);
                         self.send_event(NetworkEvent::ConnectedToBootstrap {
                             peer: peer_id.to_string(),
-                        }).await;
+                        })
+                        .await;
                         self.change_state(NetworkState::Running).await;
                     }
                 }
@@ -562,13 +571,13 @@ impl NetworkWorker {
                     .iter()
                     .map(|addr| addr.to_string())
                     .collect();
-                
+
                 self.send_event(NetworkEvent::PeerIdentified {
-                        peer: peer_id.to_string(),
-                        addresses,
-                    })
-                    .await;
-                
+                    peer: peer_id.to_string(),
+                    addresses,
+                })
+                .await;
+
                 // Add identified peer to the behaviour.
                 info!(TARGET_WORKER, "Identified peer {}", peer_id);
                 self.swarm
@@ -673,10 +682,7 @@ impl NetworkWorker {
                 trace!(TARGET_WORKER, "Message processed from peer {}", peer_id);
             }
             SwarmEvent::Behaviour(BehaviourEvent::RelayServer(
-                RelayServerEvent::ReservationReqAccepted {
-                    src_peer_id,
-                    ..
-                },
+                RelayServerEvent::ReservationReqAccepted { src_peer_id, .. },
             )) => {
                 // Relay server started.
                 info!(
@@ -703,7 +709,10 @@ impl NetworkWorker {
                     );
                 }
             }
-            SwarmEvent::OutgoingConnectionError { peer_id: Some(peer), .. } =>  {
+            SwarmEvent::OutgoingConnectionError {
+                peer_id: Some(peer),
+                ..
+            } => {
                 if self.pending_reservations.contains_key(&peer) {
                     // We must retry with another relay node when we have an error due to a pending
                     // reservation.
@@ -713,12 +722,13 @@ impl NetworkWorker {
                     );
                     self.request_circuit_reservation(peer);
                 } else if self.relay_circuits.remove(&peer).is_some() {
-                        warn!(
-                            TARGET_WORKER,
-                            "Error connecting to dctur to node {}. Removing relay circuit.", peer
-                        );
-                        self.send_event(NetworkEvent::Error(Error::Relay("Dctur error".to_owned()))).await;
-                }    
+                    warn!(
+                        TARGET_WORKER,
+                        "Error connecting to dctur to node {}. Removing relay circuit.", peer
+                    );
+                    self.send_event(NetworkEvent::Error(Error::Relay("Dctur error".to_owned())))
+                        .await;
+                }
             }
             _ => {}
         }
@@ -771,6 +781,8 @@ enum Fact {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::routing::RoutingNode;
 
     use super::*;
 
@@ -829,7 +841,11 @@ mod tests {
         // Build a fake bootstrap node.
         let fake_boot_peer = PeerId::random();
         let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
-        boot_nodes.push((fake_boot_peer.to_string(), fake_boot_addr.to_owned()));
+        let fake_node = RoutingNode {
+            peer_id: fake_boot_peer.to_string(),
+            address: fake_boot_addr.to_owned(),
+        };
+        boot_nodes.push(fake_node);
 
         // Build a node.
         let node_addr = "/ip4/127.0.0.1/tcp/54422";
@@ -887,13 +903,21 @@ mod tests {
             token.clone(),
             Some(boot_addr.to_owned()),
         );
-        boot_nodes.push((boot.local_peer_id().to_string(), boot_addr.to_owned()));
+        let boot_node = RoutingNode {
+            peer_id: boot.local_peer_id().to_string(),
+            address: boot_addr.to_owned(),
+        };
+        boot_nodes.push(boot_node);
         let boot_peer_id = boot.local_peer_id().to_string();
 
         // Build a fake bootstrap node.
         let fake_boot_peer = PeerId::random();
         let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
-        boot_nodes.push((fake_boot_peer.to_string(), fake_boot_addr.to_owned()));
+        let fake_node = RoutingNode {
+            peer_id: fake_boot_peer.to_string(),
+            address: fake_boot_addr.to_owned(),
+        };
+        boot_nodes.push(fake_node);
 
         // Build a node.
         let node_addr = "/ip4/127.0.0.1/tcp/54422";
@@ -907,7 +931,7 @@ mod tests {
 
         // Spawn the boot node
         tokio::spawn(async move {
-            boot.run_main().await;                
+            boot.run_main().await;
         });
 
         // Wait for connection.
@@ -939,7 +963,7 @@ mod tests {
                             NetworkEvent::StateChanged(state) => {
                                 match state {
                                     NetworkState::Running => {
-                                        
+
                                     }
                                     _ => {}
                                 }
@@ -971,7 +995,11 @@ mod tests {
             token.clone(),
             Some(boot_addr.to_owned()),
         );
-        boot_nodes.push((boot.local_peer_id().to_string(), boot_addr.to_owned()));
+        let boot_node = RoutingNode {
+            peer_id: boot.local_peer_id().to_string(),
+            address: boot_addr.to_owned(),
+        };
+        boot_nodes.push(boot_node);
 
         // Build a ephemeral node.
         let ephemeral_addr = "/ip4/127.0.0.1/tcp/54422";
@@ -1005,13 +1033,13 @@ mod tests {
         // Spawn the boot node
         tokio::spawn(async move {
             boot.run_main().await;
-        });            
+        });
 
         // Wait for connect ephemeral node.
         if ephemeral.wait_for_connection().await.is_err() {
             error!(TARGET_WORKER, "Error connecting to the network");
         }
-        
+
         // Wait for connect addressable node.
         if addressable.wait_for_connection().await.is_err() {
             error!(TARGET_WORKER, "Error connecting to the network");
@@ -1021,7 +1049,7 @@ mod tests {
         tokio::spawn(async move {
             ephemeral.run_main().await;
         });
-        
+
         // Spawn the addressable node
         tokio::spawn(async move {
             addressable.run_main().await;
@@ -1115,7 +1143,7 @@ mod tests {
 
     // Build a relay server.
     fn build_worker(
-        boot_nodes: Vec<(String, String)>,
+        boot_nodes: Vec<RoutingNode>,
         random_walk: bool,
         node_type: NodeType,
         token: CancellationToken,
@@ -1136,7 +1164,7 @@ mod tests {
 
     // Create a config
     fn create_config(
-        boot_nodes: Vec<(String, String)>,
+        boot_nodes: Vec<RoutingNode>,
         random_walk: bool,
         node_type: NodeType,
         listen_addresses: Vec<String>,

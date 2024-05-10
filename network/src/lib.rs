@@ -15,11 +15,13 @@ mod utils;
 mod worker;
 
 pub use error::Error;
-pub use routing::Config as RoutingConfig;
+pub use routing::{Config as RoutingConfig, RoutingNode};
 pub use service::NetworkService;
 pub use worker::{NetworkError, NetworkState, NetworkWorker};
+pub use libp2p::PeerId;
+pub use tell::Config as TellConfig;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// The maximum allowed number of established connections per peer.
 ///
@@ -31,26 +33,43 @@ use serde::{Deserialize, Serialize};
 const MAX_CONNECTIONS_PER_PEER: usize = 2;
 
 /// The network configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     /// The user agent.
-    user_agent: String,
+    pub user_agent: String,
 
     /// The node type.
-    node_type: NodeType,
+    pub node_type: NodeType,
 
     /// Listen addresses.
-    listen_addresses: Vec<String>,
+    pub listen_addresses: Vec<String>,
 
     /// Message telling configuration.
-    tell: tell::Config,
+    pub tell: tell::Config,
 
     /// Routing configuration.
-    routing: routing::Config,
+    pub routing: routing::Config,
+}
+
+impl Config {
+    /// Create a new configuration.
+    pub fn new(
+        node_type: NodeType,
+        listen_addresses: Vec<String>,
+        boot_nodes: Vec<RoutingNode>,
+    ) -> Self {
+        Self {
+            user_agent: "kore-node".to_owned(),
+            node_type,
+            listen_addresses,
+            tell: tell::Config::default(),
+            routing: routing::Config::new(boot_nodes),
+        }
+    }
 }
 
 /// Type of a node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum NodeType {
     /// Bootstrap node.
     Bootstrap,
@@ -64,15 +83,15 @@ pub enum NodeType {
 pub enum Command {
     /// Start providing the given keys.
     StartProviding {
-        /// The keys to provide. 
-        keys: Vec<String> 
+        /// The keys to provide.
+        keys: Vec<String>,
     },
     /// Send a message to the given peer.
-    SendMessage { 
+    SendMessage {
         /// The peer to send the message to.
-        peer: Vec<u8>, 
+        peer: Vec<u8>,
         /// The message to send.
-        message: Vec<u8> 
+        message: Vec<u8>,
     },
     /// Bootstrap the network.
     Bootstrap,
@@ -114,5 +133,4 @@ pub enum Event {
 
     /// Network error.
     Error(Error),
-
 }
