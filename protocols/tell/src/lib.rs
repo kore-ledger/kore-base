@@ -32,7 +32,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use smallvec::SmallVec;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -187,7 +187,7 @@ impl fmt::Display for InboundFailure {
 impl std::error::Error for InboundFailure {}
 
 /// The configuration for a `Behaviour` protocol.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     message_timeout: Duration,
     max_concurrent_streams: usize,
