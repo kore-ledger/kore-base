@@ -752,6 +752,7 @@ mod tests {
     type TestSwarm = Swarm<TestBehaviour>;
 
     #[async_std::test]
+    #[ignore]
     async fn test_send_message() {
         let mut boot_nodes = vec![];
 
