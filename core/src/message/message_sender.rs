@@ -5,20 +5,20 @@ use crate::DigestDerivator;
 
 use log::debug;
 use rmp_serde;
-use std::sync::{Arc, RwLock};
+use tokio::sync::mpsc::Sender;
 
 use super::{MessageContent, TaskCommandContent};
 
 use super::error::Error;
 
-use network::{NetworkService, Command};
+use network::Command;
 
 const LOG_TARGET: &str = "MESSAGE_SENDER";
 
 /// Network MessageSender struct
 #[derive(Clone)]
 pub struct MessageSender {
-    service: Arc<RwLock<NetworkService>>,
+    sender: Sender<Command>,
     controller_id: KeyIdentifier,
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
@@ -28,13 +28,13 @@ pub struct MessageSender {
 impl MessageSender {
     /// New MessageSender
     pub fn new(
-        service: Arc<RwLock<NetworkService>>,
+        sender: Sender<Command>,
         controller_id: KeyIdentifier,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator
     ) -> Self {
         Self {
-            service,
+            sender,
             controller_id,
             signature_manager,
             derivator,
@@ -57,51 +57,24 @@ impl MessageSender {
         )?;
         let bytes = rmp_serde::to_vec(&complete_message)
             .map_err(|error| Error::MsgPackSerialize { source: error })?;
-        match self.service.write() {
-            Ok(mut service) => {
-                service.send_command(Command::SendMessage { 
-                    peer: target.public_key, 
-                    message: bytes, 
-                })
-                    .await
-                    .map_err(|_| Error::ChannelClosed)?;
-                Ok(())
-            }
-            Err(_) => {
-                Err(Error::NetworkService)
-            }
-        }
+        Ok(self.sender.send(
+            Command::SendMessage { peer: target.public_key, message: bytes 
+            })
+            .await
+            .map_err(|_| Error::ChannelClosed)?)
     }
+    
 
     #[allow(dead_code)]
     /// Set node as a provider of keys
     pub async fn start_providing(&mut self, keys: Vec<String>) -> Result<(), Error> {
-        match self.service.write() {
-            Ok(mut service) => {
-                service.send_command(Command::StartProviding { keys })
-                    .await
-                    .map_err(|_| Error::ChannelClosed)?;
-                Ok(())
-            }
-            Err(_) => {
-                Err(Error::NetworkService)
-            }
-        }
+        debug!("{}: Starting Providing", LOG_TARGET);
+        Ok(self.sender.send(Command::StartProviding { keys }).await.map_err(|_| Error::ChannelClosed)?)
     }
 
     #[allow(dead_code)]
     pub async fn bootstrap(&mut self) -> Result<(), Error> {
         debug!("{}: Starting Bootstrap", LOG_TARGET);
-        match self.service.write() {
-            Ok(mut service) => {
-                service.send_command(Command::Bootstrap)
-                    .await
-                    .map_err(|_| Error::ChannelClosed)?;
-                Ok(())
-            }
-            Err(_) => {
-                Err(Error::NetworkService)
-            }
-        }
+        Ok(self.sender.send(Command::Bootstrap).await.map_err(|_| Error::ChannelClosed)?)
     }
 }

@@ -28,4 +28,9 @@ impl NetworkService {
             .await
             .map_err(|e| Error::Command(e.to_string()))
     }
+
+    /// Send a message to the network worker.
+    pub fn sender(&self) -> Sender<Command> {
+        self.command_sender.clone()
+    }
 }

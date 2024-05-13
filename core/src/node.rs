@@ -5,7 +5,7 @@
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
 use crate::approval::{
-    inner_manager::{InnerApprovalManager, RequestNotifier},
+    inner_manager::InnerApprovalManager,
     ApprovalMessages, ApprovalResponses,
 };
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
@@ -81,11 +81,11 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
     /// for the initialization of the components, mainly due to problems in the initial [configuration](Settings).
     /// # Panics
     /// This method panics if it has not been possible to generate the network layer.
-    pub fn build(settings: Settings, key_pair: KeyPair, registry: &mut Registry, database: M) -> Result<(Self, Api), Error> {
+    pub fn build(settings: Settings, key_pair: KeyPair, registry: &mut Registry, database: M) -> Result<Api, Error> {
 
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
-        let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
+        //let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
 
         let (network_tx, network_rx): (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>) =
             mpsc::channel(BUFFER_SIZE);
@@ -155,21 +155,27 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             network_rx,
             protocol_tx,
             token.clone(),
-            notification_tx.clone(),
             signature_manager.get_own_identifier(),
         );
 
         // TODO: refactor network service access.
         let service = worker.service().clone();
+        let service = match service.read() {
+            Ok(service) => service,
+            Err(e) => {
+                error!("Error accessing network service: {}", e);
+                return Err(Error::NetworkError(e.to_string()));
+            }
+        };
         let network_tx = MessageSender::new(
-            service,
+            service.sender(),
             controller_id.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
         );
 
         let task_manager =
-            MessageTaskManager::new(network_tx, task_rx, token.clone(), notification_tx.clone());
+            MessageTaskManager::new(network_tx, task_rx, token.clone(),);
 
         // Defines protocol channels
         let channels = ProtocolChannels {
@@ -187,13 +193,12 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         // Build protocol manager
         let protocol_manager =
-            ProtocolManager::new(channels, token.clone(), notification_tx.clone());
+            ProtocolManager::new(channels, token.clone());
 
         // Build governance
         let mut governance_manager = Governance::<M, C>::new(
             governance_rx,
             token.clone(),
-            notification_tx.clone(),
             DB::new(database.clone()),
             governance_update_sx.clone(),
         );
@@ -203,7 +208,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
             task_tx.clone(),
-            notification_tx.clone(),
             ledger_tx.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -224,20 +228,19 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             task_tx.clone(),
             distribution_tx,
             controller_id.clone(),
-            notification_tx.clone(),
             settings.node.digest_derivator,
         );
 
         // Build ledger manager
         let ledger_manager = LedgerManager::new(ledger_rx, inner_ledger, token.clone());
 
+        // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
             as_rx,
             DB::new(database.clone()),
             task_tx.clone(),
             controller_id.clone(),
             token.clone(),
-            notification_tx.clone(),
         );
 
         // Build api
@@ -268,7 +271,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.smartcontracts_directory.clone(),
                 engine.clone(),
                 token.clone(),
-                notification_tx.clone(),
             );
 
             // Build core runner
@@ -298,7 +300,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             let inner_approval = InnerApprovalManager::new(
                 GovernanceAPI::new(governance_tx.clone()),
                 DB::new(database.clone()),
-                RequestNotifier::new(notification_tx.clone()),
                 signature_manager.clone(),
                 passvotation,
                 settings.node.digest_derivator,
@@ -327,7 +328,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             distribution_rx,
             governance_update_sx.subscribe(),
             token.clone(),
-            notification_tx.clone(),
             inner_distribution,
         );
 
@@ -346,15 +346,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 validation_rx,
                 inner_validation,
                 token.clone(),
-                notification_tx,
             )
-        };
-
-        let taple = Node {
-            notification_rx,
-            token,
-            _m: PhantomData,
-            _c: PhantomData,
         };
 
         let api = Api::new(
@@ -364,12 +356,9 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             api_tx,
         );
 
-        // Await network worker connection
-        // TODO
-
         // Start network worker
         tokio::spawn(async move {
-            worker.run_main().await;
+            worker.run().await;
         });
 
 
@@ -424,7 +413,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             api_manager.run().await;
         });
 
-        Ok((taple, api))
+        Ok(api)
     }
 
     /// Receive a single notification

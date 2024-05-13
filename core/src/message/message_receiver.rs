@@ -6,7 +6,7 @@ use tokio::sync::mpsc::{self};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{commons::channel::SenderEnd, signature::Signed, KeyIdentifier, Notification};
+use crate::{commons::channel::SenderEnd, signature::Signed, KeyIdentifier};
 
 use network::Event as NetworkEvent;
 
@@ -20,8 +20,6 @@ where
     receiver: ReceiverStream<NetworkEvent>,
     sender: SenderEnd<Signed<MessageContent<T>>, ()>,
     token: CancellationToken,
-    // TODO: Could be removed?
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     own_id: KeyIdentifier,
 }
 
@@ -30,7 +28,6 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
         receiver: mpsc::Receiver<NetworkEvent>,
         sender: SenderEnd<Signed<MessageContent<T>>, ()>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
         own_id: KeyIdentifier,
     ) -> Self {
         let receiver = ReceiverStream::new(receiver);
@@ -38,7 +35,6 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
             receiver,
             sender,
             token,
-            _notification_tx: notification_tx,
             own_id,
         }
     }

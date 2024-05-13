@@ -20,7 +20,7 @@ use crate::{
     DatabaseCollection,
 };
 use crate::{
-    ApprovalResponse, DigestDerivator, Event, KeyDerivator, Metadata, Notification, ValueWrapper,
+    ApprovalResponse, DigestDerivator, Event, KeyDerivator, Metadata, ValueWrapper,
 };
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
@@ -40,7 +40,7 @@ pub struct Ledger<C: DatabaseCollection> {
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     distribution_channel: SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     our_id: KeyIdentifier,
-    notification_sender: tokio::sync::mpsc::Sender<Notification>,
+    //notification_sender: tokio::sync::mpsc::Sender<Notification>,
     derivator: DigestDerivator,
 }
 
@@ -54,7 +54,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             Result<(), DistributionManagerError>,
         >,
         our_id: KeyIdentifier,
-        notification_sender: tokio::sync::mpsc::Sender<Notification>,
+        //notification_sender: tokio::sync::mpsc::Sender<Notification>,
         derivator: DigestDerivator,
     ) -> Self {
         Self {
@@ -65,7 +65,7 @@ impl<C: DatabaseCollection> Ledger<C> {
             message_channel,
             distribution_channel,
             our_id,
-            notification_sender,
+            //notification_sender,
             derivator,
         }
     }
@@ -248,7 +248,7 @@ impl<C: DatabaseCollection> Ledger<C> {
         )?;
         self.database.set_event(&subject_id, event)?;
         self.set_finished_request(&request_id, ev_request, sn, subject_id.clone(), true)?;
-        let _ = self
+        /*let _ = self
             .notification_sender
             .send(Notification::NewEvent {
                 sn,
@@ -262,7 +262,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                 subject_id: subject_id.to_str(),
             })
             .await
-            .map_err(|_| LedgerError::NotificationChannelError);
+            .map_err(|_| LedgerError::NotificationChannelError);*/
         // Upgrade Ledger State
         match self.ledger_state.entry(subject_id.clone()) {
             Entry::Occupied(mut ledger_state) => {
@@ -336,14 +336,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                 } else {
                     subject.sn = event.content.sn;
                 }
-                let _ = self
+                /*let _ = self
                     .notification_sender
                     .send(Notification::StateUpdated {
                         sn: event.content.sn,
                         subject_id: subject.subject_id.to_str(),
                     })
                     .await
-                    .map_err(|_| LedgerError::NotificationChannelError);
+                    .map_err(|_| LedgerError::NotificationChannelError);*/
                 self.database.set_event(&subject_id, event.clone())?;
                 self.set_finished_request(
                     &request_id,
@@ -352,14 +352,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                     subject_id.clone(),
                     true,
                 )?;
-                let _ = self
+                /*let _ = self
                     .notification_sender
                     .send(Notification::NewEvent {
                         sn,
                         subject_id: subject_id.to_str(),
                     })
                     .await
-                    .map_err(|_| LedgerError::NotificationChannelError);
+                    .map_err(|_| LedgerError::NotificationChannelError);*/
                 self.database.set_subject(&subject_id, subject)?;
                 // Check is_gov
                 let is_gov = self.subject_is_gov.get(&subject_id);
@@ -425,14 +425,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                     subject_id.clone(),
                     true,
                 )?;
-                let _ = self
+                /*let _ = self
                     .notification_sender
                     .send(Notification::NewEvent {
                         sn,
                         subject_id: subject_id.to_str(),
                     })
                     .await
-                    .map_err(|_| LedgerError::NotificationChannelError);
+                    .map_err(|_| LedgerError::NotificationChannelError);*/
                 subject.sn = event.content.sn;
                 self.database.set_subject(&subject_id, subject)?;
                 let is_gov = self.subject_is_gov.get(&subject_id);
@@ -479,14 +479,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                     subject_id.clone(),
                     true,
                 )?;
-                let _ = self
+                /*let _ = self
                     .notification_sender
                     .send(Notification::NewEvent {
                         sn,
                         subject_id: subject_id.to_str(),
                     })
                     .await
-                    .map_err(|_| LedgerError::NotificationChannelError);
+                    .map_err(|_| LedgerError::NotificationChannelError);*/
                 subject.sn = sn;
                 subject.eol_event();
                 self.database.set_subject(&subject_id, subject)?;
@@ -1168,7 +1168,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                 // Cryptographic checks
                 let ledger_state = self.ledger_state.get(&state_request.subject_id);
                 let metadata = validation_proof.get_metadata();
-                let sn = event.content.sn;
+                //let sn = event.content.sn;
                 match ledger_state {
                     Some(ledger_state) => {
                         match ledger_state.current_sn {
@@ -1328,14 +1328,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                             } else {
                                 subject.sn = event.content.sn;
                             }
-                            let _ = self
+                            /*let _ = self
                                 .notification_sender
                                 .send(Notification::StateUpdated {
                                     sn: event.content.sn,
                                     subject_id: subject.subject_id.to_str(),
                                 })
                                 .await
-                                .map_err(|_| LedgerError::NotificationChannelError);
+                                .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database.set_signatures(
                                 &state_request.subject_id,
                                 sn,
@@ -1350,14 +1350,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 event.content.eval_success && event.content.approved,
                             )?;
                             self.database.set_event(&state_request.subject_id, event)?;
-                            let _ = self
+                            /*let _ = self
                                 .notification_sender
                                 .send(Notification::NewEvent {
                                     sn,
                                     subject_id: subject_id.to_str(),
                                 })
                                 .await
-                                .map_err(|_| LedgerError::NotificationChannelError);
+                                .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database
                                 .set_subject(&state_request.subject_id, subject)?;
                             if self.subject_is_gov.get(&subject_id).unwrap().to_owned() {
@@ -1460,15 +1460,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 event.content.eval_success && event.content.approved,
                             )?;
                             self.database.set_event(&state_request.subject_id, event)?;
-                            let _ = self
+                            /*let _ = self
                                 .notification_sender
                                 .send(Notification::NewEvent {
                                     sn,
                                     subject_id: subject_id.to_str(),
                                 })
                                 .await
-                                .map_err(|_| LedgerError::NotificationChannelError);
+                                .map_err(|_| LedgerError::NotificationChannelError);*/
                             if last_lce.is_some() {
+                                // TODO: Unwrap
                                 let last_lce_sn = last_lce.unwrap();
                                 self.database
                                     .del_signatures(&state_request.subject_id, last_lce_sn)?;
@@ -1510,7 +1511,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 if let ApprovalState::Pending = data.state {
                                     data.state = ApprovalState::Obsolete;
                                     self.database.set_approval(approval_request_hash, data)?;
-                                    let _ = self
+                                    /*let _ = self
                                         .notification_sender
                                         .send(Notification::ObsoletedApproval {
                                             id: approval_request_hash.to_str(),
@@ -1518,7 +1519,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                             sn,
                                         })
                                         .await
-                                        .map_err(|_| LedgerError::NotificationChannelError);
+                                        .map_err(|_| LedgerError::NotificationChannelError);*/
                                 }
                             }
                             Err(error) => match error {
@@ -1616,14 +1617,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                             subject_id.clone(),
                             true,
                         )?;
-                        let _ = self
+                        /*let _ = self
                             .notification_sender
                             .send(Notification::NewEvent {
                                 sn,
                                 subject_id: subject_id.to_str(),
                             })
                             .await
-                            .map_err(|_| LedgerError::NotificationChannelError);
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                         self.set_finished_request(
                             &request_id,
                             event_request.clone(),
@@ -1802,14 +1803,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 true,
                             )?;
                             self.database.set_event(&eol_request.subject_id, event)?;
-                            let _ = self
+                            /*let _ = self
                                 .notification_sender
                                 .send(Notification::NewEvent {
                                     sn,
                                     subject_id: subject_id.to_str(),
                                 })
                                 .await
-                                .map_err(|_| LedgerError::NotificationChannelError);
+                                .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database
                                 .set_subject(&eol_request.subject_id, subject)?;
                             if self.subject_is_gov.get(&subject_id).unwrap().to_owned() {
@@ -1915,14 +1916,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 event.content.eval_success && event.content.approved,
                             )?;
                             self.database.set_event(&eol_request.subject_id, event)?;
-                            let _ = self
+                            /*let _ = self
                                 .notification_sender
                                 .send(Notification::NewEvent {
                                     sn,
                                     subject_id: subject_id.to_str(),
                                 })
                                 .await
-                                .map_err(|_| LedgerError::NotificationChannelError);
+                                .map_err(|_| LedgerError::NotificationChannelError);*/
                             if last_lce.is_some() {
                                 let last_lce_sn = last_lce.unwrap();
                                 self.database
@@ -2046,14 +2047,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                             subject_id.clone(),
                             success,
                         )?;
-                        let _ = self
+                        /*let _ = self
                             .notification_sender
                             .send(Notification::NewEvent {
                                 sn,
                                 subject_id: subject_id.to_str(),
                             })
                             .await
-                            .map_err(|_| LedgerError::NotificationChannelError);
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                         self.ledger_state.insert(
                             eol_request.subject_id.clone(),
                             LedgerState {
@@ -2178,14 +2179,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         subject_id.clone(),
                                         event.content.eval_success && event.content.approved,
                                     )?;
-                                    let _ = self
+                                    /*let _ = self
                                         .notification_sender
                                         .send(Notification::NewEvent {
                                             sn: event.content.sn,
                                             subject_id: subject_id.to_str(),
                                         })
                                         .await
-                                        .map_err(|_| LedgerError::NotificationChannelError);
+                                        .map_err(|_| LedgerError::NotificationChannelError);*/
                                     let approval_request_hash = &event
                                         .content
                                         .get_approval_hash(
@@ -2203,7 +2204,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                                 data.state = ApprovalState::Obsolete;
                                                 self.database
                                                     .set_approval(approval_request_hash, data)?;
-                                                let _ = self
+                                                /*let _ = self
                                                     .notification_sender
                                                     .send(Notification::ObsoletedApproval {
                                                         id: approval_request_hash.to_str(),
@@ -2213,7 +2214,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                                                     .await
                                                     .map_err(|_| {
                                                         LedgerError::NotificationChannelError
-                                                    });
+                                                    });*/
                                             }
                                         }
                                         Err(error) => match error {
@@ -2658,22 +2659,22 @@ impl<C: DatabaseCollection> Ledger<C> {
             subject_id.clone(),
             success,
         )?;
-        let _ = self
+        /*let _ = self
             .notification_sender
             .send(Notification::NewEvent {
                 sn,
                 subject_id: subject_id.to_str(),
             })
             .await
-            .map_err(|_| LedgerError::NotificationChannelError);
+            .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database.set_subject(&subject_id, subject)?;
-        let _ = self
+        /*let _ = self
             .notification_sender
             .send(Notification::NewSubject {
                 subject_id: subject_id.to_str(),
             })
             .await
-            .map_err(|_| LedgerError::NotificationChannelError);
+            .map_err(|_| LedgerError::NotificationChannelError);*/
         Ok(metadata)
     }
 
@@ -2817,14 +2818,14 @@ impl<C: DatabaseCollection> Ledger<C> {
             return Err(LedgerError::EventNotNext);
         }
         subject.sn = event.content.sn;
-        let _ = self
+        /*let _ = self
             .notification_sender
             .send(Notification::StateUpdated {
                 sn: event.content.sn,
                 subject_id: subject.subject_id.to_str(),
             })
             .await
-            .map_err(|_| LedgerError::NotificationChannelError);
+            .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database
             .set_subject(&event.content.subject_id, subject.clone())?;
         Ok(subject)
@@ -2866,14 +2867,14 @@ impl<C: DatabaseCollection> Ledger<C> {
         // };
         // check_context(&event, metadata, subject.properties.clone())?;
         subject.update_subject(event.content.patch, event.content.sn)?;
-        let _ = self
+        /*let _ = self
             .notification_sender
             .send(Notification::StateUpdated {
                 sn: event.content.sn,
                 subject_id: subject.subject_id.to_str(),
             })
             .await
-            .map_err(|_| LedgerError::NotificationChannelError);
+            .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database.set_subject(&subject_id, subject.clone())?;
         Ok(subject)
     }

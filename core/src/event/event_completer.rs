@@ -35,7 +35,7 @@ use crate::{
     },
     validation::ValidationEvent,
     ApprovalRequest, ApprovalResponse, DatabaseCollection, DigestDerivator, EvaluationResponse,
-    EventRequest, Notification, ValueWrapper,
+    EventRequest, ValueWrapper,
 };
 use std::hash::Hash;
 
@@ -54,7 +54,6 @@ pub struct EventCompleter<C: DatabaseCollection> {
     gov_api: GovernanceAPI,
     database: DB<C>,
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-    notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
     own_identifier: KeyIdentifier,
     subjects_by_governance: HashMap<DigestIdentifier, HashSet<DigestIdentifier>>,
@@ -84,7 +83,6 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         gov_api: GovernanceAPI,
         database: DB<C>,
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
         ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
@@ -93,7 +91,6 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             gov_api,
             database,
             message_channel,
-            notification_tx,
             ledger_sender,
             subjects_completing_event: HashMap::new(),
             // actual_sn: HashMap::new(),

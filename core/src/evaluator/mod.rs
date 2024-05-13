@@ -2,8 +2,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    commons::models::evaluation::EvaluationRequest, identifier::DigestIdentifier,
-    signature::Signature, KeyIdentifier, ValueWrapper,
+    commons::models::evaluation::EvaluationRequest,
+    KeyIdentifier,
 };
 
 use self::errors::EvaluatorErrorResponses;
@@ -31,6 +31,8 @@ pub enum EvaluatorMessage {
 pub enum EvaluatorResponse {
     AskForEvaluation(Result<(), EvaluatorErrorResponses>),
 }
+
+/* 
 #[derive(Clone, Debug)]
 pub struct AskForEvaluationResponse {
     pub governance_version: u64,
@@ -40,3 +42,4 @@ pub struct AskForEvaluationResponse {
     pub approval_required: bool,
     pub signature: Signature,
 }
+*/

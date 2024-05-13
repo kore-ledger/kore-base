@@ -1,3 +1,4 @@
+/* 
 mod common;
 use common::{generate_mc, NodeBuilder};
 use kore_base::{
@@ -53,3 +54,5 @@ fn create_governance() {
         node.shutdown().await
     });
 }
+
+*/

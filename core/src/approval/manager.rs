@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     error::{ApprovalErrorResponse, ApprovalManagerError},
-    inner_manager::{InnerApprovalManager, RequestNotifier},
+    inner_manager::InnerApprovalManager,
     ApprovalMessages, ApprovalResponses, EmitVote,
 };
 
@@ -26,7 +26,7 @@ pub struct ApprovalManager<C: DatabaseCollection> {
     token: CancellationToken,
     governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-    inner_manager: InnerApprovalManager<GovernanceAPI, RequestNotifier, C>,
+    inner_manager: InnerApprovalManager<GovernanceAPI, C>,
 }
 
 pub struct ApprovalAPI {
@@ -41,6 +41,8 @@ impl ApprovalAPI {
 
 #[async_trait]
 pub trait ApprovalAPIInterface {
+    // TODO: Remove this???
+    #[allow(dead_code)]
     async fn request_approval(
         &self,
         data: Signed<ApprovalRequest>,
@@ -59,6 +61,7 @@ pub trait ApprovalAPIInterface {
 
 #[async_trait]
 impl ApprovalAPIInterface for ApprovalAPI {
+
     async fn request_approval(
         &self,
         data: Signed<ApprovalRequest>,
@@ -120,7 +123,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
         token: CancellationToken,
         messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
-        inner_manager: InnerApprovalManager<GovernanceAPI, RequestNotifier, C>,
+        inner_manager: InnerApprovalManager<GovernanceAPI, C>,
     ) -> Self {
         Self {
             input_channel,

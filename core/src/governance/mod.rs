@@ -19,6 +19,7 @@ use error::RequestError;
 
 use self::stage::ValidationStage;
 
+/* 
 #[derive(Debug, Clone)]
 pub struct GovernanceMember {
     pub id: String,
@@ -33,7 +34,7 @@ pub struct SingleGovernance {
     pub members: Vec<GovernanceMember>,
     pub schemas: Vec<()>,
 }
-
+*/
 #[derive(Debug, Clone)]
 pub enum GovernanceMessage {
     GetInitState {

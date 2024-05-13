@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+//
 
 use super::{errors::ProtocolErrors, models::HashId};
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
 /// Self signature trait.
 ///
 pub trait SelfSignature {
+    /* 
     /// Change settings.
     ///
     /// # Arguments
@@ -26,7 +27,7 @@ pub trait SelfSignature {
     /// * `()` - Returns nothing.
     ///
     fn change_settings(&mut self, settings: &Settings);
-
+*/
     /// Get own identifier.
     ///
     /// # Returns
@@ -50,7 +51,9 @@ pub trait SelfSignature {
         content: &T,
         derivator: DigestDerivator,
     ) -> Result<Signature, ProtocolErrors>;
-    fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool;
+
+    // /// Check if signature present.
+    //fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool;
 }
 
 /// Self signature manager.
@@ -89,9 +92,9 @@ impl SelfSignatureManager {
 
 /// Implementation of self signature trait.
 impl SelfSignature for SelfSignatureManager {
-    fn change_settings(&mut self, settings: &Settings) {
-        self.digest_derivator = settings.node.digest_derivator;
-    }
+    //fn change_settings(&mut self, settings: &Settings) {
+    //    self.digest_derivator = settings.node.digest_derivator;
+    //}
 
     fn get_own_identifier(&self) -> KeyIdentifier {
         self.identifier.clone()
@@ -105,9 +108,9 @@ impl SelfSignature for SelfSignatureManager {
         Signature::new(content, &self.keys, derivator).map_err(|_| ProtocolErrors::SignatureError)
     }
 
-    fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool {
-        signers.contains(&self.identifier)
-    }
+    //fn check_if_signature_present(&self, signers: &HashSet<KeyIdentifier>) -> bool {
+    //    signers.contains(&self.identifier)
+    //}
 }
 
 #[cfg(test)]

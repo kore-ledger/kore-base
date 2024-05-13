@@ -268,7 +268,7 @@ impl NetworkWorker {
                 return;
             }
         };
-        //println!("Relay: {} - {:?}", relay_peer, relay_addr);
+        // Listen on the relay address.
         let listen_addr = relay_addr
             .with(Protocol::P2p(relay_peer))
             .with(Protocol::P2pCircuit);
@@ -363,8 +363,23 @@ impl NetworkWorker {
         }
     }
 
-    /// Wait for connection to bootstrap node.
-    pub async fn wait_for_connection(&mut self) -> Result<(), Error> {
+    /// Run the network worker.
+    pub async fn run(&mut self) {
+        // Run connection to bootstrap node.
+        if let Err(error) = self.run_connection().await {
+            error!(TARGET_WORKER, "Error running connection: {:?}", error);
+            self.send_event(NetworkEvent::Error(error)).await;
+            // Irrecoverable error. Cancel the node.
+            self.cancel.cancel();
+            return;
+        }
+
+        // Run main loop.
+        self.run_main().await;
+    }
+
+    /// Run connection to bootstrap node.
+    pub async fn run_connection(&mut self) -> Result<(), Error> {
         info!(TARGET_WORKER, "Running connection loop");
         let mut result = Ok(());
         loop {
@@ -396,10 +411,9 @@ impl NetworkWorker {
                         if self.node_type == NodeType::Bootstrap {
                             self.change_state(NetworkState::Running).await;
                             break;
-                        } else {
+                        } else {                            
+                            error!(TARGET_WORKER, "Can't connect to kore network");
                             self.change_state(NetworkState::Disconnected).await;
-                            result = Err(Error::Network("No more bootstrap nodes.".to_owned()));
-                            break;
                         }
                     }
                 }
@@ -811,7 +825,7 @@ mod tests {
 
         // Spawn the ephemeral node
         tokio::spawn(async move {
-            let _ = node.wait_for_connection().await;
+            let _ = node.run_connection().await;
         });
 
         loop {
@@ -863,7 +877,7 @@ mod tests {
 
         // Spawn the ephemeral node
         tokio::spawn(async move {
-            let _ = node.wait_for_connection().await;
+            let _ = node.run_connection().await;
         });
 
         loop {
@@ -940,13 +954,13 @@ mod tests {
         });
 
         // Wait for connection.
-        if node.wait_for_connection().await.is_err() {
-            error!(TARGET_WORKER, "Error connecting to the network");
-        }
+        //if node.run_connection().await.is_err() {
+        //    error!(TARGET_WORKER, "Error connecting to the network");
+        //}
 
         // Spawn the node
         tokio::spawn(async move {
-            node.run_main().await;
+            node.run().await;
         });
 
         loop {
@@ -1031,7 +1045,7 @@ mod tests {
         let addressable_peer_id = addressable.local_peer_id();
 
         // Wait for connect boot node.
-        if boot.wait_for_connection().await.is_err() {
+        if boot.run_connection().await.is_err() {
             error!(TARGET_WORKER, "Error connecting to the network");
         }
 
@@ -1041,12 +1055,12 @@ mod tests {
         });
 
         // Wait for connect ephemeral node.
-        if ephemeral.wait_for_connection().await.is_err() {
+        if ephemeral.run_connection().await.is_err() {
             error!(TARGET_WORKER, "Error connecting to the network");
         }
 
         // Wait for connect addressable node.
-        if addressable.wait_for_connection().await.is_err() {
+        if addressable.run_connection().await.is_err() {
             error!(TARGET_WORKER, "Error connecting to the network");
         }
 

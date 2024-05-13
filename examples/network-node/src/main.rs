@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(worker.local_peer_id().to_string(), settings.peer_id);
 
     // Wait for connection.
-    worker.wait_for_connection().await?;
+    worker.run_connection().await?;
 
     // Spawn the worker.
     tokio::spawn(async move {

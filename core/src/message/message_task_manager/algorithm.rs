@@ -46,7 +46,7 @@ impl Algorithm {
     pub fn make_future<T: 'static + TaskCommandContent>(
         request: T,
         targets: Vec<KeyIdentifier>,
-        sender: MessageSender,
+        mut sender: MessageSender,
         config: MessageConfig,
     ) -> BoxFuture<'static, Result<(), Error>> {
         async move {
