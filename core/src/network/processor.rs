@@ -4,7 +4,7 @@
 use super::routing::{RoutingBehavior, RoutingBehaviorEvent as RoutingEvent};
 
 use crate::{
-    crypto::{KeyMaterial, KeyPair},
+    keys::{KeyMaterial, KeyPair},
     message::{Command, NetworkEvent},
     ListenAddr, NetworkSettings,
 };

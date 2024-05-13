@@ -1,8 +1,6 @@
 use crate::{
-    commons::{
-        channel::{ChannelData, MpscChannel},
-        identifier::KeyIdentifier,
-    },
+    commons::channel::{ChannelData, MpscChannel},
+    identifier::KeyIdentifier,
     Notification,
 };
 use futures::future::{AbortHandle, Abortable, Aborted};

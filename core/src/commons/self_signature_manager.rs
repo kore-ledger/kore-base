@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 
 use super::{errors::ProtocolErrors, models::HashId};
-use crate::commons::{
-    crypto::{KeyMaterial, KeyPair},
+use crate::{
+    commons::{
+        models::signature::Signature,
+        settings::Settings,
+    },
+    keys::{KeyMaterial, KeyPair},
     identifier::{derive::digest::DigestDerivator, KeyIdentifier},
-    models::signature::Signature,
-    settings::Settings,
+
 };
+
 
 /// Self signature trait.
 ///
@@ -109,7 +113,7 @@ impl SelfSignature for SelfSignatureManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::commons::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
+    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::commons::models::test::Content;
     use crate::commons::settings::Settings;
 

@@ -7,7 +7,7 @@ use crate::commons::models::approval::ApprovalEntity;
 use crate::commons::models::request::KoreRequest;
 use crate::commons::models::state::Subject;
 use crate::commons::models::validation::ValidationProof;
-use crate::crypto::KeyPair;
+use crate::keys::KeyPair;
 use crate::identifier::{DigestIdentifier, KeyIdentifier};
 use crate::signature::{Signature, Signed};
 use crate::{ApprovalState, Event, EventRequest};

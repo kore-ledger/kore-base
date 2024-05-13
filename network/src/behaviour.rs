@@ -371,10 +371,13 @@ mod tests {
         tcp, yamux, Multiaddr, Swarm,
     };
     use libp2p_swarm_test::SwarmExt;
+    use serial_test::serial;
+
     use std::str::FromStr;
     use std::{pin::pin, sync::Arc};
 
     #[tokio::test]
+    #[serial]
     async fn test_relay() {
         let mut boot_nodes = vec![];
         let config = create_config(boot_nodes.clone(), false, NodeType::Bootstrap);
@@ -445,6 +448,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_dcutr() {
         let mut boot_nodes = vec![];
 
@@ -577,6 +581,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_full() {
         let mut boot_nodes = vec![];
 
@@ -746,6 +751,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_reservation_error() {
         // Build node.
         let config = create_config(vec![], false, NodeType::Ephemeral);

@@ -6,13 +6,13 @@ use std::{
 use crate::{
     commons::{
         errors::ChannelErrors,
-        identifier::{Derivable, DigestIdentifier, KeyIdentifier},
         models::{event::Metadata, state::Subject},
         schema_handler::{
             gov_models::{Contract, Quorum, Role, SchemaEnum, Who},
             initial_state::get_governance_initial_state,
         },
     },
+    identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     database::Error as DbError,
     ValueWrapper,
 };

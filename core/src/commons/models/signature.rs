@@ -1,7 +1,7 @@
 //! Define the data structures related to signatures
 use crate::{
     commons::errors::SubjectError,
-    crypto::{KeyMaterial, KeyPair, Payload, DSA},
+    keys::{KeyMaterial, KeyPair, Payload, DSA},
     identifier::{DigestIdentifier, KeyIdentifier, SignatureIdentifier},
     Derivable, DigestDerivator,
 };
@@ -145,7 +145,7 @@ pub mod tests {
     use crate::commons::models::{
         approval::tests::get_approval_request, request::tests::get_eol_request,
     };
-    use crate::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
+    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
 
     /// get signature eol request for tests
     pub fn get_signature_eol_request() -> Signature {

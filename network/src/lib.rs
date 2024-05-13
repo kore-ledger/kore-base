@@ -33,7 +33,7 @@ use serde::Deserialize;
 const MAX_CONNECTIONS_PER_PEER: usize = 2;
 
 /// The network configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct Config {
     /// The user agent.
     pub user_agent: String,
@@ -69,15 +69,18 @@ impl Config {
 }
 
 /// Type of a node.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Default, PartialEq)]
 pub enum NodeType {
     /// Bootstrap node.
     Bootstrap,
     /// Addressable node.
+    #[default]
     Addressable,
     /// Ephemeral node.
     Ephemeral,
 }
+
+
 
 /// Command enumeration for the network service.
 pub enum Command {

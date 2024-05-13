@@ -1091,6 +1091,12 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
 /// A node in the routing table.
 #[derive(Clone, Debug, Deserialize)]
 pub struct RoutingNode {
@@ -1129,8 +1135,10 @@ mod tests {
     use libp2p_swarm_test::SwarmExt;
 
     use futures::prelude::*;
+    use serial_test::serial;
 
     #[tokio::test]
+    #[serial]
     async fn test_routing() {
         let mut boot_nodes = vec![];
 
@@ -1234,6 +1242,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_ignores_peers_with_unknown_protocols() {
         let supported_protocol = "/kore/routing/1.0.0";
         let unsupported_protocol = "/kore/routing/2.0.0";

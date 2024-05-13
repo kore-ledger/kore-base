@@ -1,5 +1,5 @@
 use kore_base::{
-    crypto::{KeyMaterial, KeyPair},
+    keys::{KeyMaterial, KeyPair},
     request::StartRequest,
     signature::{Signature, Signed},
     Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData,

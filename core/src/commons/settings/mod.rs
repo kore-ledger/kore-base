@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use super::{
-    errors::ListenAddrErrors,
-    identifier::derive::{digest::DigestDerivator, KeyDerivator},
-};
+//use super::errors::ListenAddrErrors;
+use crate::identifier::derive::{digest::DigestDerivator, KeyDerivator};
+use network::Config as NetworkSettings;
 use config::Value;
 use serde::Deserialize;
 
@@ -14,28 +13,7 @@ pub struct Settings {
     pub node: NodeSettings,
 }
 
-/// P2P network configuration parameters of a TAPLE node.
-#[derive(Debug, Deserialize, Clone)]
-pub struct NetworkSettings {
-    /// [Multiaddr](https://github.com/multiformats/multiaddr) to consider by the node.
-    pub listen_addr: Vec<ListenAddr>,
-    #[serde(rename = "knownnodes")]
-    /// List of bootstrap nodes to connect to.
-    pub known_nodes: Vec<String>,
-    #[serde(rename = "externaladdress")]
-    /// List of bootstrap nodes to connect to.
-    pub external_address: Vec<String>,
-    /// Maximum number of concurrent streams allowed.
-    #[serde(
-        rename = "maxConcurrentStreams",
-        default = "default_max_concurrent_streams"
-    )]
-    pub max_concurrent_streams: usize,
-    /// Timeout to be used for messages.
-    #[serde(rename = "messageTimeout", default = "default_message_timeout")]
-    pub message_timeout: u64,
-}
-
+/* 
 fn default_max_concurrent_streams() -> usize {
     100
 }
@@ -240,7 +218,7 @@ impl TryFrom<String> for ListenAddr {
         }
     }
 }
-
+*/
 #[derive(Debug, Deserialize, Clone)]
 pub struct AccessPoint {
     #[serde(rename = "peer-id")]
@@ -277,7 +255,7 @@ impl Default for NodeSettings {
             key_derivator: KeyDerivator::Ed25519,
             secret_key: String::from(""),
             digest_derivator:
-                crate::commons::identifier::derive::digest::DigestDerivator::Blake3_256,
+                crate::identifier::derive::digest::DigestDerivator::Blake3_256,
             replication_factor: 0.25f64,
             timeout: 3000u32,
             passvotation: 0,

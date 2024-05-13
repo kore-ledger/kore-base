@@ -60,7 +60,10 @@ sha2 = { workspace = true }
 sha3 = { workspace = true }
 wasmtime = { workspace = true, features = ["cache"], optional = true }
 memsecurity = { workspace = true, features = ["encryption"] }
+prometheus-client = { workspace = true }
 tell = { path = "../protocols/tell" }
+identity = { path = "../identity" }
+network = { path = "../network" }
 
 [dev-dependencies]
 kore-base = { path = ".", features = ["all"] }

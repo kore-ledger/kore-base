@@ -789,9 +789,12 @@ mod tests {
     use identity::keys::KeyPair;
 
     use tokio::sync::mpsc::{self, Receiver};
+    use serial_test::serial;
+
     //use tracing_test::traced_test;
 
     #[tokio::test]
+    #[serial]
     async fn test_no_boot_nodes() {
         let boot_nodes = vec![];
         let token = CancellationToken::new();
@@ -834,6 +837,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_fake_boot_node() {
         let mut boot_nodes = vec![];
         let token = CancellationToken::new();
@@ -889,6 +893,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_connect() {
         let mut boot_nodes = vec![];
 
@@ -980,7 +985,7 @@ mod tests {
     }
 
     #[tokio::test]
-    //#[traced_test]
+    #[serial]
     async fn test_network_worker() {
         let mut boot_nodes = vec![];
 

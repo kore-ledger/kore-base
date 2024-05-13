@@ -20,7 +20,7 @@ use crate::{
         },
         self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
-    crypto::KeyPair,
+    keys::KeyPair,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     ledger::{LedgerCommand, LedgerResponse},

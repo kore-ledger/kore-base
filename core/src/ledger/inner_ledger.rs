@@ -1,7 +1,5 @@
-use crate::commons::crypto::KeyGenerator;
 use crate::commons::models::approval::ApprovalState;
 use crate::commons::models::state::generate_subject_id;
-use crate::crypto::Secp256k1KeyPair;
 use crate::request::{KoreRequest, RequestState};
 use crate::signature::Signed;
 use crate::{
@@ -9,7 +7,7 @@ use crate::{
         channel::SenderEnd,
         models::{evaluation::SubjectContext, state::Subject, validation::ValidationProof},
     },
-    crypto::{Ed25519KeyPair, KeyMaterial, KeyPair},
+    keys::{Ed25519KeyPair, Secp256k1KeyPair, KeyMaterial, KeyPair, KeyGenerator},
     database::{Error as DbError, DB},
     distribution::{error::DistributionManagerError, DistributionMessagesNew},
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},

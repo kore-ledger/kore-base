@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use crate::{
     commons::{
-        identifier::{DigestIdentifier, KeyIdentifier},
         models::event::Metadata,
         schema_handler::gov_models::Contract,
     },
+    identifier::{DigestIdentifier, KeyIdentifier},
     ValueWrapper,
 };
 pub mod error;

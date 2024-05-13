@@ -7,10 +7,10 @@ mod message_task_manager;
 use crate::{
     commons::{
         errors::SubjectError,
-        identifier::KeyIdentifier,
         models::HashId,
         self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
+    identifier::KeyIdentifier,
     signature::Signed,
     DigestDerivator, DigestIdentifier,
 };

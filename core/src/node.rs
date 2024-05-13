@@ -11,8 +11,8 @@ use crate::approval::{
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
-use crate::commons::crypto::{KeyMaterial, KeyPair};
-use crate::commons::identifier::{Derivable, KeyIdentifier};
+use crate::keys::{KeyMaterial, KeyPair};
+use crate::identifier::{Derivable, KeyIdentifier};
 use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::commons::settings::Settings;
@@ -36,21 +36,24 @@ use crate::ledger::manager::EventManagerAPI;
 use crate::ledger::{manager::LedgerManager, LedgerCommand, LedgerResponse};
 use crate::message::{
     MessageContent, MessageReceiver, MessageSender, MessageTaskCommand, MessageTaskManager,
-    NetworkEvent,
 };
-use crate::network::processor::NetworkProcessor;
+//use crate::network::processor::NetworkProcessor;
 use crate::protocol::{KoreMessages, ProtocolChannels, ProtocolManager};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
 use crate::validation::{manager::ValidationManager, Validation};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
+
+use network::{NetworkWorker, Event as NetworkEvent};
+
 use ::futures::Future;
 use log::{error, info};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::*;
 use tokio_util::sync::CancellationToken;
+use prometheus_client::registry::Registry;
 
 use crate::api::{inner_api::InnerApi, Api, ApiManager};
 use crate::error::Error;
@@ -78,7 +81,8 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
     /// for the initialization of the components, mainly due to problems in the initial [configuration](Settings).
     /// # Panics
     /// This method panics if it has not been possible to generate the network layer.
-    pub fn build(settings: Settings, key_pair: KeyPair, database: M) -> Result<(Self, Api), Error> {
+    pub fn build(settings: Settings, key_pair: KeyPair, registry: &mut Registry, database: M) -> Result<(Self, Api), Error> {
+
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
         let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
@@ -129,12 +133,19 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let token = CancellationToken::new();
 
-        let network_manager = NetworkProcessor::new(
-            key_pair.clone(),
-            token.clone(),
-            network_tx,
-            &settings.network,
-        );
+        let mut worker = match NetworkWorker::new(
+            registry, 
+            key_pair.clone(), 
+            settings.network.clone(), 
+            network_tx.clone(), 
+            token.clone()) 
+        {
+            Ok(worker) => worker,
+            Err(e) => {
+                error!("Error creating network worker: {}", e);
+                return Err(Error::NetworkError(e.to_string()));
+            }
+        };
 
         //TODO: change name. It's not a task
         let signature_manager = SelfSignatureManager::new(key_pair.clone(), &settings);
@@ -148,8 +159,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             signature_manager.get_own_identifier(),
         );
 
+        // TODO: refactor network service access.
+        let service = worker.service().clone();
         let network_tx = MessageSender::new(
-            network_manager.client(),
+            service,
             controller_id.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -345,11 +358,20 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         };
 
         let api = Api::new(
-            network_manager.local_peer_id().to_owned(),
+            worker.local_peer_id().to_owned(),
             controller_id.to_str(),
             key_pair.public_key_bytes(),
             api_tx,
         );
+
+        // Await network worker connection
+        // TODO
+
+        // Start network worker
+        tokio::spawn(async move {
+            worker.run_main().await;
+        });
+
 
         tokio::spawn(async move {
             governance_manager.run().await;
@@ -396,10 +418,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         tokio::spawn(async move {
             as_manager.run().await;
-        });
-
-        tokio::spawn(async move {
-            network_manager.run().await;
         });
 
         tokio::spawn(async move {

@@ -96,7 +96,7 @@ pub(crate) mod evaluator;
 pub(crate) mod governance;
 pub(crate) mod ledger;
 pub mod message;
-pub(crate) mod network;
+//pub(crate) mod network;
 pub(crate) mod utils;
 pub(crate) mod validation;
 
@@ -105,9 +105,8 @@ pub(crate) mod protocol;
 
 mod node;
 pub use api::{Api, ApiError};
-pub use commons::crypto;
-pub use commons::identifier;
-pub use commons::identifier::{Derivable, DigestIdentifier, KeyIdentifier, SignatureIdentifier};
+//pub use commons::crypto;
+//pub use commons::identifier;
 pub use commons::models::approval::ApprovalRequest;
 pub use commons::models::approval::ApprovalResponse;
 pub use commons::models::approval::{ApprovalEntity, ApprovalState};
@@ -121,12 +120,11 @@ pub use commons::models::signature;
 pub use commons::models::state::SubjectData;
 pub use commons::{
     errors::ListenAddrErrors,
-    identifier::derive::{digest::DigestDerivator, KeyDerivator},
     models::notification::Notification,
     models::timestamp::TimeStamp,
     models::validation::ValidationProof,
     models::value_wrapper::ValueWrapper,
-    settings::{ListenAddr, NetworkSettings, NodeSettings, Settings},
+    settings::{NodeSettings, Settings},
 };
 pub(crate) use database::DB;
 pub use database::{
@@ -134,3 +132,11 @@ pub use database::{
 };
 pub use error::Error;
 pub use node::Node;
+
+// Export identity
+pub use identity::keys;
+pub use identity::identifier;
+pub use identifier::{Derivable, DigestIdentifier, KeyIdentifier, SignatureIdentifier};
+pub use identifier::derive::{digest::DigestDerivator, KeyDerivator};
+
+pub use network::{Config as NetworkConfig, Event as NetworkEvent};

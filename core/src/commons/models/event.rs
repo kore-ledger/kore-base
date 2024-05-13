@@ -2,10 +2,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    commons::{
-        crypto::{KeyMaterial, KeyPair},
-        errors::SubjectError,
-    },
+    commons::errors::SubjectError,
+    keys::{KeyMaterial, KeyPair},
     identifier::{DigestIdentifier, KeyIdentifier},
     request::EventRequest,
     signature::{Signature, Signed},

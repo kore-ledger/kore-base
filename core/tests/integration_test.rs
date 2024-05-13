@@ -1,7 +1,7 @@
 mod common;
 use common::{generate_mc, NodeBuilder};
 use kore_base::{
-    crypto::{Ed25519KeyPair, KeyGenerator, KeyPair},
+    keys::{Ed25519KeyPair, KeyGenerator, KeyPair},
     DigestDerivator,
 };
 

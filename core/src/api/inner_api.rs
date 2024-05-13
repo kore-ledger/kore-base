@@ -16,10 +16,8 @@ use crate::ApprovalState;
 use crate::{KeyDerivator, KeyIdentifier};
 // use crate::ledger::errors::LedgerManagerError;
 use crate::{
-    commons::{
-        identifier::DigestIdentifier,
-        models::{request::EventRequest, state::SubjectData},
-    },
+    commons::models::{request::EventRequest, state::SubjectData},
+    identifier::DigestIdentifier,
     DatabaseCollection, DB,
 };
 use std::collections::HashSet;

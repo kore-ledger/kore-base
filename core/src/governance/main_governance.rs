@@ -6,10 +6,10 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     commons::{
         channel::{ChannelData, MpscChannel, SenderEnd},
-        identifier::{DigestIdentifier, KeyIdentifier},
         models::event::Metadata,
         schema_handler::{get_governance_schema, gov_models::Contract},
     },
+    identifier::{DigestIdentifier, KeyIdentifier},
     DatabaseCollection, DatabaseManager, Notification, ValueWrapper, DB,
 };
 

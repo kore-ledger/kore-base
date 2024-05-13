@@ -8,13 +8,11 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{commons::channel::SenderEnd, signature::Signed, KeyIdentifier, Notification};
 
+use network::Event as NetworkEvent;
+
 use super::{MessageContent, TaskCommandContent};
 
-#[derive(Debug)]
-pub enum NetworkEvent {
-    MessageReceived { message: Vec<u8> },
-}
-
+/// A message receiver that listens for incoming messages and forwards them to the sender.
 pub struct MessageReceiver<T>
 where
     T: TaskCommandContent + Serialize + DeserializeOwned,
@@ -48,7 +46,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                event = self.receiver.next() => if let Some(NetworkEvent::MessageReceived { message }) = event {
+                event = self.receiver.next() => if let Some(NetworkEvent::MessageReceived { message, .. }) = event {
                     // The message will be a string for now
                     // Deserialize the message
                     let cur = Cursor::new(message);
