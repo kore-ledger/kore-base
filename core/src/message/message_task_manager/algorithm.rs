@@ -1,4 +1,4 @@
-use crate::commons::identifier::{Derivable, KeyIdentifier};
+use crate::identifier::{Derivable, KeyIdentifier};
 use futures::{future::BoxFuture, prelude::*};
 use log::debug;
 
@@ -17,7 +17,7 @@ impl Algorithm {
     }
 
     pub fn make_indefinite_future<T: 'static + TaskCommandContent>(
-        sender: MessageSender,
+        mut sender: MessageSender,
         config: MessageConfig,
         request: T,
         targets: Vec<KeyIdentifier>,
@@ -46,7 +46,7 @@ impl Algorithm {
     pub fn make_future<T: 'static + TaskCommandContent>(
         request: T,
         targets: Vec<KeyIdentifier>,
-        sender: MessageSender,
+        mut sender: MessageSender,
         config: MessageConfig,
     ) -> BoxFuture<'static, Result<(), Error>> {
         async move {

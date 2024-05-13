@@ -1,9 +1,16 @@
-// Copyright 2023 Antonio Estévez
+// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! # Codec
 //! This module contains the codec trait for encoding and decoding messages.
 //!
+
+#[cfg(feature = "binary")]
+pub mod binary;
+#[cfg(feature = "borsh")]
+pub mod borsh;
+#[cfg(feature = "json")]
+pub mod json;
 
 use async_trait::async_trait;
 use futures::prelude::*;

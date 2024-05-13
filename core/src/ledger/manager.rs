@@ -78,7 +78,8 @@ impl<C: DatabaseCollection> LedgerManager<C> {
                             let result = self.process_command(command).await;
                             if result.is_err() {
                                 log::error!("{}", result.unwrap_err());
-                                break;
+                                // TODO: Manage error. For now, we cancel the token.
+                                self.token.cancel();
                             }
                         }
                         None => {

@@ -6,7 +6,7 @@ use crate::{
     database::{Error as DbError, DB},
     evaluator::errors::{CompilerError, CompilerErrorResponses},
     governance::{GovernanceInterface, GovernanceUpdatedMessage},
-    DatabaseCollection, Derivable, DigestIdentifier, Notification,
+    DatabaseCollection, Derivable, DigestIdentifier,
 };
 
 use log::{debug, info};
@@ -18,8 +18,6 @@ pub struct KoreCompiler<C: DatabaseCollection, G: GovernanceInterface> {
     input_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     inner_compiler: Compiler<C, G>,
     token: CancellationToken,
-    // TODO: Could be removed?
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection, G: GovernanceInterface + Send> KoreCompiler<C, G> {
@@ -30,15 +28,12 @@ impl<C: DatabaseCollection, G: GovernanceInterface + Send> KoreCompiler<C, G> {
         contracts_path: String,
         engine: Engine,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ) -> Self {
         Self {
             input_channel,
             inner_compiler: Compiler::<C, G>::new(database, gov_api, engine, contracts_path),
             token,
-            // TODO: Could be removed?
-            _notification_tx: notification_tx,
-        }
+         }
     }
 
     pub async fn start(mut self) {

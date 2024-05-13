@@ -13,17 +13,16 @@ pub(crate) struct PrevalidatedEventDb<C: DatabaseCollection> {
 
 /// Prevalidated event database implementation.
 impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
-
     /// Create a new prevalidated event database.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `manager` - Database manager.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Self` - Returns prevalidated event database.
-    /// 
+    ///
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
             collection: manager.create_collection("prevalidated_event"),
@@ -32,15 +31,15 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
     }
 
     /// Get the prevalidated event.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<Signed<Event>, DbError>` - Returns the prevalidated event.
-    /// 
+    ///
     pub fn get_prevalidated_event(
         &self,
         subject_id: &DigestIdentifier,
@@ -55,16 +54,16 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
     }
 
     /// Put the prevalidated event.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
     /// * `event` - Prevalidated event.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), DbError>` - Returns Ok if the prevalidated event is put.
-    /// 
+    ///
     pub fn set_prevalidated_event(
         &self,
         subject_id: &DigestIdentifier,
@@ -82,15 +81,15 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
     }
 
     /// Delete the prevalidated event.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), DbError>` - Returns Ok if the prevalidated event is deleted.
-    /// 
+    ///
     pub fn del_prevalidated_event(&self, subject_id: &DigestIdentifier) -> Result<(), DbError> {
         let key_elements: Vec<Element> = vec![
             Element::S(self.prefix.clone()),
@@ -100,4 +99,3 @@ impl<C: DatabaseCollection> PrevalidatedEventDb<C> {
         self.collection.del(&key)
     }
 }
-

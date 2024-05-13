@@ -6,15 +6,13 @@ use tokio::sync::mpsc::{self};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{commons::channel::SenderEnd, signature::Signed, KeyIdentifier, Notification};
+use crate::{commons::channel::SenderEnd, signature::Signed, KeyIdentifier};
+
+use network::Event as NetworkEvent;
 
 use super::{MessageContent, TaskCommandContent};
 
-#[derive(Debug)]
-pub enum NetworkEvent {
-    MessageReceived { message: Vec<u8> },
-}
-
+/// A message receiver that listens for incoming messages and forwards them to the sender.
 pub struct MessageReceiver<T>
 where
     T: TaskCommandContent + Serialize + DeserializeOwned,
@@ -22,8 +20,6 @@ where
     receiver: ReceiverStream<NetworkEvent>,
     sender: SenderEnd<Signed<MessageContent<T>>, ()>,
     token: CancellationToken,
-    // TODO: Could be removed?
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     own_id: KeyIdentifier,
 }
 
@@ -32,7 +28,6 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
         receiver: mpsc::Receiver<NetworkEvent>,
         sender: SenderEnd<Signed<MessageContent<T>>, ()>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
         own_id: KeyIdentifier,
     ) -> Self {
         let receiver = ReceiverStream::new(receiver);
@@ -40,7 +35,6 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
             receiver,
             sender,
             token,
-            _notification_tx: notification_tx,
             own_id,
         }
     }
@@ -48,7 +42,7 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                event = self.receiver.next() => if let Some(NetworkEvent::MessageReceived { message }) = event {
+                event = self.receiver.next() => if let Some(NetworkEvent::MessageReceived { message, .. }) = event {
                     // The message will be a string for now
                     // Deserialize the message
                     let cur = Cursor::new(message);

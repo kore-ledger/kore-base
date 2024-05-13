@@ -1,18 +1,18 @@
-/// Copyright 2024 Antonio Estévez
+// Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #[cfg(feature = "approval")]
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
 use crate::approval::{
-    inner_manager::{InnerApprovalManager, RequestNotifier},
+    inner_manager::InnerApprovalManager,
     ApprovalMessages, ApprovalResponses,
 };
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
-use crate::commons::crypto::{KeyMaterial, KeyPair};
-use crate::commons::identifier::{Derivable, KeyIdentifier};
+use crate::keys::{KeyMaterial, KeyPair};
+use crate::identifier::{Derivable, KeyIdentifier};
 use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::commons::settings::Settings;
@@ -36,22 +36,24 @@ use crate::ledger::manager::EventManagerAPI;
 use crate::ledger::{manager::LedgerManager, LedgerCommand, LedgerResponse};
 use crate::message::{
     MessageContent, MessageReceiver, MessageSender, MessageTaskCommand, MessageTaskManager,
-    NetworkEvent,
 };
-use crate::network::network_processor::NetworkProcessor;
+//use crate::network::processor::NetworkProcessor;
 use crate::protocol::{KoreMessages, ProtocolChannels, ProtocolManager};
 use crate::signature::Signed;
 #[cfg(feature = "validation")]
 use crate::validation::{manager::ValidationManager, Validation};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
+
+use network::{NetworkWorker, Event as NetworkEvent};
+
 use ::futures::Future;
-use libp2p::{Multiaddr, PeerId};
 use log::{error, info};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::*;
 use tokio_util::sync::CancellationToken;
+use prometheus_client::registry::Registry;
 
 use crate::api::{inner_api::InnerApi, Api, ApiManager};
 use crate::error::Error;
@@ -79,10 +81,11 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
     /// for the initialization of the components, mainly due to problems in the initial [configuration](Settings).
     /// # Panics
     /// This method panics if it has not been possible to generate the network layer.
-    pub fn build(settings: Settings, key_pair: KeyPair, database: M) -> Result<(Self, Api), Error> {
+    pub fn build(settings: Settings, key_pair: KeyPair, registry: &mut Registry, database: M) -> Result<Api, Error> {
+
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
-        let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
+        //let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
 
         let (network_tx, network_rx): (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>) =
             mpsc::channel(BUFFER_SIZE);
@@ -130,16 +133,19 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let token = CancellationToken::new();
 
-        let network_manager = NetworkProcessor::new(
-            settings.network.listen_addr.clone(),
-            network_access_points(&settings.network.known_nodes)?,
-            network_tx,
-            key_pair.clone(),
-            token.clone(),
-            notification_tx.clone(),
-            external_addresses(&settings.network.external_address)?,
-        )
-        .expect("Network created");
+        let mut worker = match NetworkWorker::new(
+            registry, 
+            key_pair.clone(), 
+            settings.network.clone(), 
+            network_tx.clone(), 
+            token.clone()) 
+        {
+            Ok(worker) => worker,
+            Err(e) => {
+                error!("Error creating network worker: {}", e);
+                return Err(Error::NetworkError(e.to_string()));
+            }
+        };
 
         //TODO: change name. It's not a task
         let signature_manager = SelfSignatureManager::new(key_pair.clone(), &settings);
@@ -149,19 +155,27 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             network_rx,
             protocol_tx,
             token.clone(),
-            notification_tx.clone(),
             signature_manager.get_own_identifier(),
         );
 
+        // TODO: refactor network service access.
+        let service = worker.service().clone();
+        let service = match service.read() {
+            Ok(service) => service,
+            Err(e) => {
+                error!("Error accessing network service: {}", e);
+                return Err(Error::NetworkError(e.to_string()));
+            }
+        };
         let network_tx = MessageSender::new(
-            network_manager.client(),
+            service.sender(),
             controller_id.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
         );
 
         let task_manager =
-            MessageTaskManager::new(network_tx, task_rx, token.clone(), notification_tx.clone());
+            MessageTaskManager::new(network_tx, task_rx, token.clone(),);
 
         // Defines protocol channels
         let channels = ProtocolChannels {
@@ -179,13 +193,12 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         // Build protocol manager
         let protocol_manager =
-            ProtocolManager::new(channels, token.clone(), notification_tx.clone());
+            ProtocolManager::new(channels, token.clone());
 
         // Build governance
         let mut governance_manager = Governance::<M, C>::new(
             governance_rx,
             token.clone(),
-            notification_tx.clone(),
             DB::new(database.clone()),
             governance_update_sx.clone(),
         );
@@ -195,7 +208,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
             task_tx.clone(),
-            notification_tx.clone(),
             ledger_tx.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -216,20 +228,19 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             task_tx.clone(),
             distribution_tx,
             controller_id.clone(),
-            notification_tx.clone(),
             settings.node.digest_derivator,
         );
 
         // Build ledger manager
         let ledger_manager = LedgerManager::new(ledger_rx, inner_ledger, token.clone());
 
+        // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
             as_rx,
             DB::new(database.clone()),
             task_tx.clone(),
             controller_id.clone(),
             token.clone(),
-            notification_tx.clone(),
         );
 
         // Build api
@@ -260,7 +271,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.smartcontracts_directory.clone(),
                 engine.clone(),
                 token.clone(),
-                notification_tx.clone(),
             );
 
             // Build core runner
@@ -290,7 +300,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             let inner_approval = InnerApprovalManager::new(
                 GovernanceAPI::new(governance_tx.clone()),
                 DB::new(database.clone()),
-                RequestNotifier::new(notification_tx.clone()),
                 signature_manager.clone(),
                 passvotation,
                 settings.node.digest_derivator,
@@ -319,7 +328,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             distribution_rx,
             governance_update_sx.subscribe(),
             token.clone(),
-            notification_tx.clone(),
             inner_distribution,
         );
 
@@ -338,23 +346,21 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 validation_rx,
                 inner_validation,
                 token.clone(),
-                notification_tx,
             )
         };
 
-        let taple = Node {
-            notification_rx,
-            token,
-            _m: PhantomData,
-            _c: PhantomData,
-        };
-
         let api = Api::new(
-            network_manager.local_peer_id().to_owned(),
+            worker.local_peer_id().to_owned(),
             controller_id.to_str(),
             key_pair.public_key_bytes(),
             api_tx,
         );
+
+        // Start network worker
+        tokio::spawn(async move {
+            worker.run().await;
+        });
+
 
         tokio::spawn(async move {
             governance_manager.run().await;
@@ -404,14 +410,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         });
 
         tokio::spawn(async move {
-            network_manager.run().await;
-        });
-
-        tokio::spawn(async move {
             api_manager.run().await;
         });
 
-        Ok((taple, api))
+        Ok(api)
     }
 
     /// Receive a single notification
@@ -507,56 +509,5 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 .map_err(|e| Error::DatabaseError(e.to_string()))?;
         }
         Ok(key_identifier)
-    }
-}
-
-// TODO: move to better place, maybe settings
-fn network_access_points(points: &[String]) -> Result<Vec<(PeerId, Multiaddr)>, Error> {
-    let mut access_points: Vec<(PeerId, Multiaddr)> = Vec::new();
-    for point in points {
-        let data: Vec<&str> = point.split("/p2p/").collect();
-        if data.len() != 2 {
-            return Err(Error::AcessPointError(point.to_string()));
-        }
-        if let Some(value) = multiaddr(point) {
-            if let Ok(id) = data[1].parse::<PeerId>() {
-                access_points.push((id, value));
-            } else {
-                return Err(Error::AcessPointError(format!(
-                    "Invalid PeerId conversion: {}",
-                    point
-                )));
-            }
-        } else {
-            return Err(Error::AcessPointError(format!(
-                "Invalid MultiAddress conversion: {}",
-                point
-            )));
-        }
-    }
-    Ok(access_points)
-}
-
-// TODO: move to better place, maybe settings
-fn external_addresses(addresses: &[String]) -> Result<Vec<Multiaddr>, Error> {
-    let mut external_addresses: Vec<Multiaddr> = Vec::new();
-    for address in addresses {
-        if let Some(value) = multiaddr(address) {
-            external_addresses.push(value);
-        } else {
-            return Err(Error::AcessPointError(format!(
-                "Invalid MultiAddress conversion in External Address: {}",
-                address
-            )));
-        }
-    }
-    Ok(external_addresses)
-}
-
-// TODO: move to better place, maybe settings
-fn multiaddr(addr: &str) -> Option<Multiaddr> {
-    match addr.parse::<Multiaddr>() {
-        Ok(a) => Some(a),
-        Err(_) => None,
     }
 }

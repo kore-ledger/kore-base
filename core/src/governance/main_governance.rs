@@ -6,11 +6,11 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     commons::{
         channel::{ChannelData, MpscChannel, SenderEnd},
-        identifier::{DigestIdentifier, KeyIdentifier},
         models::event::Metadata,
         schema_handler::{get_governance_schema, gov_models::Contract},
     },
-    DatabaseCollection, DatabaseManager, Notification, ValueWrapper, DB,
+    identifier::{DigestIdentifier, KeyIdentifier},
+    DatabaseCollection, DatabaseManager, ValueWrapper, DB,
 };
 
 use super::{
@@ -23,8 +23,6 @@ use super::{
 pub struct Governance<M: DatabaseManager<C>, C: DatabaseCollection> {
     input: MpscChannel<GovernanceMessage, GovernanceResponse>,
     token: CancellationToken,
-    // TODO: What do we do with this?
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
     inner_governance: InnerGovernance<C>,
     _m: PhantomData<M>,
 }
@@ -33,14 +31,12 @@ impl<M: DatabaseManager<C>, C: DatabaseCollection> Governance<M, C> {
     pub fn new(
         input: MpscChannel<GovernanceMessage, GovernanceResponse>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
         repo_access: DB<C>,
         update_channel: tokio::sync::broadcast::Sender<GovernanceUpdatedMessage>,
     ) -> Self {
         Self {
             input,
             token,
-            _notification_tx: notification_tx,
             inner_governance: InnerGovernance::new(
                 repo_access,
                 get_governance_schema(),

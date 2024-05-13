@@ -13,17 +13,16 @@ pub(crate) struct PreauthorizedSbujectsAndProovidersDb<C: DatabaseCollection> {
 
 /// Preauthorized subjects and providers database implementation.
 impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
-
     /// Create a new preauthorized subjects and providers database.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `manager` - Database manager.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Self` - Returns preauthorized subjects and providers database.
-    /// 
+    ///
     pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
         Self {
             collection: manager.create_collection("preauthorized_subjects_and_providers"),
@@ -32,15 +31,15 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
     }
 
     /// Get the preauthorized subject and providers.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<HashSet<KeyIdentifier>, DbError>` - Returns the preauthorized subject and providers.
-    /// 
+    ///
     pub fn get_preauthorized_subject_and_providers(
         &self,
         subject_id: &DigestIdentifier,
@@ -57,16 +56,16 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
     }
 
     /// Get the allowed subjects and providers.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `from` - From.
     /// * `quantity` - Quantity.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<Vec<(DigestIdentifier, HashSet<KeyIdentifier>)>, DbError>` - Returns the allowed subjects and providers.
-    /// 
+    ///
     pub fn get_allowed_subjects_and_providers(
         &self,
         from: Option<String>,
@@ -84,16 +83,16 @@ impl<C: DatabaseCollection> PreauthorizedSbujectsAndProovidersDb<C> {
     }
 
     /// Put the preauthorized subject and providers.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `subject_id` - Subject id.
     /// * `providers` - Providersset.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), DbError>` - Returns Ok if the preauthorized subject and providers is put.
-    /// 
+    ///
     pub fn set_preauthorized_subject_and_providers(
         &self,
         subject_id: &DigestIdentifier,

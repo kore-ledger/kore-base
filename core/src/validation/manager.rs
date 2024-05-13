@@ -3,7 +3,6 @@ use tokio_util::sync::CancellationToken;
 use super::{errors::ValidationError, Validation, ValidationCommand, ValidationResponse};
 use crate::commons::channel::{ChannelData, MpscChannel, SenderEnd};
 use crate::database::DatabaseCollection;
-use crate::Notification;
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -24,7 +23,6 @@ pub struct ValidationManager<C: DatabaseCollection> {
     /// Validation functions
     inner_validation: Validation<C>,
     token: CancellationToken,
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<C: DatabaseCollection> ValidationManager<C> {
@@ -32,13 +30,11 @@ impl<C: DatabaseCollection> ValidationManager<C> {
         input_channel: MpscChannel<ValidationCommand, ValidationResponse>,
         inner_validation: Validation<C>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ) -> Self {
         Self {
             input_channel,
             inner_validation,
             token,
-            _notification_tx: notification_tx,
         }
     }
 

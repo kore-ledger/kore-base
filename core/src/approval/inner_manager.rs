@@ -12,11 +12,12 @@ use crate::{
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     request::EventRequest,
     signature::Signed,
-    ApprovalRequest, DatabaseCollection, DigestDerivator, Notification,
+    ApprovalRequest, DatabaseCollection, DigestDerivator,
 };
 
 use super::error::{ApprovalErrorResponse, ApprovalManagerError};
 
+/* 
 pub trait NotifierInterface {
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64);
     fn request_obsolete(&self, id: String, subject_id: String, sn: u64);
@@ -49,12 +50,12 @@ impl NotifierInterface for RequestNotifier {
             .send(Notification::ObsoletedApproval { id, subject_id, sn });
     }
 }
+*/
 
-pub struct InnerApprovalManager<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
+pub struct InnerApprovalManager<G: GovernanceInterface, C: DatabaseCollection>
 {
     governance: G,
     database: DB<C>,
-    notifier: N,
     signature_manager: SelfSignatureManager,
     // Cola de 1 elemento por sujeto
     // subject_been_approved: HashMap<DigestIdentifier, DigestIdentifier>, // SubjectID -> ReqId
@@ -62,13 +63,12 @@ pub struct InnerApprovalManager<G: GovernanceInterface, N: NotifierInterface, C:
     derivator: DigestDerivator,
 }
 
-impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
-    InnerApprovalManager<G, N, C>
+impl<G: GovernanceInterface, C: DatabaseCollection>
+    InnerApprovalManager<G, C>
 {
     pub fn new(
         governance: G,
         database: DB<C>,
-        notifier: N,
         signature_manager: SelfSignatureManager,
         pass_votation: VotationType,
         derivator: DigestDerivator,
@@ -76,7 +76,6 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         Self {
             governance,
             database,
-            notifier,
             signature_manager,
             // subject_been_approved: HashMap::new(),
             pass_votation,
@@ -158,11 +157,11 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
                     _ => return Err(ApprovalManagerError::UnexpectedRequestType),
                 }
             };
-            self.notifier.request_obsolete(
+            /*self.notifier.request_obsolete(
                 approval_entity.id.to_str(),
                 subject_id.to_str(),
                 approval_entity.request.content.sn,
-            );
+            );*/
             self.database
                 .del_approval(&request)
                 .map_err(|_| ApprovalManagerError::DatabaseError)?;
@@ -281,7 +280,7 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         // - VotarionType::AlwaysAccept => Yes vote is cast
         // - VotarionType::AlwaysReject => Negative vote cast
         let gov_id = approval_request.content.gov_id.clone();
-        let sn = approval_request.content.sn;
+        //let sn = approval_request.content.sn;
         let approval_entity = ApprovalEntity {
             id: id.clone(),
             request: approval_request,
@@ -300,8 +299,8 @@ impl<G: GovernanceInterface, N: NotifierInterface, C: DatabaseCollection>
         let Ok(_result) = self.database.set_approval(&id, approval_entity) else {
             return Err(ApprovalManagerError::DatabaseError);
         };
-        self.notifier
-            .request_reached(&id.to_str(), &subject_id.to_str(), sn);
+        /*self.notifier
+            .request_reached(&id.to_str(), &subject_id.to_str(), sn);*/
 
         match self.pass_votation {
             VotationType::Normal => Ok(Ok(None)),

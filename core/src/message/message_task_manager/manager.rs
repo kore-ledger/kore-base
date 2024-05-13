@@ -1,9 +1,6 @@
 use crate::{
-    commons::{
-        channel::{ChannelData, MpscChannel},
-        identifier::KeyIdentifier,
-    },
-    Notification,
+    commons::channel::{ChannelData, MpscChannel},
+    identifier::KeyIdentifier,
 };
 use futures::future::{AbortHandle, Abortable, Aborted};
 use log::debug;
@@ -30,8 +27,6 @@ where
     receiver: MpscChannel<MessageTaskCommand<T>, ()>,
     sender: MessageSender,
     token: CancellationToken,
-    // TODO: Could be removed?
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
 }
 
 impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTaskManager<T> {
@@ -39,14 +34,12 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageTask
         sender: MessageSender,
         receiver: MpscChannel<MessageTaskCommand<T>, ()>,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ) -> MessageTaskManager<T> {
         MessageTaskManager {
             list: HashMap::new(),
             receiver,
             sender,
             token,
-            _notification_tx: notification_tx,
         }
     }
 

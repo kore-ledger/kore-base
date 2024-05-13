@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use crate::{
     commons::{
-        identifier::{DigestIdentifier, KeyIdentifier},
         models::event::Metadata,
         schema_handler::gov_models::Contract,
     },
+    identifier::{DigestIdentifier, KeyIdentifier},
     ValueWrapper,
 };
 pub mod error;
@@ -19,6 +19,7 @@ use error::RequestError;
 
 use self::stage::ValidationStage;
 
+/* 
 #[derive(Debug, Clone)]
 pub struct GovernanceMember {
     pub id: String,
@@ -33,7 +34,7 @@ pub struct SingleGovernance {
     pub members: Vec<GovernanceMember>,
     pub schemas: Vec<()>,
 }
-
+*/
 #[derive(Debug, Clone)]
 pub enum GovernanceMessage {
     GetInitState {

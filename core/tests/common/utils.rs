@@ -1,10 +1,12 @@
+
+/* 
 use kore_base::{
-    crypto::{KeyMaterial, KeyPair},
+    keys::{KeyMaterial, KeyPair},
     request::StartRequest,
     signature::{Signature, Signed},
     Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData,
 };
-use libp2p::identity::ed25519::Keypair as EdKeyPair;
+use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
 
 pub async fn check_subject(
@@ -53,12 +55,13 @@ impl McNodeData {
 }
 
 pub fn generate_mc(keys: KeyPair) -> McNodeData {
-    let peer_id = PeerId::from_public_key(
-        &libp2p::identity::Keypair::Ed25519(
-            EdKeyPair::decode(&mut keys.to_bytes()).expect("Decode of Ed25519 possible"),
-        )
-        .public(),
-    );
+    let peer_id = {
+        let sk =
+            ed25519::SecretKey::try_from_bytes(keys.secret_key_bytes()).expect("Invalid keypair");
+        let kp = ed25519::Keypair::from(sk);
+        let key_pair = Keypair::from(kp);
+        PeerId::from_public_key(&key_pair.public())
+    };
     McNodeData { keys, peer_id }
 }
 
@@ -75,3 +78,4 @@ pub fn create_governance_request<S: Into<String>>(
         public_key,
     })
 }
+*/

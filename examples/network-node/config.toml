@@ -1,0 +1,11 @@
+node_type = "Bootstrap"
+peer_id = "12D3KooWNPP1uxL9NP4zbctjT2cGTi3vSyZjQn8UngpATPfYLqiU"
+private_key = "a022f1626c995419b077a2df080cc5add736648cddbc5a593cfb1f72a82be4dc"
+listen_addresses = ["/ip4/127.0.0.1/tcp/54421"]
+boot_nodes = [
+    {peer_id = "12D3KooWNPP1uxL9NP4zbctjT2cGTi3vSyZjQn8UngpATPfYLqiU", address = "/ip4/127.0.0.1/tcp/54421"},
+]
+dht_random_walk = true
+allow_non_globals_in_dht = true
+allow_private_ip = true
+mdns = false

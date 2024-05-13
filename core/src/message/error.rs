@@ -32,4 +32,6 @@ pub enum Error {
     ChannelClosed,
     #[error("Error Creating message")]
     CreatingMessage,
+    #[error("Error accessing the network service")]
+    NetworkService,
 }

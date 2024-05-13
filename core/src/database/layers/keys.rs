@@ -1,5 +1,5 @@
 use super::utils::{get_key, Element};
-use crate::crypto::KeyPair;
+use crate::keys::KeyPair;
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
 use crate::{DatabaseCollection, DatabaseManager, Derivable, KeyIdentifier};
@@ -110,8 +110,8 @@ impl<C: DatabaseCollection> KeysDb<C> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::crypto::KeyMaterial;
-    use crate::crypto::{Ed25519KeyPair, KeyGenerator, KeyPair};
+    use crate::keys::KeyMaterial;
+    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::database::DatabaseManager;
     use crate::database::MemoryManager;
     use crate::KeyIdentifier;

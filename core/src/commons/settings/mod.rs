@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use super::{
-    errors::ListenAddrErrors,
-    identifier::derive::{digest::DigestDerivator, KeyDerivator},
-};
+//use super::errors::ListenAddrErrors;
+use crate::identifier::derive::{digest::DigestDerivator, KeyDerivator};
+use network::Config as NetworkSettings;
 use config::Value;
 use serde::Deserialize;
 
@@ -14,17 +13,13 @@ pub struct Settings {
     pub node: NodeSettings,
 }
 
-/// P2P network configuration parameters of a TAPLE node.
-#[derive(Debug, Deserialize, Clone)]
-pub struct NetworkSettings {
-    /// [Multiaddr](https://github.com/multiformats/multiaddr) to consider by the node.
-    pub listen_addr: Vec<ListenAddr>,
-    #[serde(rename = "knownnodes")]
-    /// List of bootstrap nodes to connect to.
-    pub known_nodes: Vec<String>,
-    #[serde(rename = "externaladdress")]
-    /// List of bootstrap nodes to connect to.
-    pub external_address: Vec<String>,
+/* 
+fn default_max_concurrent_streams() -> usize {
+    100
+}
+
+fn default_message_timeout() -> u64 {
+    10
 }
 
 impl Default for NetworkSettings {
@@ -33,6 +28,8 @@ impl Default for NetworkSettings {
             listen_addr: vec![ListenAddr::default()],
             known_nodes: Vec::<String>::new(),
             external_address: vec![],
+            max_concurrent_streams: 100,
+            message_timeout: 10,
         }
     }
 }
@@ -221,7 +218,7 @@ impl TryFrom<String> for ListenAddr {
         }
     }
 }
-
+*/
 #[derive(Debug, Deserialize, Clone)]
 pub struct AccessPoint {
     #[serde(rename = "peer-id")]
@@ -248,7 +245,7 @@ pub struct NodeSettings {
     pub timeout: u32,
     #[doc(hidden)]
     pub passvotation: u8,
-    #[cfg(feature = "evaluation")]
+    //#[cfg(feature = "evaluation")]
     pub smartcontracts_directory: String,
 }
 
@@ -258,7 +255,7 @@ impl Default for NodeSettings {
             key_derivator: KeyDerivator::Ed25519,
             secret_key: String::from(""),
             digest_derivator:
-                crate::commons::identifier::derive::digest::DigestDerivator::Blake3_256,
+                crate::identifier::derive::digest::DigestDerivator::Blake3_256,
             replication_factor: 0.25f64,
             timeout: 3000u32,
             passvotation: 0,

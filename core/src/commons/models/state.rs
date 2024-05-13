@@ -1,9 +1,7 @@
 use crate::{
-    commons::{
-        crypto::KeyPair,
-        errors::SubjectError,
-        identifier::{DigestIdentifier, KeyIdentifier},
-    },
+    commons::errors::SubjectError,
+    identifier::{DigestIdentifier, KeyIdentifier},
+    keys::KeyPair,
     signature::Signed,
     Derivable, DigestDerivator, Event,
 };

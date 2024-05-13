@@ -16,7 +16,7 @@ use crate::evaluator::EvaluatorResponse;
 use crate::validation::ValidationCommand;
 #[cfg(feature = "validation")]
 use crate::validation::ValidationResponse;
-use crate::{approval::ApprovalMessages, Notification};
+use crate::approval::ApprovalMessages;
 use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     distribution::{error::DistributionManagerError, DistributionMessagesNew},
@@ -69,14 +69,13 @@ pub struct ProtocolManager {
     approval_sx: SenderEnd<ApprovalMessages, ApprovalResponses>,
     ledger_sx: SenderEnd<LedgerCommand, LedgerResponse>,
     token: CancellationToken,
-    _notification_tx: tokio::sync::mpsc::Sender<Notification>,
+
 }
 
 impl ProtocolManager {
     pub fn new(
         channels: ProtocolChannels,
         token: CancellationToken,
-        notification_tx: tokio::sync::mpsc::Sender<Notification>,
     ) -> Self {
         Self {
             input: channels.input_channel,
@@ -90,7 +89,6 @@ impl ProtocolManager {
             approval_sx: channels.approval_channel,
             ledger_sx: channels.ledger_channel,
             token,
-            _notification_tx: notification_tx,
         }
     }
 

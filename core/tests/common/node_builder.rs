@@ -1,12 +1,15 @@
+
+/* 
 use std::str::FromStr;
 
 use kore_base::{
-    Api, DigestIdentifier, Error, ListenAddr, MemoryCollection, MemoryManager, Notification,
+    Api, DigestIdentifier, Error, MemoryCollection, MemoryManager, Notification,
     Settings,
 };
 
-use kore_base::{crypto::KeyPair, Node};
+use kore_base::{keys::KeyPair, Node};
 use tokio::time::{sleep, Duration};
+use prometheus_client::registry::Registry;
 
 use super::error::NotifierError;
 
@@ -30,16 +33,17 @@ impl NodeBuilder {
 
     pub fn build(self) -> Result<OnMemoryNode, Error> {
         let mut settings = Settings::default();
-        settings.network.listen_addr = vec![ListenAddr::Memory {
+        /*settings.network.listen_addr = vec![ListenAddr::Memory {
             port: self.p2p_port,
         }];
-        settings.network.known_nodes = self.access_points;
+        settings.network.known_nodes = self.access_points;*/
         settings.node.passvotation = self.pass_votation.unwrap_or(settings.node.passvotation);
         let path = format!("/tmp/.taple/sc");
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
         let database = MemoryManager::new();
-        let (node, api) = Node::build(settings, self.key_pair, database)?;
+        let mut registry = Registry::default();
+        let (node, api) = Node::build(settings, self.key_pair, &mut registry, database)?;
         Ok(OnMemoryNode::new(node, api))
     }
 
@@ -140,3 +144,4 @@ impl OnMemoryNode {
         }
     }
 }
+*/
