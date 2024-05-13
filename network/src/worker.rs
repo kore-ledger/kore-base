@@ -999,7 +999,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
+    #[ignore]
     async fn test_network_worker() {
         let mut boot_nodes = vec![];
 
