@@ -12,22 +12,20 @@ use crate::{
         models::{
             approval::UniqueApproval,
             evaluation::{EvaluationRequest, SubjectContext},
-            event::Event,
-            event::Metadata,
+            event::{Event, Metadata},
             state::{generate_subject_id, Subject},
             validation::ValidationProof,
             HashId,
         },
         self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
-    keys::KeyPair,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
+    keys::KeyPair,
     ledger::{LedgerCommand, LedgerResponse},
-    message::{MessageConfig, MessageTaskCommand},
+    message::{MessageConfig, MessageContent, MessageTaskCommand},
     protocol::KoreMessages,
-    request::KoreRequest,
-    request::StartRequest,
+    request::{KoreRequest, StartRequest},
     signature::{Signature, Signed, UniqueSignature},
     utils::message::{
         approval::create_approval_request, evaluator::create_evaluator_request,
@@ -48,6 +46,26 @@ const QUORUM_PORCENTAGE_AMPLIFICATION: f64 = 0.2;
 
 type SubjectsCompletingEvent =
     HashMap<DigestIdentifier, (ValidationStage, HashSet<KeyIdentifier>, (u32, u32))>;
+
+pub struct EventCompleterChannels {
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+    ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
+    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+}
+
+impl EventCompleterChannels {
+    pub fn new(
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+        ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
+        input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    ) -> Self {
+        Self {
+            message_channel,
+            ledger_sender,
+            input_channel_protocol,
+        }
+    }
+}
 
 #[allow(dead_code)]
 pub struct EventCompleter<C: DatabaseCollection> {
@@ -75,6 +93,9 @@ pub struct EventCompleter<C: DatabaseCollection> {
     // SignatureManager
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
+    // Protocol sender
+    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    controller_id: KeyIdentifier,
 }
 
 #[allow(dead_code)]
@@ -82,16 +103,17 @@ impl<C: DatabaseCollection> EventCompleter<C> {
     pub fn new(
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
+        channels: EventCompleterChannels,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
+
+        controller_id: KeyIdentifier,
     ) -> Self {
         Self {
             gov_api,
             database,
-            message_channel,
-            ledger_sender,
+            message_channel: channels.message_channel,
+            ledger_sender: channels.ledger_sender,
             subjects_completing_event: HashMap::new(),
             // actual_sn: HashMap::new(),
             // virtual_state: HashMap::new(),
@@ -107,6 +129,8 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             own_identifier: signature_manager.get_own_identifier(),
             signature_manager,
             derivator,
+            input_channel_protocol: channels.input_channel_protocol,
+            controller_id,
         }
     }
 
@@ -646,6 +670,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                     .or_default()
                     .insert(subject_id.clone());
             }
+            // TODO revisar esta estructura, ya no va todo por algorithm.
             self.subjects_completing_event
                 .insert(subject_id, (stage, signers, (quorum_size, 0)));
             return Ok(request_id);
@@ -1380,18 +1405,30 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                     governance_id,
                     our_governance_version + 1,
                 );
-                self.message_channel
-                    .tell(MessageTaskCommand::Request(
-                        None,
+                if signature.signer == self.own_identifier {
+                    let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+                        self.own_identifier.clone(),
+                        self.own_identifier.clone(),
                         msg,
-                        vec![signature.signer],
-                        MessageConfig {
-                            timeout: 2000,
-                            replication_factor: 1.0,
-                        },
-                    ))
-                    .await?;
-                return Ok(());
+                        &self.signature_manager,
+                        self.derivator,
+                    )
+                    .unwrap();
+
+                    self.input_channel_protocol.tell(complete_message).await?
+                } else {
+                    self.message_channel
+                        .tell(MessageTaskCommand::Request(
+                            None,
+                            msg,
+                            vec![signature.signer.clone()],
+                            MessageConfig {
+                                timeout: 2000,
+                                replication_factor: 1.0,
+                            },
+                        ))
+                        .await?
+                }
             }
             Ordering::Greater => {
                 // We ignore the validation signature because it is not valid for us.
@@ -1439,13 +1476,38 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             let event_message = create_validator_request(validation_event.to_owned());
             let mut new_signers: HashSet<KeyIdentifier> = signers.clone();
             new_signers.remove(&signer);
-            self.ask_signatures(
-                &subject_id,
-                event_message,
-                new_signers.clone(),
-                quorum_size.0,
-            )
-            .await?;
+
+            let total_signers = signers.len();
+            // If only has 1 signer and is our node
+            let our_node_is_validator = signers.contains(&self.own_identifier.clone());
+            if total_signers == 1 && signers.contains(&self.own_identifier.clone()) {
+                self.ask_signatures_local(event_message).await?;
+
+            // If our node is a validator and is not the only one.
+            } else if our_node_is_validator {
+                // our node validation
+                self.ask_signatures_local(event_message.clone()).await?;
+                // validation of others nodes.
+                new_signers.remove(&self.own_identifier);
+                self.ask_signatures(
+                    &subject_id,
+                    event_message,
+                    new_signers.clone(),
+                    quorum_size.0,
+                )
+                .await?;
+                new_signers.insert(self.own_identifier.clone());
+            }
+            // If our node is not a validator.
+            else {
+                self.ask_signatures(
+                    &subject_id,
+                    event_message,
+                    new_signers.clone(),
+                    quorum_size.0,
+                )
+                .await?;
+            }
             // Make update of the phase the event is going through
             self.subjects_completing_event.insert(
                 subject_id,
@@ -1503,21 +1565,42 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         governance_id: DigestIdentifier,
         who_asked: KeyIdentifier,
     ) -> Result<(), EventError> {
-        self.message_channel
-            .tell(MessageTaskCommand::Request(
-                None,
+        // Our node.
+        if who_asked == self.own_identifier {
+            let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+                self.controller_id.clone(),
+                self.own_identifier.clone(),
                 KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
                     who_asked: self.own_identifier.clone(),
                     subject_id: governance_id,
                 }),
-                vec![who_asked],
-                MessageConfig {
-                    timeout: TIMEOUT,
-                    replication_factor: 1.0,
-                },
-            ))
-            .await
-            .map_err(EventError::ChannelError)
+                &self.signature_manager,
+                self.derivator,
+            )
+            .unwrap();
+
+            self.input_channel_protocol
+                .tell(complete_message)
+                .await
+                .map_err(EventError::ChannelError)
+        // Other node
+        } else {
+            self.message_channel
+                .tell(MessageTaskCommand::Request(
+                    None,
+                    KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
+                        who_asked: self.own_identifier.clone(),
+                        subject_id: governance_id,
+                    }),
+                    vec![who_asked],
+                    MessageConfig {
+                        timeout: TIMEOUT,
+                        replication_factor: 1.0,
+                    },
+                ))
+                .await
+                .map_err(EventError::ChannelError)
+        }
     }
 
     async fn get_signers_and_quorum(
@@ -1542,6 +1625,37 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         &self,
         subject_id: &DigestIdentifier,
         event_message: KoreMessages,
+        mut signers: HashSet<KeyIdentifier>,
+        quorum_size: u32,
+    ) -> Result<(), EventError> {
+        let total_signers = signers.len();
+        // If only has 1 signer and is our node
+        let our_node_is_validator = signers.contains(&self.own_identifier.clone());
+        if total_signers == 1 && signers.contains(&self.own_identifier.clone()) {
+            self.ask_signatures_local(event_message).await?
+
+        // If our node is a validator and is not the only one.
+        } else if our_node_is_validator {
+            // our node validation
+            self.ask_signatures_local(event_message.clone()).await?;
+            // validation of others nodes.
+            signers.remove(&self.own_identifier);
+            self.ask_signatures_network(subject_id, event_message, signers.clone(), quorum_size)
+                .await?;
+            signers.insert(self.own_identifier.clone());
+        }
+        // If our node is not a validator.
+        else {
+            self.ask_signatures_network(subject_id, event_message, signers.clone(), quorum_size)
+                .await?
+        }
+        Ok(())
+    }
+
+    async fn ask_signatures_network(
+        &self,
+        subject_id: &DigestIdentifier,
+        event_message: KoreMessages,
         signers: HashSet<KeyIdentifier>,
         quorum_size: u32,
     ) -> Result<(), EventError> {
@@ -1557,8 +1671,23 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                 },
             ))
             .await
-            .map_err(EventError::ChannelError)?;
-        Ok(())
+            .map_err(EventError::ChannelError)
+    }
+
+    async fn ask_signatures_local(&self, event_message: KoreMessages) -> Result<(), EventError> {
+        let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+            self.controller_id.clone(),
+            self.own_identifier.clone(),
+            event_message,
+            &self.signature_manager,
+            self.derivator,
+        )
+        .unwrap();
+
+        self.input_channel_protocol
+            .tell(complete_message)
+            .await
+            .map_err(EventError::ChannelError)
     }
 
     fn create_event_prevalidated_no_eval(

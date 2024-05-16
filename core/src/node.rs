@@ -4,15 +4,10 @@
 #[cfg(feature = "approval")]
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
-use crate::approval::{
-    inner_manager::InnerApprovalManager,
-    ApprovalMessages, ApprovalResponses,
-};
+use crate::approval::{inner_manager::InnerApprovalManager, ApprovalMessages, ApprovalResponses};
 use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
-use crate::keys::{KeyMaterial, KeyPair};
-use crate::identifier::{Derivable, KeyIdentifier};
 use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::commons::settings::Settings;
@@ -26,11 +21,13 @@ use crate::evaluator::{
     compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager,
     EvaluatorMessage, EvaluatorResponse,
 };
-use crate::event::event_completer::EventCompleter;
+use crate::event::event_completer::{EventCompleter, EventCompleterChannels};
 use crate::event::manager::{EventAPI, EventManager};
 use crate::event::{EventCommand, EventResponse};
 use crate::governance::GovernanceAPI;
 use crate::governance::{main_governance::Governance, GovernanceMessage, GovernanceResponse};
+use crate::identifier::{Derivable, KeyIdentifier};
+use crate::keys::{KeyMaterial, KeyPair};
 use crate::ledger::inner_ledger::Ledger;
 use crate::ledger::manager::EventManagerAPI;
 use crate::ledger::{manager::LedgerManager, LedgerCommand, LedgerResponse};
@@ -45,15 +42,15 @@ use crate::validation::{manager::ValidationManager, Validation};
 #[cfg(feature = "validation")]
 use crate::validation::{ValidationCommand, ValidationResponse};
 
-use network::{NetworkWorker, Event as NetworkEvent};
+use network::{Event as NetworkEvent, NetworkWorker};
 
 use ::futures::Future;
 use log::{error, info};
+use prometheus_client::registry::Registry;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::*;
 use tokio_util::sync::CancellationToken;
-use prometheus_client::registry::Registry;
 
 use crate::api::{inner_api::InnerApi, Api, ApiManager};
 use crate::error::Error;
@@ -81,8 +78,12 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
     /// for the initialization of the components, mainly due to problems in the initial [configuration](Settings).
     /// # Panics
     /// This method panics if it has not been possible to generate the network layer.
-    pub fn build(settings: Settings, key_pair: KeyPair, registry: &mut Registry, database: M) -> Result<Api, Error> {
-
+    pub fn build(
+        settings: Settings,
+        key_pair: KeyPair,
+        registry: &mut Registry,
+        database: M,
+    ) -> Result<Api, Error> {
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
         //let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
@@ -134,12 +135,12 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let token = CancellationToken::new();
 
         let mut worker = match NetworkWorker::new(
-            registry, 
-            key_pair.clone(), 
-            settings.network.clone(), 
-            network_tx.clone(), 
-            token.clone()) 
-        {
+            registry,
+            key_pair.clone(),
+            settings.network.clone(),
+            network_tx.clone(),
+            token.clone(),
+        ) {
             Ok(worker) => worker,
             Err(e) => {
                 error!("Error creating network worker: {}", e);
@@ -153,7 +154,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         //TODO: change name. It's a task
         let network_rx = MessageReceiver::new(
             network_rx,
-            protocol_tx,
+            protocol_tx.clone(),
             token.clone(),
             signature_manager.get_own_identifier(),
         );
@@ -174,8 +175,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             settings.node.digest_derivator,
         );
 
-        let task_manager =
-            MessageTaskManager::new(network_tx, task_rx, token.clone(),);
+        let task_manager = MessageTaskManager::new(network_tx, task_rx, token.clone());
 
         // Defines protocol channels
         let channels = ProtocolChannels {
@@ -192,8 +192,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         };
 
         // Build protocol manager
-        let protocol_manager =
-            ProtocolManager::new(channels, token.clone());
+        let protocol_manager = ProtocolManager::new(channels, token.clone());
 
         // Build governance
         let mut governance_manager = Governance::<M, C>::new(
@@ -203,14 +202,16 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             governance_update_sx.clone(),
         );
 
+        let event_completer_channels =
+            EventCompleterChannels::new(task_tx.clone(), ledger_tx.clone(), protocol_tx);
         // Build event completer
         let event_completer = EventCompleter::new(
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
-            task_tx.clone(),
-            ledger_tx.clone(),
+            event_completer_channels,
             signature_manager.clone(),
             settings.node.digest_derivator,
+            controller_id.clone(),
         );
 
         // Build event manager
@@ -342,11 +343,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             );
 
-            ValidationManager::new(
-                validation_rx,
-                inner_validation,
-                token.clone(),
-            )
+            ValidationManager::new(validation_rx, inner_validation, token.clone())
         };
 
         let api = Api::new(
@@ -360,7 +357,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         tokio::spawn(async move {
             worker.run().await;
         });
-
 
         tokio::spawn(async move {
             governance_manager.run().await;
