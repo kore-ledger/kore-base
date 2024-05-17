@@ -1638,7 +1638,6 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             signers.remove(&self.own_identifier);
             self.ask_signatures_network(subject_id, event_message, signers.clone(), quorum_size)
                 .await?;
-            signers.insert(self.own_identifier.clone());
         }
         // If our node is not a validator.
         else {

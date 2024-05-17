@@ -6,7 +6,7 @@ use crate::approval::manager::ApprovalManagerChannels;
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
 use crate::approval::{inner_manager::InnerApprovalManager, ApprovalMessages, ApprovalResponses};
-use crate::authorized_subjecs::manager::{AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
+use crate::authorized_subjecs::manager::{AuthorizedSubjectChannels, AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
 use crate::commons::models::notification::Notification;
@@ -235,13 +235,15 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         // Build ledger manager
         let ledger_manager = LedgerManager::new(ledger_rx, inner_ledger, token.clone());
 
+        let authorized_subjects_channels = AuthorizedSubjectChannels::new(as_rx, task_tx.clone(), protocol_tx.clone());
         // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
-            as_rx,
             DB::new(database.clone()),
-            task_tx.clone(),
             controller_id.clone(),
             token.clone(),
+            signature_manager.clone(),
+            settings.node.digest_derivator,
+            authorized_subjects_channels,
         );
 
         // Build api

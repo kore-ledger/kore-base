@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use identity::identifier::{derive::digest::DigestDerivator, Derivable, KeyIdentifier};
+use identity::identifier::{derive::digest::DigestDerivator, KeyIdentifier};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
