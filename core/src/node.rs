@@ -29,7 +29,7 @@ use crate::governance::GovernanceAPI;
 use crate::governance::{main_governance::Governance, GovernanceMessage, GovernanceResponse};
 use crate::identifier::{Derivable, KeyIdentifier};
 use crate::keys::{KeyMaterial, KeyPair};
-use crate::ledger::inner_ledger::Ledger;
+use crate::ledger::inner_ledger::{Ledger, LedgerChannels};
 use crate::ledger::manager::EventManagerAPI;
 use crate::ledger::{manager::LedgerManager, LedgerCommand, LedgerResponse};
 use crate::message::{
@@ -222,14 +222,19 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             event_completer,
         );
 
+        let inner_ledger_channels = LedgerChannels::new(
+            task_tx.clone(),
+            distribution_tx,
+            protocol_tx.clone()
+        );
+
         // Build inner ledger
         let inner_ledger = Ledger::new(
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
-            task_tx.clone(),
-            distribution_tx,
-            controller_id.clone(),
+            signature_manager.clone(),
             settings.node.digest_derivator,
+            inner_ledger_channels
         );
 
         // Build ledger manager
