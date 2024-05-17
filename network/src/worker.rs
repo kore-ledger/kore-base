@@ -17,7 +17,7 @@ use identity::keys::{KeyMaterial, KeyPair};
 use libp2p::{
     core::ConnectedPoint,
     dcutr::Event as DcutrEvent,
-    identity::{ed25519, Keypair},
+    identity::{ed25519::{self, PublicKey as PublicKeyEd25519}, Keypair, PublicKey},
     multiaddr::Protocol,
     relay::{client::Event as RelayClientEvent, Event as RelayServerEvent},
     swarm::{self, SwarmEvent},
@@ -516,8 +516,9 @@ impl NetworkWorker {
     async fn handle_command(&mut self, command: Command) {
         match command {
             Command::SendMessage { peer, message } => {
-                if let Ok(peer) = PeerId::from_bytes(&peer) {
-                    self.send_message(peer, message);
+                if let Ok(public_key) = PublicKeyEd25519::try_from_bytes(peer.as_slice()) {
+                    let peer = PublicKey::from(public_key);
+                    self.send_message(peer.to_peer_id(), message);
                 } else {
                     error!(TARGET_WORKER, "Invalid peer id");
                 }
