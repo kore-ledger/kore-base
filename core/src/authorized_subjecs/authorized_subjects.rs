@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use identity::identifier::derive::digest::DigestDerivator;
 
 use crate::{
-    commons::{channel::SenderEnd, self_signature_manager::SelfSignatureManager},
+    commons::{channel::SenderEnd, self_signature_manager::{SelfSignature, SelfSignatureManager}},
     database::DB,
     ledger::LedgerCommand,
     message::{MessageConfig, MessageContent, MessageTaskCommand},
@@ -38,7 +38,6 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
     pub fn new(
         database: DB<C>,
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        our_id: KeyIdentifier,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
         channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
@@ -46,7 +45,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
         Self {
             database,
             message_channel,
-            our_id,
+            our_id: signature_manager.get_own_identifier(),
             channel_protocol,
             signature_manager,
             derivator,
@@ -128,20 +127,20 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
         message_config: MessageConfig,
     ) -> Result<(), AuthorizedSubjectsError> {
         let total_signers = signers.len();
-        // If only has 1 signer and is our node
+        // If only has 1 id and is our node
         let our_node_is_validator = signers.contains(&self.our_id.clone());
         if total_signers == 1 && signers.contains(&self.our_id.clone()) {
             self.send_message_local(event_message).await
-        // If our node is a validator and is not the only one.
+        // If our node is in the hashset and is not the only one.
         } else if our_node_is_validator {
-            // our node validation
+            // our node
             self.send_message_local(event_message.clone()).await?;
-            // validation of others nodes.
+            // others nodes.
             signers.remove(&self.our_id);
             self.send_message_network(subject_id, event_message, signers.clone(), message_config)
                 .await
         }
-        // If our node is not a validator.
+        // If our node is not in the hashset
         else {
             self.send_message_network(subject_id, event_message, signers.clone(), message_config)
                 .await

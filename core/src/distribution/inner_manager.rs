@@ -3,7 +3,6 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use crate::commons::channel::SenderEnd;
 use crate::commons::models::state::Subject;
 use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::distribution::{AskForSignatures, SignaturesReceived};
@@ -16,6 +15,7 @@ use crate::utils::message::distribution::{
     create_distribution_request, create_distribution_response,
 };
 use crate::utils::message::ledger::{request_gov_event, request_lce};
+use crate::{commons::channel::SenderEnd, message::MessageContent, signature::Signed};
 use crate::{
     database::{Error as DbError, DB},
     governance::GovernanceInterface,
@@ -37,6 +37,8 @@ pub struct InnerDistributionManager<G: GovernanceInterface, C: DatabaseCollectio
     timeout: u32,
     replication_factor: f64,
     derivator: DigestDerivator,
+    our_id: KeyIdentifier,
+    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, C> {
@@ -47,15 +49,18 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         signature_manager: SelfSignatureManager,
         settings: Settings,
         derivator: DigestDerivator,
+        channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             governance,
             db,
             messenger_channel,
+            our_id: signature_manager.get_own_identifier(),
             signature_manager,
             timeout: settings.node.timeout,
             replication_factor: settings.node.replication_factor,
             derivator,
+            channel_protocol,
         }
     }
 
@@ -327,18 +332,17 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             signatures_requested.clone(),
             self.signature_manager.get_own_identifier(),
         );
-        self.messenger_channel
-            .tell(MessageTaskCommand::Request(
-                Some(format!("WITNESS/{}", subject_id_str)),
-                request,
-                Vec::from_iter(targets.into_iter()),
-                MessageConfig {
-                    timeout: self.timeout,
-                    replication_factor: self.replication_factor,
-                },
-            ))
-            .await
-            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+        self.send_message(
+            Some(format!("WITNESS/{}", subject_id_str)),
+            request,
+            targets.clone(),
+            MessageConfig {
+                timeout: self.timeout,
+                replication_factor: self.replication_factor,
+            },
+        )
+        .await?;
+
         Ok(())
     }
 
@@ -378,15 +382,14 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                             .collect();
                         let response =
                             create_distribution_response(msg.subject_id.clone(), sn, result);
-                        self.messenger_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                response,
-                                vec![msg.sender_id.clone()],
-                                MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+
+                        self.send_message_one_id(
+                            None,
+                            response,
+                            msg.sender_id.clone(),
+                            MessageConfig::direct_response(),
+                        )
+                        .await?
                     }
                     Ordering::Greater => {
                         // I don't see the need for a message for MSG.SN = SN + 1.
@@ -407,15 +410,13 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                                 msg.subject_id.clone(),
                             )
                         };
-                        self.messenger_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                request,
-                                vec![msg.sender_id.clone()],
-                                MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+                        self.send_message_one_id(
+                            None,
+                            request,
+                            msg.sender_id.clone(),
+                            MessageConfig::direct_response(),
+                        )
+                        .await?
                     }
                     Ordering::Less => {}
                 }
@@ -426,15 +427,13 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
                     self.signature_manager.get_own_identifier(),
                     msg.subject_id.clone(),
                 );
-                self.messenger_channel
-                    .tell(MessageTaskCommand::Request(
-                        None,
-                        request,
-                        vec![msg.sender_id.clone()],
-                        MessageConfig::direct_response(),
-                    ))
-                    .await
-                    .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)?;
+                self.send_message_one_id(
+                    None,
+                    request,
+                    msg.sender_id.clone(),
+                    MessageConfig::direct_response(),
+                )
+                .await?
             }
             Err(error) => {
                 return Err(DistributionManagerError::DatabaseError(error.to_string()));
@@ -543,6 +542,102 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             }
             Err(error) => Err(DistributionManagerError::DatabaseError(error.to_string())),
         }
+    }
+
+    /// This function is in charge of sending KoreMessages, if it is a message addressed
+    /// to the node itself, the message is sent directly to Protocol, otherwise it is sent to Network.
+    async fn send_message(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        mut ids: HashSet<KeyIdentifier>,
+        message_config: MessageConfig,
+    ) -> Result<(), DistributionManagerError> {
+        let total_ids = ids.len();
+        // If only has 1 keyidentifier and is our node
+        let our_node_is_validator = ids.contains(&self.our_id.clone());
+        if total_ids == 1 && ids.contains(&self.our_id.clone()) {
+            self.send_message_local(event_message).await
+        // If our node is in the hashSet and is not the only one.
+        } else if our_node_is_validator {
+            // our node
+            self.send_message_local(event_message.clone()).await?;
+            // others nodes.
+            ids.remove(&self.our_id);
+            self.send_message_network(
+                subject_id,
+                event_message,
+                ids.into_iter().collect(),
+                message_config,
+            )
+            .await
+        }
+        // If our node is not in the hashset.
+        else {
+            self.send_message_network(
+                subject_id,
+                event_message,
+                ids.into_iter().collect(),
+                message_config,
+            )
+            .await
+        }
+    }
+
+    // If only have one keyidentifier
+    async fn send_message_one_id(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        id: KeyIdentifier,
+        message_config: MessageConfig,
+    ) -> Result<(), DistributionManagerError> {
+        if id == self.our_id {
+            self.send_message_local(event_message.clone())
+                .await
+                .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)
+        } else {
+            self.send_message_network(subject_id, event_message, vec![id], message_config)
+                .await
+                .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)
+        }
+    }
+
+    async fn send_message_network(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        ids: Vec<KeyIdentifier>,
+        message_config: MessageConfig,
+    ) -> Result<(), DistributionManagerError> {
+        self.messenger_channel
+            .tell(MessageTaskCommand::Request(
+                subject_id,
+                event_message,
+                ids,
+                message_config,
+            ))
+            .await
+            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)
+    }
+
+    async fn send_message_local(
+        &self,
+        event_message: KoreMessages,
+    ) -> Result<(), DistributionManagerError> {
+        let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+            self.our_id.clone(),
+            self.our_id.clone(),
+            event_message,
+            &self.signature_manager,
+            self.derivator,
+        )
+        .unwrap();
+
+        self.channel_protocol
+            .tell(complete_message)
+            .await
+            .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)
     }
 }
 

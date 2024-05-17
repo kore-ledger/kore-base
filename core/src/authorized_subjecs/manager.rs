@@ -78,7 +78,6 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
     /// Creates a new `AuthorizedSubjectsManager` with the given input channel, database, message channel, ID, and shutdown channels.
     pub fn new(
         database: DB<C>,
-        our_id: KeyIdentifier,
         token: CancellationToken,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
@@ -86,7 +85,7 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
     ) -> Self {
         Self {
             input_channel: channels.input_channel,
-            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, our_id, signature_manager, derivator, channels.channel_protocol),
+            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, signature_manager, derivator, channels.channel_protocol),
             token,
         }
     }

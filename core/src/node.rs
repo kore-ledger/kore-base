@@ -239,7 +239,6 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
             DB::new(database.clone()),
-            controller_id.clone(),
             token.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -327,6 +326,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             signature_manager.clone(),
             settings.clone(),
             settings.node.digest_derivator,
+            protocol_tx.clone()
         );
 
         // Build distribution manager
