@@ -22,7 +22,7 @@ pub struct AuthorizedSubjects<C: DatabaseCollection> {
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     /// Unique identifier for the component using this structure.
     our_id: KeyIdentifier,
-    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
 }
@@ -40,13 +40,13 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
-        channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             database,
             message_channel,
             our_id: signature_manager.get_own_identifier(),
-            channel_protocol,
+            protocol_channel,
             signature_manager,
             derivator,
         }
@@ -178,7 +178,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
         )
         .unwrap();
 
-        self.channel_protocol
+        self.protocol_channel
             .tell(complete_message)
             .await
             .map_err( AuthorizedSubjectsError::ChannelError)

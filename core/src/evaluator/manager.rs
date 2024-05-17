@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use std::marker::PhantomData;
 
+use identity::identifier::KeyIdentifier;
 use tokio_util::sync::CancellationToken;
 
 use super::compiler::manager::KoreCompiler;
@@ -13,13 +14,32 @@ use crate::database::{DatabaseCollection, DatabaseManager};
 use crate::evaluator::errors::ExecutorErrorResponses;
 use crate::evaluator::runner::manager::KoreRunner;
 use crate::governance::GovernanceInterface;
-use crate::message::{MessageConfig, MessageTaskCommand};
+use crate::message::{MessageConfig, MessageContent, MessageTaskCommand};
 use crate::protocol::KoreMessages;
 use crate::request::EventRequest;
 use crate::signature::Signed;
 use crate::utils::message::event::create_evaluator_response;
 use crate::{DigestDerivator, EvaluationResponse};
 
+pub struct EvaluatorManagerChannels {
+    input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+}
+
+impl EvaluatorManagerChannels {
+    pub fn new(
+        input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    ) -> Self {
+        Self {
+            input_channel,
+            messenger_channel,
+            protocol_channel,
+        }
+    }
+}
 pub struct EvaluatorManager<
     M: DatabaseManager<C>,
     C: DatabaseCollection + 'static,
@@ -35,6 +55,8 @@ pub struct EvaluatorManager<
     derivator: DigestDerivator,
     _m: PhantomData<M>,
     _g: PhantomData<G>,
+    our_id: KeyIdentifier,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl<
@@ -44,13 +66,12 @@ impl<
     > EvaluatorManager<M, C, G>
 {
     pub fn new(
-        input_channel: MpscChannel<EvaluatorMessage, EvaluatorResponse>,
         compiler: KoreCompiler<C, G>,
         runner: KoreRunner<C, G>,
         signature_manager: SelfSignatureManager,
         token: CancellationToken,
-        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
+        channels: EvaluatorManagerChannels,
     ) -> Self {
         // spawn compiler
         tokio::spawn(async move {
@@ -58,14 +79,16 @@ impl<
         });
 
         Self {
-            input_channel,
+            input_channel: channels.input_channel,
             runner,
+            our_id: signature_manager.get_own_identifier(),
             signature_manager,
             token,
-            messenger_channel,
+            messenger_channel: channels.messenger_channel,
             _m: PhantomData,
             _g: PhantomData,
             derivator,
+            protocol_channel: channels.protocol_channel,
         }
     }
 
@@ -136,52 +159,43 @@ impl<
                                 crate::EvaluationResponse,
                             > = Signed::<EvaluationResponse>::new(executor_response, signature);
                             let msg = create_evaluator_response(signed_evaluator_response);
-                            self.messenger_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    vec![sender],
-                                    MessageConfig::direct_response(),
-                                ))
-                                .await
-                                .map_err(|_| EvaluatorError::ChannelNotAvailable)?;
+                            self.send_message(None, msg, sender, MessageConfig::direct_response())
+                                .await?;
                             EvaluatorResponse::AskForEvaluation(Ok(()))
                         }
                         Err(ExecutorErrorResponses::OurGovIsHigher) => {
                             // Mandar mensaje de actualización pendiente
-                            self.messenger_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    KoreMessages::EventMessage(
-                                        crate::event::EventCommand::HigherGovernanceExpected {
-                                            governance_id: evaluation_request.context.governance_id,
-                                            who_asked: self.signature_manager.get_own_identifier(),
-                                        },
-                                    ),
-                                    vec![sender],
-                                    MessageConfig::direct_response(),
-                                ))
-                                .await
-                                .map_err(|_| EvaluatorError::ChannelNotAvailable)?;
+                            self.send_message(
+                                None,
+                                KoreMessages::EventMessage(
+                                    crate::event::EventCommand::HigherGovernanceExpected {
+                                        governance_id: evaluation_request.context.governance_id,
+                                        who_asked: self.signature_manager.get_own_identifier(),
+                                    },
+                                ),
+                                sender,
+                                MessageConfig::direct_response(),
+                            )
+                            .await?;
+
                             EvaluatorResponse::AskForEvaluation(Ok(()))
                         }
                         Err(ExecutorErrorResponses::OurGovIsLower) => {
                             // No podemos evaluar porque nos la van a rechazar
                             // Pedir LCE al que nos mando la petición
-                            self.messenger_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    KoreMessages::LedgerMessages(
-                                        crate::ledger::LedgerCommand::GetLCE {
-                                            who_asked: self.signature_manager.get_own_identifier(),
-                                            subject_id: evaluation_request.context.governance_id,
-                                        },
-                                    ),
-                                    vec![sender],
-                                    MessageConfig::direct_response(),
-                                ))
-                                .await
-                                .map_err(|_| EvaluatorError::ChannelNotAvailable)?;
+                            self.send_message(
+                                None,
+                                KoreMessages::LedgerMessages(
+                                    crate::ledger::LedgerCommand::GetLCE {
+                                        who_asked: self.signature_manager.get_own_identifier(),
+                                        subject_id: evaluation_request.context.governance_id,
+                                    },
+                                ),
+                                sender,
+                                MessageConfig::direct_response(),
+                            )
+                            .await?;
+
                             EvaluatorResponse::AskForEvaluation(Ok(()))
                         }
                         Err(ExecutorErrorResponses::DatabaseError(error)) => {
@@ -226,6 +240,42 @@ impl<
                 .map_err(|_| EvaluatorError::ChannelNotAvailable)?;
         }
         Ok(())
+    }
+
+    /// This function is in charge of sending KoreMessages, if it is a message addressed
+    /// to the node itself, the message is sent directly to Protocol, otherwise it is sent to Network.
+    async fn send_message(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        sender: KeyIdentifier,
+        message_config: MessageConfig,
+    ) -> Result<(), EvaluatorError> {
+        if sender == self.our_id {
+            let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+                self.our_id.clone(),
+                self.our_id.clone(),
+                event_message,
+                &self.signature_manager,
+                self.derivator,
+            )
+            .unwrap();
+
+            self.protocol_channel
+                .tell(complete_message)
+                .await
+                .map_err(|_| EvaluatorError::ChannelNotAvailable)
+        } else {
+            self.messenger_channel
+                .tell(MessageTaskCommand::Request(
+                    subject_id,
+                    event_message,
+                    vec![sender],
+                    message_config,
+                ))
+                .await
+                .map_err(|_| EvaluatorError::ChannelNotAvailable)
+        }
     }
 }
 

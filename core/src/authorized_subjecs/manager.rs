@@ -57,19 +57,19 @@ pub struct AuthorizedSubjectsManager<C: DatabaseCollection> {
 pub struct AuthorizedSubjectChannels {
     input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl AuthorizedSubjectChannels {
     pub fn new(
         input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             input_channel,
             message_channel,
-            channel_protocol,
+            protocol_channel,
         }
     }
 }
@@ -85,7 +85,7 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
     ) -> Self {
         Self {
             input_channel: channels.input_channel,
-            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, signature_manager, derivator, channels.channel_protocol),
+            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, signature_manager, derivator, channels.protocol_channel),
             token,
         }
     }

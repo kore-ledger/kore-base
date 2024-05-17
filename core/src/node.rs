@@ -19,7 +19,7 @@ use crate::distribution::manager::DistributionManager;
 use crate::distribution::DistributionMessagesNew;
 #[cfg(feature = "evaluation")]
 use crate::evaluator::{
-    compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager,
+    compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager, EvaluatorManagerChannels,
     EvaluatorMessage, EvaluatorResponse,
 };
 use crate::event::event_completer::{EventCompleter, EventCompleterChannels};
@@ -283,15 +283,22 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             );
 
+            let evaluator_manager_channels = EvaluatorManagerChannels::new(
+                evaluation_rx,
+                task_tx.clone(),
+                protocol_tx.clone()
+            );
+
             // Build evaluation manager
             EvaluatorManager::new(
-                evaluation_rx,
+                
                 compiler,
                 runner,
                 signature_manager.clone(),
                 token.clone(),
-                task_tx.clone(),
+            
                 settings.node.digest_derivator,
+                evaluator_manager_channels
             )
         };
 

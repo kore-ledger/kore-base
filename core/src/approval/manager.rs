@@ -26,19 +26,19 @@ use super::{
 pub struct ApprovalManagerChannels {
     input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
     messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl ApprovalManagerChannels {
     pub fn new(
         input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
         messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             input_channel,
             messenger_channel,
-            input_channel_protocol,
+            protocol_channel,
         }
     }
 }
@@ -50,7 +50,7 @@ pub struct ApprovalManager<C: DatabaseCollection> {
     messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     inner_manager: InnerApprovalManager<GovernanceAPI, C>,
     own_identifier: KeyIdentifier,
-    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
 }
@@ -158,7 +158,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
             governance_update_channel,
             inner_manager,
             own_identifier: signature_manager.get_own_identifier(),
-            channel_protocol: channels.input_channel_protocol,
+            protocol_channel: channels.protocol_channel,
             signature_manager,
             derivator,
         }
@@ -352,7 +352,7 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
             )
             .unwrap();
 
-            self.channel_protocol
+            self.protocol_channel
                 .tell(complete_message)
                 .await
                 .map_err(|_| ApprovalManagerError::MessageChannelFailed)?

@@ -50,19 +50,19 @@ type SubjectsCompletingEvent =
 pub struct EventCompleterChannels {
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
-    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    input_protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl EventCompleterChannels {
     pub fn new(
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
-        input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        input_protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             message_channel,
             ledger_sender,
-            input_channel_protocol,
+            input_protocol_channel,
         }
     }
 }
@@ -94,7 +94,7 @@ pub struct EventCompleter<C: DatabaseCollection> {
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
     // Protocol sender
-    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 #[allow(dead_code)]
@@ -126,7 +126,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             own_identifier: signature_manager.get_own_identifier(),
             signature_manager,
             derivator,
-            channel_protocol: channels.input_channel_protocol
+            protocol_channel: channels.input_protocol_channel
         }
     }
 
@@ -1411,7 +1411,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                     )
                     .unwrap();
 
-                    self.channel_protocol.tell(complete_message).await?
+                    self.protocol_channel.tell(complete_message).await?
                 } else {
                     self.message_channel
                         .tell(MessageTaskCommand::Request(
@@ -1575,7 +1575,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             )
             .unwrap();
 
-            self.channel_protocol
+            self.protocol_channel
                 .tell(complete_message)
                 .await
                 .map_err(EventError::ChannelError)
@@ -1679,7 +1679,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         )
         .unwrap();
 
-        self.channel_protocol
+        self.protocol_channel
             .tell(complete_message)
             .await
             .map_err(EventError::ChannelError)

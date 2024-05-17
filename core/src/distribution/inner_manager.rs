@@ -38,7 +38,7 @@ pub struct InnerDistributionManager<G: GovernanceInterface, C: DatabaseCollectio
     replication_factor: f64,
     derivator: DigestDerivator,
     our_id: KeyIdentifier,
-    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, C> {
@@ -49,7 +49,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         signature_manager: SelfSignatureManager,
         settings: Settings,
         derivator: DigestDerivator,
-        channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             governance,
@@ -60,7 +60,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
             timeout: settings.node.timeout,
             replication_factor: settings.node.replication_factor,
             derivator,
-            channel_protocol,
+            protocol_channel,
         }
     }
 
@@ -634,7 +634,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         )
         .unwrap();
 
-        self.channel_protocol
+        self.protocol_channel
             .tell(complete_message)
             .await
             .map_err(|_| DistributionManagerError::MessageChannelNotAvailable)
