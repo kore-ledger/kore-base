@@ -50,19 +50,19 @@ type SubjectsCompletingEvent =
 pub struct EventCompleterChannels {
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
-    input_protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl EventCompleterChannels {
     pub fn new(
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         ledger_sender: SenderEnd<LedgerCommand, LedgerResponse>,
-        input_protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             message_channel,
             ledger_sender,
-            input_protocol_channel,
+            protocol_channel,
         }
     }
 }
@@ -126,7 +126,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             own_identifier: signature_manager.get_own_identifier(),
             signature_manager,
             derivator,
-            protocol_channel: channels.input_protocol_channel
+            protocol_channel: channels.protocol_channel
         }
     }
 

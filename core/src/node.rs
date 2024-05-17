@@ -353,6 +353,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 signature_manager.clone(),
                 task_tx.clone(),
                 settings.node.digest_derivator,
+                protocol_tx.clone()
             );
 
             ValidationManager::new(validation_rx, inner_validation, token.clone())

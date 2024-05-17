@@ -7,15 +7,15 @@ use crate::{
     commons::{
         channel::SenderEnd,
         errors::ChannelErrors,
-        models::{validation::ValidationEventResponse, validation::ValidationProof},
+        models::validation::{ValidationEventResponse, ValidationProof},
         self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
     database::{DatabaseCollection, DB},
     event::EventCommand,
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
-    message::{MessageConfig, MessageTaskCommand},
+    message::{MessageConfig, MessageContent, MessageTaskCommand},
     protocol::KoreMessages,
-    signature::Signature,
+    signature::{Signature, Signed},
     Derivable, DigestDerivator, KeyIdentifier, Metadata,
 };
 
@@ -54,6 +54,8 @@ pub struct Validation<C: DatabaseCollection> {
     signature_manager: SelfSignatureManager,
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     derivator: DigestDerivator,
+    our_id: KeyIdentifier,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl<C: DatabaseCollection> Validation<C> {
@@ -63,13 +65,16 @@ impl<C: DatabaseCollection> Validation<C> {
         signature_manager: SelfSignatureManager,
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         derivator: DigestDerivator,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             gov_api,
             database,
+            our_id: signature_manager.get_own_identifier(),
             signature_manager,
             message_channel,
             derivator,
+            protocol_channel,
         }
     }
 
@@ -111,19 +116,19 @@ impl<C: DatabaseCollection> Validation<C> {
             }
             std::cmp::Ordering::Greater => {
                 // Report outdated Gov.
-                self.message_channel
-                    .tell(MessageTaskCommand::Request(
-                        None,
-                        KoreMessages::EventMessage(
-                            crate::event::EventCommand::HigherGovernanceExpected {
-                                governance_id: validation_event.proof.governance_id.clone(),
-                                who_asked: self.signature_manager.get_own_identifier(),
-                            },
-                        ),
-                        vec![sender],
-                        MessageConfig::direct_response(),
-                    ))
-                    .await?;
+                self.send_message(
+                    None,
+                    KoreMessages::EventMessage(
+                        crate::event::EventCommand::HigherGovernanceExpected {
+                            governance_id: validation_event.proof.governance_id.clone(),
+                            who_asked: self.signature_manager.get_own_identifier(),
+                        },
+                    ),
+                    sender,
+                    MessageConfig::direct_response(),
+                )
+                .await?;
+
                 return Err(ValidationError::GovernanceVersionTooLow);
             }
             std::cmp::Ordering::Equal => {}
@@ -167,18 +172,19 @@ impl<C: DatabaseCollection> Validation<C> {
             .signature_manager
             .sign(&validation_event.proof, self.derivator)
             .map_err(ValidationError::ProtocolErrors)?;
-        self.message_channel
-            .tell(MessageTaskCommand::Request(
-                None,
-                KoreMessages::EventMessage(EventCommand::ValidatorResponse {
-                    event_hash: validation_event.proof.event_hash,
-                    signature: validation_signature.clone(),
-                    governance_version: actual_gov_version,
-                }),
-                vec![sender],
-                MessageConfig::direct_response(),
-            ))
-            .await?;
+
+        self.send_message(
+            None,
+            KoreMessages::EventMessage(EventCommand::ValidatorResponse {
+                event_hash: validation_event.proof.event_hash,
+                signature: validation_signature.clone(),
+                governance_version: actual_gov_version,
+            }),
+            sender,
+            MessageConfig::direct_response(),
+        )
+        .await?;
+
         Ok(ValidationEventResponse {
             validation_signature,
             gov_version_validation: actual_gov_version,
@@ -333,5 +339,41 @@ impl<C: DatabaseCollection> Validation<C> {
             .await
             .map_err(ValidationError::GovernanceError)?;
         Ok((signers, quorum_size))
+    }
+
+    /// This function is in charge of sending KoreMessages, if it is a message addressed
+    /// to the node itself, the message is sent directly to Protocol, otherwise it is sent to Network.
+    async fn send_message(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        sender: KeyIdentifier,
+        message_config: MessageConfig,
+    ) -> Result<(), ValidationError> {
+        if sender == self.our_id {
+            let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+                self.our_id.clone(),
+                self.our_id.clone(),
+                event_message,
+                &self.signature_manager,
+                self.derivator,
+            )
+            .unwrap();
+
+            self.protocol_channel
+                .tell(complete_message)
+                .await
+                .map_err(ValidationError::ChannelError)
+        } else {
+            self.message_channel
+                .tell(MessageTaskCommand::Request(
+                    subject_id,
+                    event_message,
+                    vec![sender],
+                    message_config,
+                ))
+                .await
+                .map_err(ValidationError::ChannelError)
+        }
     }
 }
