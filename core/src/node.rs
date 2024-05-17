@@ -1,6 +1,7 @@
 // Copyright 2024 Antonio Estévez
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use crate::approval::manager::ApprovalManagerChannels;
 #[cfg(feature = "approval")]
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
@@ -203,15 +204,14 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         );
 
         let event_completer_channels =
-            EventCompleterChannels::new(task_tx.clone(), ledger_tx.clone(), protocol_tx);
+            EventCompleterChannels::new(task_tx.clone(), ledger_tx.clone(), protocol_tx.clone());
         // Build event completer
         let event_completer = EventCompleter::new(
             GovernanceAPI::new(governance_tx.clone()),
             DB::new(database.clone()),
             event_completer_channels,
             signature_manager.clone(),
-            settings.node.digest_derivator,
-            controller_id.clone(),
+            settings.node.digest_derivator
         );
 
         // Build event manager
@@ -306,12 +306,15 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             );
 
+            let approval_channels = ApprovalManagerChannels::new(approval_rx, task_tx.clone(), protocol_tx.clone());
+
             ApprovalManager::new(
-                approval_rx,
                 token.clone(),
-                task_tx.clone(),
                 governance_update_sx.subscribe(),
                 inner_approval,
+                signature_manager.clone(),
+                settings.node.digest_derivator,
+                approval_channels
             )
         };
         // Build inner distribution

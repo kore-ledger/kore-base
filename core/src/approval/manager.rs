@@ -1,14 +1,16 @@
 use async_trait::async_trait;
+use identity::identifier::{derive::digest::DigestDerivator, Derivable, KeyIdentifier};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     commons::{
         channel::{ChannelData, MpscChannel, SenderEnd},
         models::approval::ApprovalEntity,
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
     },
     governance::{GovernanceAPI, GovernanceUpdatedMessage},
     identifier::DigestIdentifier,
-    message::{MessageConfig, MessageTaskCommand},
+    message::{MessageConfig, MessageContent, MessageTaskCommand},
     protocol::KoreMessages,
     signature::Signed,
     utils::message::event::create_approver_response,
@@ -21,12 +23,36 @@ use super::{
     ApprovalMessages, ApprovalResponses, EmitVote,
 };
 
+pub struct ApprovalManagerChannels {
+    input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
+    messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+}
+
+impl ApprovalManagerChannels {
+    pub fn new(
+        input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
+        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+        input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    ) -> Self {
+        Self {
+            input_channel,
+            messenger_channel,
+            input_channel_protocol,
+        }
+    }
+}
+
 pub struct ApprovalManager<C: DatabaseCollection> {
     input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
     token: CancellationToken,
     governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
     messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     inner_manager: InnerApprovalManager<GovernanceAPI, C>,
+    own_identifier: KeyIdentifier,
+    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    signature_manager: SelfSignatureManager,
+    derivator: DigestDerivator,
 }
 
 pub struct ApprovalAPI {
@@ -61,7 +87,6 @@ pub trait ApprovalAPIInterface {
 
 #[async_trait]
 impl ApprovalAPIInterface for ApprovalAPI {
-
     async fn request_approval(
         &self,
         data: Signed<ApprovalRequest>,
@@ -119,18 +144,23 @@ impl ApprovalAPIInterface for ApprovalAPI {
 
 impl<C: DatabaseCollection> ApprovalManager<C> {
     pub fn new(
-        input_channel: MpscChannel<ApprovalMessages, ApprovalResponses>,
         token: CancellationToken,
-        messenger_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
         governance_update_channel: tokio::sync::broadcast::Receiver<GovernanceUpdatedMessage>,
         inner_manager: InnerApprovalManager<GovernanceAPI, C>,
+        signature_manager: SelfSignatureManager,
+        derivator: DigestDerivator,
+        channels: ApprovalManagerChannels,
     ) -> Self {
         Self {
-            input_channel,
+            input_channel: channels.input_channel,
             token,
-            messenger_channel,
+            messenger_channel: channels.messenger_channel,
             governance_update_channel,
             inner_manager,
+            own_identifier: signature_manager.get_own_identifier(),
+            channel_protocol: channels.input_channel_protocol,
+            signature_manager,
+            derivator,
         }
     }
 
@@ -208,15 +238,8 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                 match result {
                     Ok(Some((approval, sender))) => {
                         let msg = create_approver_response(approval);
-                        self.messenger_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                msg,
-                                vec![sender],
-                                MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| ApprovalManagerError::MessageChannelFailed)?;
+                        self.send_message(None, msg, sender, MessageConfig::direct_response())
+                            .await?;
                     }
                     Ok(None) => {}
                     Err(error) => match error {
@@ -224,9 +247,8 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                             our_id,
                             sender,
                             gov_id,
-                        } => self
-                            .messenger_channel
-                            .tell(MessageTaskCommand::Request(
+                        } => {
+                            self.send_message(
                                 None,
                                 KoreMessages::LedgerMessages(
                                     crate::ledger::LedgerCommand::GetLCE {
@@ -234,18 +256,17 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                                         subject_id: gov_id,
                                     },
                                 ),
-                                vec![sender],
+                                sender,
                                 MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| ApprovalManagerError::MessageChannelFailed)?,
+                            )
+                            .await?
+                        }
                         ApprovalErrorResponse::OurGovIsHigher {
                             our_id,
                             sender,
                             gov_id,
-                        } => self
-                            .messenger_channel
-                            .tell(MessageTaskCommand::Request(
+                        } => {
+                            self.send_message(
                                 None,
                                 KoreMessages::EventMessage(
                                     crate::event::EventCommand::HigherGovernanceExpected {
@@ -253,11 +274,11 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                                         who_asked: our_id,
                                     },
                                 ),
-                                vec![sender],
+                                sender,
                                 MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| ApprovalManagerError::MessageChannelFailed)?,
+                            )
+                            .await?
+                        }
                         _ => {}
                     },
                 }
@@ -270,15 +291,8 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
                 match result {
                     Ok((vote, owner)) => {
                         let msg = create_approver_response(vote.response.clone().unwrap());
-                        self.messenger_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                msg,
-                                vec![owner],
-                                MessageConfig::direct_response(),
-                            ))
-                            .await
-                            .map_err(|_| ApprovalManagerError::MessageChannelFailed)?;
+                        self.send_message(None, msg, owner, MessageConfig::direct_response())
+                            .await?;
                         if sender_top.is_some() {
                             sender_top
                                 .unwrap()
@@ -316,6 +330,43 @@ impl<C: DatabaseCollection> ApprovalManager<C> {
             }
         };
 
+        Ok(())
+    }
+
+    /// This function is in charge of sending KoreMessages, if it is a message addressed
+    /// to the node itself, the message is sent directly to Protocol, otherwise it is sent to Network.
+    async fn send_message(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        sender: KeyIdentifier,
+        message_config: MessageConfig,
+    ) -> Result<(), ApprovalManagerError> {
+        if sender == self.own_identifier {
+            let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+                self.own_identifier.clone(),
+                self.own_identifier.clone(),
+                event_message,
+                &self.signature_manager,
+                self.derivator,
+            )
+            .unwrap();
+
+            self.channel_protocol
+                .tell(complete_message)
+                .await
+                .map_err(|_| ApprovalManagerError::MessageChannelFailed)?
+        } else {
+            self.messenger_channel
+                .tell(MessageTaskCommand::Request(
+                    subject_id,
+                    event_message,
+                    vec![sender],
+                    message_config,
+                ))
+                .await
+                .map_err(|_| ApprovalManagerError::MessageChannelFailed)?
+        }
         Ok(())
     }
 }

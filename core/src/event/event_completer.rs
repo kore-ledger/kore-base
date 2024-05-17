@@ -94,8 +94,7 @@ pub struct EventCompleter<C: DatabaseCollection> {
     signature_manager: SelfSignatureManager,
     derivator: DigestDerivator,
     // Protocol sender
-    input_channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
-    controller_id: KeyIdentifier,
+    channel_protocol: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 #[allow(dead_code)]
@@ -106,8 +105,6 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         channels: EventCompleterChannels,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
-
-        controller_id: KeyIdentifier,
     ) -> Self {
         Self {
             gov_api,
@@ -129,8 +126,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             own_identifier: signature_manager.get_own_identifier(),
             signature_manager,
             derivator,
-            input_channel_protocol: channels.input_channel_protocol,
-            controller_id,
+            channel_protocol: channels.input_channel_protocol
         }
     }
 
@@ -1415,7 +1411,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
                     )
                     .unwrap();
 
-                    self.input_channel_protocol.tell(complete_message).await?
+                    self.channel_protocol.tell(complete_message).await?
                 } else {
                     self.message_channel
                         .tell(MessageTaskCommand::Request(
@@ -1568,7 +1564,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         // Our node.
         if who_asked == self.own_identifier {
             let complete_message = Signed::<MessageContent<KoreMessages>>::new(
-                self.controller_id.clone(),
+                self.own_identifier.clone(),
                 self.own_identifier.clone(),
                 KoreMessages::LedgerMessages(LedgerCommand::GetLCE {
                     who_asked: self.own_identifier.clone(),
@@ -1579,7 +1575,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             )
             .unwrap();
 
-            self.input_channel_protocol
+            self.channel_protocol
                 .tell(complete_message)
                 .await
                 .map_err(EventError::ChannelError)
@@ -1676,7 +1672,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
 
     async fn ask_signatures_local(&self, event_message: KoreMessages) -> Result<(), EventError> {
         let complete_message = Signed::<MessageContent<KoreMessages>>::new(
-            self.controller_id.clone(),
+            self.own_identifier.clone(),
             self.own_identifier.clone(),
             event_message,
             &self.signature_manager,
@@ -1684,7 +1680,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
         )
         .unwrap();
 
-        self.input_channel_protocol
+        self.channel_protocol
             .tell(complete_message)
             .await
             .map_err(EventError::ChannelError)
