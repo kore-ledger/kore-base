@@ -17,7 +17,7 @@ use identity::keys::{KeyMaterial, KeyPair};
 use libp2p::{
     core::ConnectedPoint,
     dcutr::Event as DcutrEvent,
-    identity::{ed25519, Keypair},
+    identity::{ed25519::{self, PublicKey as PublicKeyEd25519}, Keypair, PublicKey},
     multiaddr::Protocol,
     relay::{client::Event as RelayClientEvent, Event as RelayServerEvent},
     swarm::{self, SwarmEvent},
@@ -382,56 +382,57 @@ impl NetworkWorker {
     pub async fn run_connection(&mut self) -> Result<(), Error> {
         info!(TARGET_WORKER, "Running connection loop");
         let mut result = Ok(());
-        loop {
-            match self.state {
-                NetworkState::Dial => {
-                    // Dial boot node.
-                    if let Some((peer_id, addr)) = self.next_boot_node() {
-                        if self.local_peer_id == peer_id {
-                            continue;
-                        }
-                        if self.swarm.dial(addr.clone()).is_err() {
-                            error!(TARGET_WORKER, "Error dialing boot node {}", peer_id);
+        // If is the first node of kore network.
+        if self.node_type == NodeType::Bootstrap && self.boot_nodes.is_empty() {
+            self.change_state(NetworkState::Running).await;
+        }
+        else {
+            loop {
+                match self.state {
+                    NetworkState::Dial => {
+                        // Dial boot node.
+                        if let Some((peer_id, addr)) = self.next_boot_node() {
+                            if self.local_peer_id == peer_id {
+                                continue;
+                            }
+                            if self.swarm.dial(addr.clone()).is_err() {
+                                error!(TARGET_WORKER, "Error dialing boot node {}", peer_id);
+                            } else {
+                                self.change_state(NetworkState::Dialing).await;
+                                self.current_dialing = Some((peer_id, addr));
+                            }
                         } else {
-                            self.change_state(NetworkState::Dialing).await;
-                            self.current_dialing = Some((peer_id, addr));
-                        }
-                    } else {
-                        error!(TARGET_WORKER, "No more bootstrap nodes.");
-                        if self
-                            .event_sender
-                            .send(NetworkEvent::Error(Error::Network(
-                                "No more bootstrap nodes.".to_owned(),
-                            )))
-                            .await
-                            .is_err()
-                        {
-                            error!(TARGET_WORKER, "Error sending network error event.");
-                        }
-                        if self.node_type == NodeType::Bootstrap {
-                            self.change_state(NetworkState::Running).await;
-                            break;
-                        } else {                            
-                            error!(TARGET_WORKER, "Can't connect to kore network");
-                            self.change_state(NetworkState::Disconnected).await;
+                            error!(TARGET_WORKER, "No more bootstrap nodes.");
+                            if self
+                                .event_sender
+                                .send(NetworkEvent::Error(Error::Network(
+                                    "No more bootstrap nodes.".to_owned(),
+                                )))
+                                .await
+                                .is_err()
+                            {
+                                error!(TARGET_WORKER, "Error sending network error event.");
+                            }
+                                error!(TARGET_WORKER, "Can't connect to kore network");
+                                self.change_state(NetworkState::Disconnected).await;
                         }
                     }
+                    NetworkState::Running => {
+                        break;
+                    }
+                    NetworkState::Disconnected => {
+                        result = Err(Error::Network("Can't connect to kore network".to_owned()));
+                        break;
+                    }
+                    _ => {}
                 }
-                NetworkState::Running => {
-                    break;
-                }
-                NetworkState::Disconnected => {
-                    result = Err(Error::Network("Can't connect to kore network".to_owned()));
-                    break;
-                }
-                _ => {}
-            }
-            tokio::select! {
-                event = self.swarm.select_next_some() => {
-                    self.handle_connection_events(event).await;
-                }
-                _ = self.cancel.cancelled() => {
-                    break;
+                tokio::select! {
+                    event = self.swarm.select_next_some() => {
+                        self.handle_connection_events(event).await;
+                    }
+                    _ = self.cancel.cancelled() => {
+                        break;
+                    }
                 }
             }
         }
@@ -516,8 +517,9 @@ impl NetworkWorker {
     async fn handle_command(&mut self, command: Command) {
         match command {
             Command::SendMessage { peer, message } => {
-                if let Ok(peer) = PeerId::from_bytes(&peer) {
-                    self.send_message(peer, message);
+                if let Ok(public_key) = PublicKeyEd25519::try_from_bytes(peer.as_slice()) {
+                    let peer = PublicKey::from(public_key);
+                    self.send_message(peer.to_peer_id(), message);
                 } else {
                     error!(TARGET_WORKER, "Invalid peer id");
                 }

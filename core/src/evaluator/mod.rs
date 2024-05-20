@@ -16,6 +16,8 @@ mod manager;
 #[cfg(feature = "evaluation")]
 pub use manager::EvaluatorManager;
 #[cfg(feature = "evaluation")]
+pub use manager::EvaluatorManagerChannels;
+#[cfg(feature = "evaluation")]
 pub mod runner;
 
 #[derive(Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]

@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 
+use identity::identifier::derive::digest::DigestDerivator;
 use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
 
+use crate::commons::self_signature_manager::SelfSignatureManager;
 use crate::database::Error as DbError;
+use crate::message::MessageContent;
+use crate::signature::Signed;
 use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     database::DB,
@@ -50,18 +54,38 @@ pub struct AuthorizedSubjectsManager<C: DatabaseCollection> {
     token: CancellationToken,
 }
 
-impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
-    /// Creates a new `AuthorizedSubjectsManager` with the given input channel, database, message channel, ID, and shutdown channels.
+pub struct AuthorizedSubjectChannels {
+    input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+}
+
+impl AuthorizedSubjectChannels {
     pub fn new(
         input_channel: MpscChannel<AuthorizedSubjectsCommand, AuthorizedSubjectsResponse>,
-        database: DB<C>,
         message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        our_id: KeyIdentifier,
-        token: CancellationToken,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
     ) -> Self {
         Self {
             input_channel,
-            inner_authorized_subjects: AuthorizedSubjects::new(database, message_channel, our_id),
+            message_channel,
+            protocol_channel,
+        }
+    }
+}
+
+impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
+    /// Creates a new `AuthorizedSubjectsManager` with the given input channel, database, message channel, ID, and shutdown channels.
+    pub fn new(
+        database: DB<C>,
+        token: CancellationToken,
+        signature_manager: SelfSignatureManager,
+        derivator: DigestDerivator,
+        channels: AuthorizedSubjectChannels
+    ) -> Self {
+        Self {
+            input_channel: channels.input_channel,
+            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, signature_manager, derivator, channels.protocol_channel),
             token,
         }
     }

@@ -57,11 +57,11 @@ impl MessageSender {
         )?;
         let bytes = rmp_serde::to_vec(&complete_message)
             .map_err(|error| Error::MsgPackSerialize { source: error })?;
-        Ok(self.sender.send(
+        self.sender.send(
             Command::SendMessage { peer: target.public_key, message: bytes 
             })
             .await
-            .map_err(|_| Error::ChannelClosed)?)
+            .map_err(|_| Error::ChannelClosed)
     }
     
 
@@ -69,12 +69,12 @@ impl MessageSender {
     /// Set node as a provider of keys
     pub async fn start_providing(&mut self, keys: Vec<String>) -> Result<(), Error> {
         debug!("{}: Starting Providing", LOG_TARGET);
-        Ok(self.sender.send(Command::StartProviding { keys }).await.map_err(|_| Error::ChannelClosed)?)
+        self.sender.send(Command::StartProviding { keys }).await.map_err(|_| Error::ChannelClosed)
     }
 
     #[allow(dead_code)]
     pub async fn bootstrap(&mut self) -> Result<(), Error> {
         debug!("{}: Starting Bootstrap", LOG_TARGET);
-        Ok(self.sender.send(Command::Bootstrap).await.map_err(|_| Error::ChannelClosed)?)
+        self.sender.send(Command::Bootstrap).await.map_err(|_| Error::ChannelClosed)
     }
 }

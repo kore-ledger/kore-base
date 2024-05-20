@@ -1,5 +1,7 @@
 use crate::commons::models::approval::ApprovalState;
 use crate::commons::models::state::generate_subject_id;
+use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
+use crate::message::MessageContent;
 use crate::request::{KoreRequest, RequestState};
 use crate::signature::Signed;
 use crate::{
@@ -7,11 +9,11 @@ use crate::{
         channel::SenderEnd,
         models::{evaluation::SubjectContext, state::Subject, validation::ValidationProof},
     },
-    keys::{Ed25519KeyPair, Secp256k1KeyPair, KeyMaterial, KeyPair, KeyGenerator},
     database::{Error as DbError, DB},
     distribution::{error::DistributionManagerError, DistributionMessagesNew},
     governance::{stage::ValidationStage, GovernanceAPI, GovernanceInterface},
     identifier::{Derivable, DigestIdentifier, KeyIdentifier},
+    keys::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair},
     message::{MessageConfig, MessageTaskCommand},
     protocol::KoreMessages,
     request::EventRequest,
@@ -19,9 +21,7 @@ use crate::{
     utils::message::ledger::{request_event, request_gov_event},
     DatabaseCollection,
 };
-use crate::{
-    ApprovalResponse, DigestDerivator, Event, KeyDerivator, Metadata, ValueWrapper,
-};
+use crate::{ApprovalResponse, DigestDerivator, Event, KeyDerivator, Metadata, ValueWrapper};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use super::errors::LedgerError;
@@ -32,6 +32,29 @@ pub struct LedgerState {
     pub head: Option<u64>,
 }
 
+pub struct LedgerChannels {
+    message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+    distribution_channel: SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+}
+
+impl LedgerChannels {
+    pub fn new(
+        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
+        distribution_channel: SenderEnd<
+            DistributionMessagesNew,
+            Result<(), DistributionManagerError>,
+        >,
+        protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
+    ) -> Self {
+        Self {
+            message_channel,
+            distribution_channel,
+            protocol_channel,
+        }
+    }
+}
+
 pub struct Ledger<C: DatabaseCollection> {
     gov_api: GovernanceAPI,
     database: DB<C>,
@@ -40,33 +63,31 @@ pub struct Ledger<C: DatabaseCollection> {
     message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
     distribution_channel: SenderEnd<DistributionMessagesNew, Result<(), DistributionManagerError>>,
     our_id: KeyIdentifier,
-    //notification_sender: tokio::sync::mpsc::Sender<Notification>,
     derivator: DigestDerivator,
+    signature_manager: SelfSignatureManager,
+    protocol_channel: SenderEnd<Signed<MessageContent<KoreMessages>>, ()>,
 }
 
 impl<C: DatabaseCollection> Ledger<C> {
     pub fn new(
         gov_api: GovernanceAPI,
         database: DB<C>,
-        message_channel: SenderEnd<MessageTaskCommand<KoreMessages>, ()>,
-        distribution_channel: SenderEnd<
-            DistributionMessagesNew,
-            Result<(), DistributionManagerError>,
-        >,
-        our_id: KeyIdentifier,
+        signature_manager: SelfSignatureManager,
         //notification_sender: tokio::sync::mpsc::Sender<Notification>,
         derivator: DigestDerivator,
+        channels: LedgerChannels,
     ) -> Self {
         Self {
             gov_api,
             database,
             subject_is_gov: HashMap::new(),
             ledger_state: HashMap::new(),
-            message_channel,
-            distribution_channel,
-            our_id,
-            //notification_sender,
+            message_channel: channels.message_channel,
+            distribution_channel: channels.distribution_channel,
+            our_id: signature_manager.get_own_identifier(),
+            signature_manager,
             derivator,
+            protocol_channel: channels.protocol_channel,
         }
     }
 
@@ -337,13 +358,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                     subject.sn = event.content.sn;
                 }
                 /*let _ = self
-                    .notification_sender
-                    .send(Notification::StateUpdated {
-                        sn: event.content.sn,
-                        subject_id: subject.subject_id.to_str(),
-                    })
-                    .await
-                    .map_err(|_| LedgerError::NotificationChannelError);*/
+                .notification_sender
+                .send(Notification::StateUpdated {
+                    sn: event.content.sn,
+                    subject_id: subject.subject_id.to_str(),
+                })
+                .await
+                .map_err(|_| LedgerError::NotificationChannelError);*/
                 self.database.set_event(&subject_id, event.clone())?;
                 self.set_finished_request(
                     &request_id,
@@ -353,13 +374,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                     true,
                 )?;
                 /*let _ = self
-                    .notification_sender
-                    .send(Notification::NewEvent {
-                        sn,
-                        subject_id: subject_id.to_str(),
-                    })
-                    .await
-                    .map_err(|_| LedgerError::NotificationChannelError);*/
+                .notification_sender
+                .send(Notification::NewEvent {
+                    sn,
+                    subject_id: subject_id.to_str(),
+                })
+                .await
+                .map_err(|_| LedgerError::NotificationChannelError);*/
                 self.database.set_subject(&subject_id, subject)?;
                 // Check is_gov
                 let is_gov = self.subject_is_gov.get(&subject_id);
@@ -426,13 +447,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                     true,
                 )?;
                 /*let _ = self
-                    .notification_sender
-                    .send(Notification::NewEvent {
-                        sn,
-                        subject_id: subject_id.to_str(),
-                    })
-                    .await
-                    .map_err(|_| LedgerError::NotificationChannelError);*/
+                .notification_sender
+                .send(Notification::NewEvent {
+                    sn,
+                    subject_id: subject_id.to_str(),
+                })
+                .await
+                .map_err(|_| LedgerError::NotificationChannelError);*/
                 subject.sn = event.content.sn;
                 self.database.set_subject(&subject_id, subject)?;
                 let is_gov = self.subject_is_gov.get(&subject_id);
@@ -480,13 +501,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                     true,
                 )?;
                 /*let _ = self
-                    .notification_sender
-                    .send(Notification::NewEvent {
-                        sn,
-                        subject_id: subject_id.to_str(),
-                    })
-                    .await
-                    .map_err(|_| LedgerError::NotificationChannelError);*/
+                .notification_sender
+                .send(Notification::NewEvent {
+                    sn,
+                    subject_id: subject_id.to_str(),
+                })
+                .await
+                .map_err(|_| LedgerError::NotificationChannelError);*/
                 subject.sn = sn;
                 subject.eol_event();
                 self.database.set_subject(&subject_id, subject)?;
@@ -614,17 +635,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         transfer_request.subject_id.clone(),
                                         0,
                                     );
-                                    self.message_channel
-                                        .tell(MessageTaskCommand::Request(
-                                            None,
-                                            msg,
-                                            vec![sender],
-                                            MessageConfig {
-                                                timeout: 2000,
-                                                replication_factor: 1.0,
-                                            },
-                                        ))
-                                        .await?;
+                                    self.send_message_one_id(
+                                        None,
+                                        msg,
+                                        sender,
+                                        MessageConfig {
+                                            timeout: 2000,
+                                            replication_factor: 1.0,
+                                        },
+                                    )
+                                    .await?;
+
                                     return Err(LedgerError::SubjectNotFound(
                                         transfer_request.subject_id.to_str(),
                                     ));
@@ -651,17 +672,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         subject.subject_id.clone(),
                                         subject.sn + 1,
                                     );
-                                    self.message_channel
-                                        .tell(MessageTaskCommand::Request(
-                                            None,
-                                            msg,
-                                            vec![sender],
-                                            MessageConfig {
-                                                timeout: 2000,
-                                                replication_factor: 1.0,
-                                            },
-                                        ))
-                                        .await?;
+                                    self.send_message_one_id(
+                                        None,
+                                        msg,
+                                        sender,
+                                        MessageConfig {
+                                            timeout: 2000,
+                                            replication_factor: 1.0,
+                                        },
+                                    )
+                                    .await?;
+
                                     return Err(LedgerError::GovernanceLCE(
                                         transfer_request.subject_id.to_str(),
                                     ));
@@ -804,17 +825,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id.clone(),
                                     sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 self.gov_api
                                     .governance_updated(subject_id.clone(), sn)
                                     .await?;
@@ -849,17 +870,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id,
                                     subject.sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::GovernanceLCE(
                                     transfer_request.subject_id.to_str(),
                                 ));
@@ -920,17 +941,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                             witnesses.insert(subject.owner);
                             let msg =
                                 request_event(self.our_id.clone(), transfer_request.subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    witnesses.into_iter().collect(),
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 0.8,
-                                    },
-                                ))
-                                .await?;
+
+                            self.send_message(
+                                None,
+                                msg,
+                                witnesses,
+                                MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 0.8,
+                                },
+                            )
+                            .await?
                         } else {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
@@ -945,17 +966,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                             self.subject_is_gov.insert(subject_id.clone(), true);
                             // ORDER GENESIS
                             let msg = request_gov_event(self.our_id.clone(), subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    vec![sender],
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 1.0,
-                                    },
-                                ))
-                                .await?;
+                            self.send_message_one_id(
+                                None,
+                                msg,
+                                sender,
+                                MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 1.0,
+                                },
+                            )
+                            .await?;
+
                             return Err(LedgerError::GovernanceLCE(
                                 transfer_request.subject_id.to_str(),
                             ));
@@ -1027,17 +1048,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                         // Request event 0
                         let msg =
                             request_event(self.our_id.clone(), transfer_request.subject_id, 0);
-                        self.message_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                msg,
-                                vec![sender],
-                                MessageConfig {
-                                    timeout: 2000,
-                                    replication_factor: 1.0,
-                                },
-                            ))
-                            .await?;
+                        self.send_message_one_id(
+                            None,
+                            msg,
+                            sender,
+                            MessageConfig {
+                                timeout: 2000,
+                                replication_factor: 1.0,
+                            },
+                        )
+                        .await?
                     }
                 };
             }
@@ -1190,17 +1210,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 // ORDER GENESIS
                                 let msg =
                                     request_event(self.our_id.clone(), state_request.subject_id, 0);
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::SubjectNotFound("aaa".into()));
                             }
                             Err(error) => {
@@ -1228,17 +1248,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject.subject_id.clone(),
                                     subject.sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::GovernanceLCE(
                                     state_request.subject_id.to_str(),
                                 ));
@@ -1329,13 +1349,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 subject.sn = event.content.sn;
                             }
                             /*let _ = self
-                                .notification_sender
-                                .send(Notification::StateUpdated {
-                                    sn: event.content.sn,
-                                    subject_id: subject.subject_id.to_str(),
-                                })
-                                .await
-                                .map_err(|_| LedgerError::NotificationChannelError);*/
+                            .notification_sender
+                            .send(Notification::StateUpdated {
+                                sn: event.content.sn,
+                                subject_id: subject.subject_id.to_str(),
+                            })
+                            .await
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database.set_signatures(
                                 &state_request.subject_id,
                                 sn,
@@ -1351,13 +1371,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             )?;
                             self.database.set_event(&state_request.subject_id, event)?;
                             /*let _ = self
-                                .notification_sender
-                                .send(Notification::NewEvent {
-                                    sn,
-                                    subject_id: subject_id.to_str(),
-                                })
-                                .await
-                                .map_err(|_| LedgerError::NotificationChannelError);*/
+                            .notification_sender
+                            .send(Notification::NewEvent {
+                                sn,
+                                subject_id: subject_id.to_str(),
+                            })
+                            .await
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database
                                 .set_subject(&state_request.subject_id, subject)?;
                             if self.subject_is_gov.get(&subject_id).unwrap().to_owned() {
@@ -1367,17 +1387,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id.clone(),
                                     sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 self.gov_api
                                     .governance_updated(subject_id.clone(), sn)
                                     .await?;
@@ -1412,17 +1432,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id,
                                     subject.sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::GovernanceLCE(
                                     state_request.subject_id.to_str(),
                                 ));
@@ -1461,13 +1481,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             )?;
                             self.database.set_event(&state_request.subject_id, event)?;
                             /*let _ = self
-                                .notification_sender
-                                .send(Notification::NewEvent {
-                                    sn,
-                                    subject_id: subject_id.to_str(),
-                                })
-                                .await
-                                .map_err(|_| LedgerError::NotificationChannelError);*/
+                            .notification_sender
+                            .send(Notification::NewEvent {
+                                sn,
+                                subject_id: subject_id.to_str(),
+                            })
+                            .await
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                             if last_lce.is_some() {
                                 // TODO: Unwrap
                                 let last_lce_sn = last_lce.unwrap();
@@ -1491,17 +1511,10 @@ impl<C: DatabaseCollection> Ledger<C> {
                             witnesses.insert(subject.owner);
                             let msg =
                                 request_event(self.our_id.clone(), state_request.subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    witnesses.into_iter().collect(),
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 0.8,
-                                    },
-                                ))
-                                .await?;
+                                self.send_message(None, msg, witnesses,MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 0.8,
+                                }).await?
                         } else {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
@@ -1512,14 +1525,14 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     data.state = ApprovalState::Obsolete;
                                     self.database.set_approval(approval_request_hash, data)?;
                                     /*let _ = self
-                                        .notification_sender
-                                        .send(Notification::ObsoletedApproval {
-                                            id: approval_request_hash.to_str(),
-                                            subject_id: subject_id.to_str(),
-                                            sn,
-                                        })
-                                        .await
-                                        .map_err(|_| LedgerError::NotificationChannelError);*/
+                                    .notification_sender
+                                    .send(Notification::ObsoletedApproval {
+                                        id: approval_request_hash.to_str(),
+                                        subject_id: subject_id.to_str(),
+                                        sn,
+                                    })
+                                    .await
+                                    .map_err(|_| LedgerError::NotificationChannelError);*/
                                 }
                             }
                             Err(error) => match error {
@@ -1539,17 +1552,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                             self.subject_is_gov.insert(subject_id.clone(), true);
                             // ORDER GENESIS
                             let msg = request_gov_event(self.our_id.clone(), subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    vec![sender],
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 1.0,
-                                    },
-                                ))
-                                .await?;
+                            self.send_message_one_id(
+                                None,
+                                msg,
+                                sender,
+                                MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 1.0,
+                                },
+                            )
+                            .await?;
+
                             return Err(LedgerError::GovernanceLCE(
                                 state_request.subject_id.to_str(),
                             ));
@@ -1618,13 +1631,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             true,
                         )?;
                         /*let _ = self
-                            .notification_sender
-                            .send(Notification::NewEvent {
-                                sn,
-                                subject_id: subject_id.to_str(),
-                            })
-                            .await
-                            .map_err(|_| LedgerError::NotificationChannelError);*/
+                        .notification_sender
+                        .send(Notification::NewEvent {
+                            sn,
+                            subject_id: subject_id.to_str(),
+                        })
+                        .await
+                        .map_err(|_| LedgerError::NotificationChannelError);*/
                         self.set_finished_request(
                             &request_id,
                             event_request.clone(),
@@ -1641,17 +1654,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                         );
                         // Request event 0
                         let msg = request_event(self.our_id.clone(), state_request.subject_id, 0);
-                        self.message_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                msg,
-                                vec![sender],
-                                MessageConfig {
-                                    timeout: 2000,
-                                    replication_factor: 1.0,
-                                },
-                            ))
-                            .await?;
+                        self.send_message_one_id(
+                            None,
+                            msg,
+                            sender,
+                            MessageConfig {
+                                timeout: 2000,
+                                replication_factor: 1.0,
+                            },
+                        )
+                        .await?;
                     }
                 };
             }
@@ -1679,17 +1691,18 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 // ORDER GENESIS
                                 let msg =
                                     request_event(self.our_id.clone(), eol_request.subject_id, 0);
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::SubjectNotFound("aaa".into()));
                             }
                             Err(error) => {
@@ -1715,17 +1728,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject.subject_id.clone(),
                                     subject.sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::GovernanceLCE(
                                     eol_request.subject_id.to_str(),
                                 ));
@@ -1804,13 +1817,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             )?;
                             self.database.set_event(&eol_request.subject_id, event)?;
                             /*let _ = self
-                                .notification_sender
-                                .send(Notification::NewEvent {
-                                    sn,
-                                    subject_id: subject_id.to_str(),
-                                })
-                                .await
-                                .map_err(|_| LedgerError::NotificationChannelError);*/
+                            .notification_sender
+                            .send(Notification::NewEvent {
+                                sn,
+                                subject_id: subject_id.to_str(),
+                            })
+                            .await
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                             self.database
                                 .set_subject(&eol_request.subject_id, subject)?;
                             if self.subject_is_gov.get(&subject_id).unwrap().to_owned() {
@@ -1820,17 +1833,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id.clone(),
                                     sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 self.gov_api
                                     .governance_updated(subject_id.clone(), sn)
                                     .await?;
@@ -1865,17 +1878,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                                     subject_id,
                                     subject.sn + 1,
                                 );
-                                self.message_channel
-                                    .tell(MessageTaskCommand::Request(
-                                        None,
-                                        msg,
-                                        vec![sender],
-                                        MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 1.0,
-                                        },
-                                    ))
-                                    .await?;
+                                self.send_message_one_id(
+                                    None,
+                                    msg,
+                                    sender,
+                                    MessageConfig {
+                                        timeout: 2000,
+                                        replication_factor: 1.0,
+                                    },
+                                )
+                                .await?;
+
                                 return Err(LedgerError::GovernanceLCE(
                                     eol_request.subject_id.to_str(),
                                 ));
@@ -1917,13 +1930,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             )?;
                             self.database.set_event(&eol_request.subject_id, event)?;
                             /*let _ = self
-                                .notification_sender
-                                .send(Notification::NewEvent {
-                                    sn,
-                                    subject_id: subject_id.to_str(),
-                                })
-                                .await
-                                .map_err(|_| LedgerError::NotificationChannelError);*/
+                            .notification_sender
+                            .send(Notification::NewEvent {
+                                sn,
+                                subject_id: subject_id.to_str(),
+                            })
+                            .await
+                            .map_err(|_| LedgerError::NotificationChannelError);*/
                             if last_lce.is_some() {
                                 let last_lce_sn = last_lce.unwrap();
                                 self.database
@@ -1945,17 +1958,10 @@ impl<C: DatabaseCollection> Ledger<C> {
                             // Request next event to current_sn
                             witnesses.insert(subject.owner);
                             let msg = request_event(self.our_id.clone(), eol_request.subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    witnesses.into_iter().collect(),
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 0.8,
-                                    },
-                                ))
-                                .await?;
+                            self.send_message(None, msg, witnesses,MessageConfig {
+                                timeout: 2000,
+                                replication_factor: 0.8,
+                            }).await?
                         } else {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
@@ -1971,17 +1977,17 @@ impl<C: DatabaseCollection> Ledger<C> {
                             self.subject_is_gov.insert(subject_id.clone(), true);
                             // ORDER GENESIS
                             let msg = request_gov_event(self.our_id.clone(), subject_id, 0);
-                            self.message_channel
-                                .tell(MessageTaskCommand::Request(
-                                    None,
-                                    msg,
-                                    vec![sender],
-                                    MessageConfig {
-                                        timeout: 2000,
-                                        replication_factor: 1.0,
-                                    },
-                                ))
-                                .await?;
+                            self.send_message_one_id(
+                                None,
+                                msg,
+                                sender,
+                                MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 1.0,
+                                },
+                            )
+                            .await?;
+
                             return Err(LedgerError::GovernanceLCE(
                                 eol_request.subject_id.to_str(),
                             ));
@@ -2048,13 +2054,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                             success,
                         )?;
                         /*let _ = self
-                            .notification_sender
-                            .send(Notification::NewEvent {
-                                sn,
-                                subject_id: subject_id.to_str(),
-                            })
-                            .await
-                            .map_err(|_| LedgerError::NotificationChannelError);*/
+                        .notification_sender
+                        .send(Notification::NewEvent {
+                            sn,
+                            subject_id: subject_id.to_str(),
+                        })
+                        .await
+                        .map_err(|_| LedgerError::NotificationChannelError);*/
                         self.ledger_state.insert(
                             eol_request.subject_id.clone(),
                             LedgerState {
@@ -2064,17 +2070,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                         );
                         // Request event 0
                         let msg = request_event(self.our_id.clone(), eol_request.subject_id, 0);
-                        self.message_channel
-                            .tell(MessageTaskCommand::Request(
-                                None,
-                                msg,
-                                vec![sender],
-                                MessageConfig {
-                                    timeout: 2000,
-                                    replication_factor: 1.0,
-                                },
-                            ))
-                            .await?;
+                        self.send_message_one_id(
+                            None,
+                            msg,
+                            sender,
+                            MessageConfig {
+                                timeout: 2000,
+                                replication_factor: 1.0,
+                            },
+                        )
+                        .await?;
                     }
                 }
             }
@@ -2180,13 +2185,13 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         event.content.eval_success && event.content.approved,
                                     )?;
                                     /*let _ = self
-                                        .notification_sender
-                                        .send(Notification::NewEvent {
-                                            sn: event.content.sn,
-                                            subject_id: subject_id.to_str(),
-                                        })
-                                        .await
-                                        .map_err(|_| LedgerError::NotificationChannelError);*/
+                                    .notification_sender
+                                    .send(Notification::NewEvent {
+                                        sn: event.content.sn,
+                                        subject_id: subject_id.to_str(),
+                                    })
+                                    .await
+                                    .map_err(|_| LedgerError::NotificationChannelError);*/
                                     let approval_request_hash = &event
                                         .content
                                         .get_approval_hash(
@@ -2205,16 +2210,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                                                 self.database
                                                     .set_approval(approval_request_hash, data)?;
                                                 /*let _ = self
-                                                    .notification_sender
-                                                    .send(Notification::ObsoletedApproval {
-                                                        id: approval_request_hash.to_str(),
-                                                        subject_id: subject_id.to_str(),
-                                                        sn: event.content.sn,
-                                                    })
-                                                    .await
-                                                    .map_err(|_| {
-                                                        LedgerError::NotificationChannelError
-                                                    });*/
+                                                .notification_sender
+                                                .send(Notification::ObsoletedApproval {
+                                                    id: approval_request_hash.to_str(),
+                                                    subject_id: subject_id.to_str(),
+                                                    sn: event.content.sn,
+                                                })
+                                                .await
+                                                .map_err(|_| {
+                                                    LedgerError::NotificationChannelError
+                                                });*/
                                             }
                                         }
                                         Err(error) => match error {
@@ -2297,17 +2302,10 @@ impl<C: DatabaseCollection> Ledger<C> {
                                             subject_id,
                                             current_sn + 2,
                                         );
-                                        self.message_channel
-                                            .tell(MessageTaskCommand::Request(
-                                                None,
-                                                msg,
-                                                witnesses.into_iter().collect(),
-                                                MessageConfig {
-                                                    timeout: 2000,
-                                                    replication_factor: 0.8,
-                                                },
-                                            ))
-                                            .await?;
+                                        self.send_message(None, msg, witnesses,MessageConfig {
+                                            timeout: 2000,
+                                            replication_factor: 0.8,
+                                        }).await?
                                     }
                                     Ok(())
                                 } else {
@@ -2408,17 +2406,10 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         witnesses
                                             .insert(event.content.event_request.signature.signer);
                                         let msg = request_event(self.our_id.clone(), subject_id, 1);
-                                        self.message_channel
-                                            .tell(MessageTaskCommand::Request(
-                                                None,
-                                                msg,
-                                                witnesses.into_iter().collect(),
-                                                MessageConfig {
-                                                    timeout: 2000,
-                                                    replication_factor: 0.8,
-                                                },
-                                            ))
-                                            .await?;
+                                        self.send_message(None, msg, witnesses,MessageConfig {
+                                            timeout: 2000,
+                                            replication_factor: 0.8,
+                                        }).await?
                                     }
                                     Ok(())
                                 } else {
@@ -2441,16 +2432,16 @@ impl<C: DatabaseCollection> Ledger<C> {
         sn: u64,
     ) -> Result<Signed<Event>, LedgerError> {
         let event = self.database.get_event(&subject_id, sn)?;
-        self.message_channel
-            .tell(MessageTaskCommand::Request(
-                None,
-                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
-                    event: event.clone(),
-                }),
-                vec![who_asked],
-                MessageConfig::direct_response(),
-            ))
-            .await?;
+        self.send_message_one_id(
+            None,
+            KoreMessages::LedgerMessages(super::LedgerCommand::ExternalIntermediateEvent {
+                event: event.clone(),
+            }),
+            who_asked,
+            MessageConfig::direct_response(),
+        )
+        .await?;
+
         Ok(event)
     }
 
@@ -2465,19 +2456,19 @@ impl<C: DatabaseCollection> Ledger<C> {
             Ok((s, validation_proof)) => (s, validation_proof),
             Err(error) => return Err(LedgerError::DatabaseError(error)),
         };
-        self.message_channel
-            .tell(MessageTaskCommand::Request(
-                None,
-                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
-                    sender: self.our_id.clone(),
-                    event: event.clone(),
-                    signatures: signatures.clone(),
-                    validation_proof,
-                }),
-                vec![who_asked],
-                MessageConfig::direct_response(),
-            ))
-            .await?;
+        self.send_message_one_id(
+            None,
+            KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                sender: self.our_id.clone(),
+                event: event.clone(),
+                signatures: signatures.clone(),
+                validation_proof,
+            }),
+            who_asked,
+            MessageConfig::direct_response(),
+        )
+        .await?;
+
         Ok((event, signatures))
     }
 
@@ -2493,20 +2484,19 @@ impl<C: DatabaseCollection> Ledger<C> {
                 Ok((s, validation_proof)) => (s, validation_proof),
                 Err(error) => return Err(LedgerError::DatabaseError(error)),
             };
+        self.send_message_one_id(
+            None,
+            KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
+                sender: self.our_id.clone(),
+                event: event.clone(),
+                signatures: signatures.clone(),
+                validation_proof,
+            }),
+            who_asked,
+            MessageConfig::direct_response(),
+        )
+        .await?;
 
-        self.message_channel
-            .tell(MessageTaskCommand::Request(
-                None,
-                KoreMessages::LedgerMessages(super::LedgerCommand::ExternalEvent {
-                    sender: self.our_id.clone(),
-                    event: event.clone(),
-                    signatures: signatures.clone(),
-                    validation_proof,
-                }),
-                vec![who_asked],
-                MessageConfig::direct_response(),
-            ))
-            .await?;
         Ok((event, signatures))
     }
 
@@ -2660,21 +2650,21 @@ impl<C: DatabaseCollection> Ledger<C> {
             success,
         )?;
         /*let _ = self
-            .notification_sender
-            .send(Notification::NewEvent {
-                sn,
-                subject_id: subject_id.to_str(),
-            })
-            .await
-            .map_err(|_| LedgerError::NotificationChannelError);*/
+        .notification_sender
+        .send(Notification::NewEvent {
+            sn,
+            subject_id: subject_id.to_str(),
+        })
+        .await
+        .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database.set_subject(&subject_id, subject)?;
         /*let _ = self
-            .notification_sender
-            .send(Notification::NewSubject {
-                subject_id: subject_id.to_str(),
-            })
-            .await
-            .map_err(|_| LedgerError::NotificationChannelError);*/
+        .notification_sender
+        .send(Notification::NewSubject {
+            subject_id: subject_id.to_str(),
+        })
+        .await
+        .map_err(|_| LedgerError::NotificationChannelError);*/
         Ok(metadata)
     }
 
@@ -2819,13 +2809,13 @@ impl<C: DatabaseCollection> Ledger<C> {
         }
         subject.sn = event.content.sn;
         /*let _ = self
-            .notification_sender
-            .send(Notification::StateUpdated {
-                sn: event.content.sn,
-                subject_id: subject.subject_id.to_str(),
-            })
-            .await
-            .map_err(|_| LedgerError::NotificationChannelError);*/
+        .notification_sender
+        .send(Notification::StateUpdated {
+            sn: event.content.sn,
+            subject_id: subject.subject_id.to_str(),
+        })
+        .await
+        .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database
             .set_subject(&event.content.subject_id, subject.clone())?;
         Ok(subject)
@@ -2868,13 +2858,13 @@ impl<C: DatabaseCollection> Ledger<C> {
         // check_context(&event, metadata, subject.properties.clone())?;
         subject.update_subject(event.content.patch, event.content.sn)?;
         /*let _ = self
-            .notification_sender
-            .send(Notification::StateUpdated {
-                sn: event.content.sn,
-                subject_id: subject.subject_id.to_str(),
-            })
-            .await
-            .map_err(|_| LedgerError::NotificationChannelError);*/
+        .notification_sender
+        .send(Notification::StateUpdated {
+            sn: event.content.sn,
+            subject_id: subject.subject_id.to_str(),
+        })
+        .await
+        .map_err(|_| LedgerError::NotificationChannelError);*/
         self.database.set_subject(&subject_id, subject.clone())?;
         Ok(subject)
     }
@@ -2915,6 +2905,96 @@ impl<C: DatabaseCollection> Ledger<C> {
             (&signers, quorum, quorum_neg),
         )?;
         Ok(())
+    }
+
+    /// This function is in charge of sending KoreMessages, if it is a message addressed
+    /// to the node itself, the message is sent directly to Protocol, otherwise it is sent to Network.
+    async fn send_message(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        mut ids: HashSet<KeyIdentifier>,
+        message_config: MessageConfig,
+    ) -> Result<(), LedgerError> {
+        let total_ids = ids.len();
+        // If only has 1 keyidentifier and is our node
+        let our_node_is_validator = ids.contains(&self.our_id.clone());
+        if total_ids == 1 && ids.contains(&self.our_id.clone()) {
+            self.send_message_local(event_message).await
+        // If our node is in the hashSet and is not the only one.
+        } else if our_node_is_validator {
+            // our node
+            self.send_message_local(event_message.clone()).await?;
+            // others nodes.
+            ids.remove(&self.our_id);
+            self.send_message_network(
+                subject_id,
+                event_message,
+                ids.into_iter().collect(),
+                message_config,
+            )
+            .await
+        }
+        // If our node is not in the hashset.
+        else {
+            self.send_message_network(
+                subject_id,
+                event_message,
+                ids.into_iter().collect(),
+                message_config,
+            )
+            .await
+        }
+    }
+
+    // If only have one keyidentifier
+    async fn send_message_one_id(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        id: KeyIdentifier,
+        message_config: MessageConfig,
+    ) -> Result<(), LedgerError> {
+        if id == self.our_id {
+            self.send_message_local(event_message.clone()).await
+        } else {
+            self.send_message_network(subject_id, event_message, vec![id], message_config)
+                .await
+        }
+    }
+
+    async fn send_message_network(
+        &self,
+        subject_id: Option<String>,
+        event_message: KoreMessages,
+        ids: Vec<KeyIdentifier>,
+        message_config: MessageConfig,
+    ) -> Result<(), LedgerError> {
+        self.message_channel
+            .tell(MessageTaskCommand::Request(
+                subject_id,
+                event_message,
+                ids,
+                message_config,
+            ))
+            .await
+            .map_err(|_| LedgerError::ChannelClosed)
+    }
+
+    async fn send_message_local(&self, event_message: KoreMessages) -> Result<(), LedgerError> {
+        let complete_message = Signed::<MessageContent<KoreMessages>>::new(
+            self.our_id.clone(),
+            self.our_id.clone(),
+            event_message,
+            &self.signature_manager,
+            self.derivator,
+        )
+        .unwrap();
+
+        self.protocol_channel
+            .tell(complete_message)
+            .await
+            .map_err(|_| LedgerError::ChannelClosed)
     }
 }
 

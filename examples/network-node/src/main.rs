@@ -68,10 +68,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         tokio::select! {
             event = event_receiver.recv() => {
-                if let Some(event) = event {
-                    match event {
-                        _ => {}
-                    }
+                if event.is_some() {
                 }
             }
             _ = token.cancelled() => {
