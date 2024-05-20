@@ -4,18 +4,26 @@ use std::{
     collections::{btree_map::Iter, BTreeMap, HashMap},
     iter::Rev,
     rc::Rc,
-    sync::{Arc, Mutex, RwLock, MutexGuard},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 pub struct DataStore {
-    data: Mutex<BTreeMap<String, Vec<u8>>>,
+    data: RwLock<BTreeMap<String, Vec<u8>>>,
 }
 
 impl DataStore {
     fn new() -> Self {
         Self {
-            data: Mutex::new(BTreeMap::new()),
+            data: RwLock::new(BTreeMap::new()),
         }
+    }
+
+    fn _get_inner_read_lock(&self) -> RwLockReadGuard<'_, BTreeMap<String, Vec<u8>>> {
+        self.data.read().unwrap()
+    }
+
+    fn _get_inner_write_lock(&self) -> RwLockWriteGuard<'_, BTreeMap<String, Vec<u8>>> {
+        self.data.write().unwrap()
     }
 }
 
@@ -71,7 +79,7 @@ pub struct MemoryCollection {
 
 impl DatabaseCollection for MemoryCollection {
     fn get(&self, key: &str) -> Result<Vec<u8>, Error> {
-        let lock = self.data.data.lock().map_err(|_| Error::CustomError("open data".to_owned()))?;
+        let lock = self.data._get_inner_read_lock();
         let Some(data) = lock.get(key) else {
             return Err(Error::EntryNotFound);
         };
@@ -79,13 +87,13 @@ impl DatabaseCollection for MemoryCollection {
     }
 
     fn put(&self, key: &str, data: &[u8]) -> Result<(), Error> {
-        let mut lock = self.data.data.lock().map_err(|_| Error::CustomError("open data".to_owned()))?;
+        let mut lock = self.data._get_inner_write_lock();
         lock.insert(key.to_string(), data.to_owned());
         Ok(())
     }
 
     fn del(&self, key: &str) -> Result<(), Error> {
-        let mut lock = self.data.data.lock().map_err(|_| Error::CustomError("open data".to_owned()))?;
+        let mut lock = self.data._get_inner_write_lock();
         lock.remove(key);
         Ok(())
     }
@@ -103,7 +111,7 @@ impl DatabaseCollection for MemoryCollection {
     }
 }
 
-type GuardIter<'a, K, V> = (Rc<MutexGuard<'a, BTreeMap<K, V>>>, Iter<'a, K, V>);
+type GuardIter<'a, K, V> = (Rc<RwLockReadGuard<'a, BTreeMap<K, V>>>, Iter<'a, K, V>);
 
 pub struct MemoryIterator<'a> {
     map: &'a DataStore,
@@ -127,7 +135,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
         let iter = if let Some((_, iter)) = self.current.as_mut() {
             iter
         } else {
-            let guard = self.map.data.lock().unwrap();
+            let guard = self.map._get_inner_read_lock();
             let sref: &BTreeMap<String, Vec<u8>> = unsafe { change_lifetime_const(&*guard) };
             let iter = sref.iter();
             self.current = Some((Rc::new(guard), iter));
@@ -159,7 +167,7 @@ impl<'a> Iterator for MemoryIterator<'a> {
 }
 
 type GuardRevIter<'a> = (
-    Rc<MutexGuard<'a, BTreeMap<String, Vec<u8>>>>,
+    Rc<RwLockReadGuard<'a, BTreeMap<String, Vec<u8>>>>,
     Rev<Iter<'a, String, Vec<u8>>>,
 );
 
@@ -185,7 +193,7 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
         let iter = if let Some((_, iter)) = self.current.as_mut() {
             iter
         } else {
-            let guard = self.map.data.lock().unwrap();
+            let guard = self.map._get_inner_read_lock();
             let sref: &BTreeMap<String, Vec<u8>> = unsafe { change_lifetime_const(&*guard) };
             let iter = sref.iter().rev();
             self.current = Some((Rc::new(guard), iter));
@@ -201,6 +209,16 @@ impl<'a> Iterator for RevMemoryIterator<'a> {
             };
             return Some((key, item.1.clone()));
         }
+        /*let Some(item) = iter.next() else {
+            return None;
+        };
+        let key = {
+            let value = item.0.clone();
+            if !value.starts_with(&self.table_name) {
+                return None;
+            }
+            value.replace(&self.table_name, "")
+        };*/
         None
     }
 }
