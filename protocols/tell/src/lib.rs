@@ -193,6 +193,15 @@ pub struct Config {
     max_concurrent_streams: usize,
 }
 
+impl Config {
+    pub fn new(message_timeout: Duration, max_concurrent_streams: usize) -> Self {
+        Self {
+            message_timeout,
+            max_concurrent_streams,
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {

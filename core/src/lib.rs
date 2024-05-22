@@ -139,4 +139,6 @@ pub use identity::identifier;
 pub use identifier::{Derivable, DigestIdentifier, KeyIdentifier, SignatureIdentifier};
 pub use identifier::derive::{digest::DigestDerivator, KeyDerivator};
 
-pub use network::{Config as NetworkConfig, Event as NetworkEvent, NodeType, RoutingNode};
+pub use network::{Config as NetworkConfig, Event as NetworkEvent, NodeType, RoutingNode, RoutingConfig};
+
+pub use tell::Config as TellConfig;

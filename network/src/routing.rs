@@ -55,6 +55,9 @@ pub struct Behaviour {
     /// Circuit relay nodes.
     relay_nodes: HashMap<PeerId, Multiaddr>,
 
+    /// Boolean that activates the random walk if the node has already finished the initial pre-routing phase.
+    pre_routing: bool,
+
     /// Kademlia behavior.
     kademlia: Toggle<Kademlia<MemoryStore>>,
 
@@ -106,6 +109,7 @@ impl Behaviour {
             kademlia_disjoint_query_paths,
             kademlia_replication_factor,
             protocol_names,
+            pre_routing
         } = config;
 
         // Convert boot nodes to `PeerId` and `Multiaddr`.
@@ -177,12 +181,17 @@ impl Behaviour {
             records_to_publish: Default::default(),
             active_queries: Default::default(),
             pending_events: VecDeque::new(),
+            pre_routing
         }
     }
 
     /// Bootstrap node list.
     pub fn boot_nodes(&self) -> Vec<(PeerId, Multiaddr)> {
         self.boot_nodes.clone()
+    }
+
+    pub fn finish_prerouting_state(&mut self) {
+        self.pre_routing = false;
     }
 
     /// Returns true if the given peer is known.
@@ -604,43 +613,45 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
-    {
+    {   
         if let Some(ev) = self.pending_events.pop_front() {
             return Poll::Ready(ToSwarm::GenerateEvent(ev));
         }
 
         // Poll the stream that fires when we need to start a random Kademlia query.
         if let Some(kademlia) = self.kademlia.as_mut() {
-            if let Some(next_random_walk) = self.next_random_walk.as_mut() {
-                while next_random_walk.poll_unpin(cx).is_ready() {
-                    let actually_started =
-                        if self.num_connections < self.discovery_only_if_under_num {
-                            let random_peer_id = PeerId::random();
-                            debug!(
-                                target: TARGET_ROUTING,
-                                "Kademlia => Starting random Kademlia request for {:?}",
-                                random_peer_id,
-                            );
-                            kademlia.get_closest_peers(random_peer_id);
-                            true
-                        } else {
-                            debug!(
-                                target: TARGET_ROUTING,
-                                "Kademlia paused due to high number of connections ({})",
-                                self.num_connections
-                            );
-                            false
-                        };
-
-                    // Schedule the next random query with exponentially increasing delay,
-                    // capped at 60 seconds.
-                    *next_random_walk = Delay::new(self.duration_to_next_kad);
-                    self.duration_to_next_kad =
-                        cmp::min(self.duration_to_next_kad * 2, Duration::from_secs(60));
-
-                    if actually_started {
-                        let ev = Event::RandomKademliaStarted;
-                        return Poll::Ready(ToSwarm::GenerateEvent(ev));
+            if !self.pre_routing {
+                if let Some(next_random_walk) = self.next_random_walk.as_mut() {
+                    while next_random_walk.poll_unpin(cx).is_ready() {
+                        let actually_started =
+                            if self.num_connections < self.discovery_only_if_under_num {
+                                let random_peer_id = PeerId::random();
+                                debug!(
+                                    target: TARGET_ROUTING,
+                                    "Kademlia => Starting random Kademlia request for {:?}",
+                                    random_peer_id,
+                                );
+                                kademlia.get_closest_peers(random_peer_id);
+                                true
+                            } else {
+                                debug!(
+                                    target: TARGET_ROUTING,
+                                    "Kademlia paused due to high number of connections ({})",
+                                    self.num_connections
+                                );
+                                false
+                            };
+    
+                        // Schedule the next random query with exponentially increasing delay,
+                        // capped at 60 seconds.
+                        *next_random_walk = Delay::new(self.duration_to_next_kad);
+                        self.duration_to_next_kad =
+                            cmp::min(self.duration_to_next_kad * 2, Duration::from_secs(60));
+    
+                        if actually_started {
+                            let ev = Event::RandomKademliaStarted;
+                            return Poll::Ready(ToSwarm::GenerateEvent(ev));
+                        }
                     }
                 }
             }
@@ -993,6 +1004,9 @@ pub struct Config {
     /// Whether to enable random walks in the Kademlia DHT.
     dht_random_walk: bool,
 
+    /// Boolean that activates the random walk if the node has already finished the initial pre-routing phase.
+    pre_routing: bool,
+
     /// Number of active connections over which we interrupt the discovery process.
     discovery_only_if_under_num: u64,
 
@@ -1029,7 +1043,13 @@ impl Config {
             kademlia_disjoint_query_paths: true,
             kademlia_replication_factor: None,
             protocol_names,
+            pre_routing: true
         }
+    }
+
+    /// Get DHT random walk.
+    pub fn get_dht_random_walk(&self) -> bool {
+        self.dht_random_walk
     }
 
     /// Enables or disables random walks in the Kademlia DHT.

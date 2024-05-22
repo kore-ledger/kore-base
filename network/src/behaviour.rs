@@ -86,9 +86,12 @@ impl Behaviour {
                 (Toggle::from(Some(dcutr)), Toggle::from(Some(relay_server)))
             }
         };
+        let is_dht_random_walk = config.routing.get_dht_random_walk() && config.node_type == NodeType::Bootstrap;
+        let config_routing = config.routing.with_dht_random_walk( is_dht_random_walk);
+
         Self {
             tell: binary::Behaviour::new(protocols, config.tell),
-            routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config.routing),
+            routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config_routing),
             node: node::Behaviour::new(&config.user_agent, public_key, external_addresses),
             relay_server,
             relay_client,
@@ -104,6 +107,10 @@ impl Behaviour {
     /// Bootstrap node list.
     pub fn boot_nodes(&mut self) -> Vec<(PeerId, Multiaddr)> {
         self.routing.boot_nodes()
+    }
+
+    pub fn finish_prerouting_state(&mut self) {
+        self.routing.finish_prerouting_state();
     }
 
     /// Get relay node.

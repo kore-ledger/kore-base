@@ -150,6 +150,7 @@ impl NetworkWorker {
             swarm::Config::with_tokio_executor(),
         );
 
+        
         // Add confirmed external addresses.
         match config.node_type {
             NodeType::Bootstrap | NodeType::Addressable => {
@@ -374,6 +375,8 @@ impl NetworkWorker {
             return;
         }
 
+        // Finish pre routing state, activating random walk (if node is a bootstrap).
+        self.swarm.behaviour_mut().finish_prerouting_state();
         // Run main loop.
         self.run_main().await;
     }
