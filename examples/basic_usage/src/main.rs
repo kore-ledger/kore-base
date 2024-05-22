@@ -59,7 +59,5 @@ async fn main() {
         .await
         .unwrap_or_else(|_| panic!("Error getting subject"));
 
-    println!("Subject ID: {}", subject.subject_id.to_str());
-
     node.shutdown_gracefully().await;
 }

@@ -129,7 +129,6 @@ mod tests {
         // Ed25519Sha512
         let sig_str = "SETCkX4WX_KcMeLKdwrtN8DGD49z7gbPfYV0Ao8C-B_dcKRj-7TXmv\
         LdKNHG27GDOvgCyWzFMMI23rw2sSssHjBQ";
-        println!("{}", sig_str.len());
         let si = SignatureIdentifier::from_str(sig_str).unwrap();
         let ser_si = serde_json::to_string_pretty(&si).unwrap();
         let des_si: SignatureIdentifier = serde_json::from_str(&ser_si).unwrap();
@@ -140,7 +139,6 @@ mod tests {
         {
             let sig_str = "SSRFbutVG3-KHv_Fuexdx24aukwvj_RqN9jiPt9EQyDYRWsMJ-kpcLfX7\
             CHmERmULScNSiG2l4_DDQF1qui8rEjQ";
-            println!("{}", sig_str.len());
             let si = SignatureIdentifier::from_str(sig_str).unwrap();
             let ser_si = serde_json::to_string_pretty(&si).unwrap();
             let des_si: SignatureIdentifier = serde_json::from_str(&ser_si).unwrap();
