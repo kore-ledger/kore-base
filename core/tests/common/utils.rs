@@ -1,12 +1,16 @@
+use std::mem;
+
 use kore_base::{
     keys::{KeyMaterial, KeyPair},
     request::{FactRequest, StartRequest},
-    signature::{Signature, Signed}, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, ValueWrapper,
+    signature::{Signature, Signed},
+    Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, ValueWrapper,
 };
 use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
+use rand::seq::IteratorRandom;
 use serde_json::Value;
-
+use sha2::digest::generic_array::iter;
 
 #[derive(Debug, Clone)]
 pub struct McNodeData {
@@ -85,13 +89,34 @@ pub fn create_governance_request<S: Into<String>>(
 }
 
 pub fn add_members_governance_request(
-    node_info: Vec<(KeyIdentifier, String, Option<Role>)>,
+    vec_nodes: &Vec<(Api, McNodeData, String)>,
     governance_id: DigestIdentifier,
 ) -> EventRequest {
     let mut operations: Vec<Value> = vec![];
+    let mut first_iteration = true;
+    let mut members = vec![];
+    let mut iteration = 0;
+
+    for node in vec_nodes.iter() {
+        if first_iteration {
+            members.push((
+                node.1.get_controller_id(),
+                format!("test{}", iteration),
+                None,
+            ));
+            first_iteration = false;
+        } else {
+            members.push((
+                node.1.get_controller_id(),
+                format!("test{}", iteration),
+                Option::from(Role::WITNESS),
+            ));
+        }
+        iteration += 1;
+    }
 
     // Add members
-    for (index, (public_key, name, _)) in node_info.iter().enumerate() {
+    for (index, (public_key, name, _)) in members.iter().enumerate() {
         let member_value = serde_json::json!({
             "op":"add",
             "path": format!("/members/{}", index),
@@ -104,7 +129,7 @@ pub fn add_members_governance_request(
     }
 
     // Add roles
-    for (index, (_, name, role)) in node_info.iter().enumerate() {
+    for (index, (_, name, role)) in members.iter().enumerate() {
         if role.is_none() {
             continue;
         }
@@ -136,5 +161,40 @@ pub fn add_members_governance_request(
     EventRequest::Fact(FactRequest {
         subject_id: governance_id,
         payload: ValueWrapper(payload),
+    })
+}
+
+fn create_genesis_event(
+    governance_id: DigestIdentifier,
+    namespace: String,
+    public_key: KeyIdentifier,
+    name: String,
+) -> EventRequest {
+    EventRequest::Create(StartRequest {
+        governance_id,
+        schema_id: "traceability".into(),
+        namespace,
+        name,
+        public_key,
+    })
+}
+
+fn send_register_event(subject_id: DigestIdentifier) -> EventRequest {
+    EventRequest::Fact(FactRequest {
+        subject_id: subject_id,
+        payload: ValueWrapper(serde_json::json!(
+            {
+                "payload": {
+                    "RegisterOrder": {
+                        "work_id": "26782378995634",
+                        "username": "pepe",
+                        "worker_id": "22",
+                        "what": ["Limpieza", "Sustitución de piezas"],
+                        "group_name": "oe3231",
+                        "average_traceability": 2
+                    }
+                }
+            }
+        )),
     })
 }

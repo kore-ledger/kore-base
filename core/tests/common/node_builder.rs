@@ -12,12 +12,11 @@ pub struct NodeBuilder {
     key_pair: KeyPair,
 }
 
-#[allow(dead_code)]
-pub enum PassVotation {
+pub enum VotationType {
+    Normal,
     AlwaysAccept,
     AlwaysReject,
 }
-
 #[allow(dead_code)]
 impl NodeBuilder {
     pub fn new(kp: KeyPair) -> Self {
@@ -29,7 +28,7 @@ impl NodeBuilder {
         }
     }
 
-    pub fn build(self, nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String> ) -> Result<Api, Error> {
+    pub fn build(self, nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType) -> Result<Api, Error> {
         let mut settings = Settings::default();
 
         // routing network config
@@ -47,7 +46,7 @@ impl NodeBuilder {
         settings.network.listen_addresses = listen_addresses;
 
         // node config
-        settings.node.passvotation = self.pass_votation.unwrap_or(1);
+        settings.node.passvotation = votation as u8;
         let path = format!("/tmp/.taple/sc");
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
