@@ -16,7 +16,7 @@ use libp2p::{
     metrics::{BandwidthTransport, Registry},
     noise,
     relay::client::{new, Behaviour},
-    tcp, yamux, PeerId, Transport,
+    tcp::{self, Config}, yamux, PeerId, Transport,
 };
 
 pub type KoreTransport = Boxed<(PeerId, StreamMuxerBox)>;
@@ -51,7 +51,8 @@ pub fn build_transport(
         .map_err(|e| Error::Transport(format!("Noise authentication {:?}", e)))?;
 
     // Allow TCP transport.
-    let transport = transport.or_transport(tcp::tokio::Transport::default());
+    // port_reuse(true) for use the same port to send / receive communication.
+    let transport = transport.or_transport(tcp::tokio::Transport::new(Config::default().port_reuse(true)));
 
     // Upgrade the transport with the noise authentication and yamux multiplexing.
     let transport = transport

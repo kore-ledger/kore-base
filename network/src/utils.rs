@@ -48,26 +48,34 @@ impl<T: Hash + Eq> LruHashSet<T> {
 }
 
 /// Convert boot nodes to `PeerId` and `Multiaddr`.
-pub fn convert_boot_nodes(boot_nodes: Vec<RoutingNode>) -> Vec<(PeerId, Multiaddr)> {
-    boot_nodes
-        .iter()
-        .map(|node| {
-            let peer = match bs58::decode(node.peer_id.clone()).into_vec() {
-                Ok(peer) => match PeerId::from_bytes(peer.as_slice()) {
-                    Ok(peer) => Some(peer),
+pub fn convert_boot_nodes(boot_nodes: Vec<RoutingNode>) -> Vec<(PeerId, Vec<Multiaddr>)> {
+    let mut boot_nodes_aux: Vec<(PeerId,Vec<Multiaddr>)> = vec![];
+    for node in boot_nodes {
+        let peer =  match bs58::decode(node.peer_id.clone()).into_vec() {
+            Ok(peer) => match PeerId::from_bytes(peer.as_slice()) {
+                Ok(peer) => Some(peer),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        };
+        let mut aux_addrs = vec![];
+        if peer.is_some() {
+            for addr in node.address {
+                let addr = match Multiaddr::from_str(&addr) {
+                    Ok(addr) => Some(addr),
                     Err(_) => None,
-                },
-                Err(_) => None,
-            };
-            let addr = match Multiaddr::from_str(&node.address) {
-                Ok(addr) => Some(addr),
-                Err(_) => None,
-            };
-            (peer, addr)
-        })
-        .filter(|(peer_id, addr)| peer_id.is_some() && addr.is_some())
-        .map(|(peer_id, addr)| (peer_id.unwrap(), addr.unwrap()))
-        .collect::<Vec<_>>()
+                };
+                if let Some(addr) = addr {
+                    aux_addrs.push(addr);
+                }
+            }
+            if !aux_addrs.is_empty() {
+                boot_nodes_aux.push((peer.unwrap(), aux_addrs))
+            }
+        }
+    }
+
+    boot_nodes_aux
 }
 
 /// Gets the list of external (public) addresses for the node from string array.

@@ -105,7 +105,7 @@ impl Behaviour {
     }
 
     /// Bootstrap node list.
-    pub fn boot_nodes(&mut self) -> Vec<(PeerId, Multiaddr)> {
+    pub fn boot_nodes(&mut self) -> Vec<(PeerId, Vec<Multiaddr>)> {
         self.routing.boot_nodes()
     }
 
@@ -198,7 +198,7 @@ impl Behaviour {
     }
 
     /// Remove node from routing table.
-    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Multiaddr) {
+    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Vec<Multiaddr>) {
         self.routing.remove_node(peer_id, address);
     }
 
@@ -397,7 +397,7 @@ mod tests {
 
         let routing_node = RoutingNode {
             peer_id: boot_node_peer_id.to_base58(),
-            address: listen_addr.to_string(),
+            address: vec![listen_addr.to_string()],
         };
 
         boot_nodes.push(routing_node);
@@ -469,7 +469,7 @@ mod tests {
 
         let routing_node = RoutingNode {
             peer_id: boot_node_peer_id.to_base58(),
-            address: listen_addr.to_string(),
+            address: vec![listen_addr.to_string()],
         };
 
         boot_nodes.push(routing_node);
@@ -602,7 +602,7 @@ mod tests {
 
         let routing_node = RoutingNode {
             peer_id: boot_node_peer_id.to_base58(),
-            address: boot_addr.to_string(),
+            address: vec![boot_addr.to_string()],
         };
 
         boot_nodes.push(routing_node);

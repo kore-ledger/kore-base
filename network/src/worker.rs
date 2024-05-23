@@ -17,10 +17,13 @@ use identity::keys::{KeyMaterial, KeyPair};
 use libp2p::{
     core::ConnectedPoint,
     dcutr::Event as DcutrEvent,
-    identity::{ed25519::{self, PublicKey as PublicKeyEd25519}, Keypair, PublicKey},
+    identity::{
+        ed25519::{self, PublicKey as PublicKeyEd25519},
+        Keypair, PublicKey,
+    },
     multiaddr::Protocol,
     relay::{client::Event as RelayClientEvent, Event as RelayServerEvent},
-    swarm::{self, SwarmEvent},
+    swarm::{self, dial_opts::DialOpts, SwarmEvent},
     Multiaddr, PeerId, Swarm,
 };
 
@@ -72,10 +75,10 @@ pub struct NetworkWorker {
     node_type: NodeType,
 
     /// Dynamic list of relay nodes.
-    relay_nodes: Vec<(PeerId, Multiaddr)>,
+    relay_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
 
     /// List of boot noodes.
-    boot_nodes: Vec<(PeerId, Multiaddr)>,
+    boot_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
 
     /// Relay circuits.
     relay_circuits: HashMap<PeerId, Multiaddr>,
@@ -86,9 +89,6 @@ pub struct NetworkWorker {
     /// Pendings outbound messages to the peer
     pending_outbound_messages: HashMap<PeerId, VecDeque<Vec<u8>>>,
 
-    /// Current dialing or circuit reservation.
-    current_dialing: Option<(PeerId, Multiaddr)>,
-
     /// Connect attempts.
     _connect_attempts: Arc<AtomicU16>,
 
@@ -97,6 +97,9 @@ pub struct NetworkWorker {
 
     /// Messages metric.
     messages_metric: Family<MetricLabels, Counter>,
+
+    ///
+    successful_dials: u64,
 }
 
 impl NetworkWorker {
@@ -150,7 +153,6 @@ impl NetworkWorker {
             swarm::Config::with_tokio_executor(),
         );
 
-        
         // Add confirmed external addresses.
         match config.node_type {
             NodeType::Bootstrap | NodeType::Addressable => {
@@ -208,7 +210,6 @@ impl NetworkWorker {
             cancel,
             node_type,
             boot_nodes,
-            current_dialing: None,
             relay_nodes: Vec::new(),
             relay_circuits: HashMap::default(),
             pending_reservations: HashMap::default(),
@@ -216,6 +217,7 @@ impl NetworkWorker {
             _connect_attempts: Arc::new(AtomicU16::new(0)),
             _max_attempts: max_attempts,
             messages_metric,
+            successful_dials: 0,
         })
     }
 
@@ -269,19 +271,22 @@ impl NetworkWorker {
                 return;
             }
         };
-        // Listen on the relay address.
-        let listen_addr = relay_addr
-            .with(Protocol::P2p(relay_peer))
-            .with(Protocol::P2pCircuit);
-        if self.swarm.listen_on(listen_addr.clone()).is_err() {
-            error!(
-                TARGET_WORKER,
-                "Transport does not support the listening addresss: {:?}.", listen_addr
-            );
-            return;
+        for addrs in relay_addr {
+            // Listen on the relay address.
+            let listen_addr = addrs
+                .with(Protocol::P2p(relay_peer))
+                .with(Protocol::P2pCircuit);
+            if self.swarm.listen_on(listen_addr.clone()).is_err() {
+                error!(
+                    TARGET_WORKER,
+                    "Transport does not support the listening addresss: {:?}.", listen_addr
+                );
+            } else {
+                // Pending reservation to the peer.
+                self.pending_reservations.insert(relay_peer, peer);
+                break;
+            }
         }
-        // Pending reservation to the peer.
-        self.pending_reservations.insert(relay_peer, peer);
     }
 
     /// Add pending message to peer.
@@ -318,17 +323,8 @@ impl NetworkWorker {
         }
     }
 
-    /// Get next boot node.
-    fn next_boot_node(&mut self) -> Option<(PeerId, Multiaddr)> {
-        if self.boot_nodes.is_empty() {
-            return None;
-        }
-        let (peer_id, addr) = self.boot_nodes.remove(0);
-        Some((peer_id, addr))
-    }
-
     /// Gets the next relay node.
-    fn relay_node(&mut self) -> Option<(PeerId, Multiaddr)> {
+    fn relay_node(&mut self) -> Option<(PeerId, Vec<Multiaddr>)> {
         trace!(TARGET_WORKER, "Getting next boot node.");
         if self.relay_nodes.is_empty() {
             self.relay_nodes = self.swarm.behaviour_mut().boot_nodes();
@@ -388,24 +384,13 @@ impl NetworkWorker {
         // If is the first node of kore network.
         if self.node_type == NodeType::Bootstrap && self.boot_nodes.is_empty() {
             self.change_state(NetworkState::Running).await;
-        }
-        else {
+        } else {
             loop {
                 match self.state {
                     NetworkState::Dial => {
-                        // Dial boot node.
-                        if let Some((peer_id, addr)) = self.next_boot_node() {
-                            if self.local_peer_id == peer_id {
-                                continue;
-                            }
-                            if self.swarm.dial(addr.clone()).is_err() {
-                                error!(TARGET_WORKER, "Error dialing boot node {}", peer_id);
-                            } else {
-                                self.change_state(NetworkState::Dialing).await;
-                                self.current_dialing = Some((peer_id, addr));
-                            }
-                        } else {
-                            error!(TARGET_WORKER, "No more bootstrap nodes.");
+                        // Dial to boot node.
+                        if self.boot_nodes.is_empty() {
+                            error!(TARGET_WORKER, "No bootstrap nodes.");
                             if self
                                 .event_sender
                                 .send(NetworkEvent::Error(Error::Network(
@@ -416,8 +401,38 @@ impl NetworkWorker {
                             {
                                 error!(TARGET_WORKER, "Error sending network error event.");
                             }
-                                error!(TARGET_WORKER, "Can't connect to kore network");
-                                self.change_state(NetworkState::Disconnected).await;
+                            error!(TARGET_WORKER, "Can't connect to kore network");
+                            self.change_state(NetworkState::Disconnected).await;
+                        }
+
+                        let copy_boot_nodes = self.boot_nodes.clone();
+                        for node in copy_boot_nodes {
+                            if self
+                                .swarm
+                                .dial(DialOpts::peer_id(node.0).addresses(node.1.clone()).build())
+                                .is_err()
+                            {
+                                error!(TARGET_WORKER, "Error dialing boot node {}", node.0);
+                                self.swarm.behaviour_mut().remove_node(&node.0, &node.1);
+                                if let Some(pos) = self
+                                    .boot_nodes
+                                    .iter()
+                                    .position(|val| val.clone() == (node.0, node.1.clone()))
+                                {
+                                    self.boot_nodes.remove(pos);
+                                }
+                            }
+                        }
+
+                        self.change_state(NetworkState::Dialing).await;
+                    }
+                    NetworkState::Dialing => {
+                        // No more bootnodes to send dial and none was successful
+                        if self.boot_nodes.is_empty() && self.successful_dials == 0 {
+                            self.change_state(NetworkState::Disconnected).await;
+                        // No more bootnodes to send dial and one or more was successful
+                        } else if self.boot_nodes.is_empty() {
+                            break;
                         }
                     }
                     NetworkState::Running => {
@@ -452,16 +467,18 @@ impl NetworkWorker {
                     self.change_state(NetworkState::Dial).await;
                 }
             }
-            SwarmEvent::OutgoingConnectionError { .. } => {
-                if let Some((peer_id, addr)) = self.current_dialing.clone() {
+            SwarmEvent::OutgoingConnectionError {
+                connection_id: _,
+                peer_id: Some(peer_id),
+                error: _,
+            } => {
                     error!(TARGET_WORKER, "Error dialing peer {}", peer_id);
-
-                    if self.state == NetworkState::Dialing {
-                        self.change_state(NetworkState::Dial).await;
-                        self.current_dialing = None;
-                        self.swarm.behaviour_mut().remove_node(&peer_id, &addr);
+                    if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer_id) {
+                        self.swarm
+                            .behaviour_mut()
+                            .remove_node(&peer_id, &self.boot_nodes[pos].1);
+                        self.boot_nodes.remove(pos);
                     }
-                }
             }
             SwarmEvent::IncomingConnection {
                 local_addr,
@@ -479,16 +496,18 @@ impl NetworkWorker {
                 self.swarm
                     .behaviour_mut()
                     .add_identified_peer(peer_id, *info.clone());
+
                 // If the identified peer is the current dialing, send event and change the state to running.
-                if let Some((peer, _)) = self.current_dialing.take() {
-                    if peer == peer_id {
-                        trace!(TARGET_WORKER, "Connected to bootstrap node {}", peer_id);
-                        self.send_event(NetworkEvent::ConnectedToBootstrap {
-                            peer: peer_id.to_string(),
-                        })
-                        .await;
-                        self.change_state(NetworkState::Running).await;
-                    }
+
+                trace!(TARGET_WORKER, "Connected to bootstrap node {}", peer_id);
+                self.send_event(NetworkEvent::ConnectedToBootstrap {
+                    peer: peer_id.to_string(),
+                })
+                .await;
+
+                if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer_id) {
+                    self.boot_nodes.remove(pos);
+                    self.successful_dials += 1;
                 }
             }
             _ => {}
@@ -807,8 +826,8 @@ mod tests {
 
     use identity::keys::KeyPair;
 
-    use tokio::sync::mpsc::{self, Receiver};
     use serial_test::serial;
+    use tokio::sync::mpsc::{self, Receiver};
 
     //use tracing_test::traced_test;
 
@@ -866,7 +885,7 @@ mod tests {
         let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
         let fake_node = RoutingNode {
             peer_id: fake_boot_peer.to_string(),
-            address: fake_boot_addr.to_owned(),
+            address: vec![fake_boot_addr.to_owned()],
         };
         boot_nodes.push(fake_node);
 
@@ -929,7 +948,7 @@ mod tests {
         );
         let boot_node = RoutingNode {
             peer_id: boot.local_peer_id().to_string(),
-            address: boot_addr.to_owned(),
+            address: vec![boot_addr.to_owned()],
         };
         boot_nodes.push(boot_node);
         let boot_peer_id = boot.local_peer_id().to_string();
@@ -939,7 +958,7 @@ mod tests {
         let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
         let fake_node = RoutingNode {
             peer_id: fake_boot_peer.to_string(),
-            address: fake_boot_addr.to_owned(),
+            address: vec![fake_boot_addr.to_owned()],
         };
         boot_nodes.push(fake_node);
 
@@ -1021,7 +1040,7 @@ mod tests {
         );
         let boot_node = RoutingNode {
             peer_id: boot.local_peer_id().to_string(),
-            address: boot_addr.to_owned(),
+            address: vec![boot_addr.to_owned()],
         };
         boot_nodes.push(boot_node);
 
