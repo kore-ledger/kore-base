@@ -1,42 +1,47 @@
-
-/* 
 use kore_base::{
     keys::{KeyMaterial, KeyPair},
-    request::StartRequest,
-    signature::{Signature, Signed},
-    Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, SubjectData,
+    request::{FactRequest, StartRequest},
+    signature::{Signature, Signed}, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, ValueWrapper,
 };
 use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
+use serde_json::Value;
 
-pub async fn check_subject(
-    node_api: &Api,
-    subject_id: &DigestIdentifier,
-    sn: Option<u64>,
-) -> SubjectData {
-    let result = node_api.get_subject(subject_id.clone()).await;
-    assert!(result.is_ok());
-    let subject = result.unwrap();
-    assert_eq!(subject.subject_id, *subject_id);
-    if let Some(sn) = sn {
-        assert_eq!(subject.sn, sn);
-    }
-    subject
-}
 
+#[derive(Debug, Clone)]
 pub struct McNodeData {
     keys: KeyPair,
     peer_id: PeerId,
 }
+#[derive(Debug, Clone)]
+pub enum Role {
+    WITNESS,
+    APPROVER,
+    EVALUATOR,
+    CREATOR,
+    ISSUER,
+    VALIDATOR,
+}
+
+impl Role {
+    fn try_from(&self) -> Result<String, String> {
+        match self {
+            Role::WITNESS => Ok("WITNESS".to_string()),
+            Role::APPROVER => Ok("APPROVER".to_string()),
+            Role::EVALUATOR => Ok("EVALUATOR".to_string()),
+            Role::CREATOR => Ok("CREATOR".to_string()),
+            Role::ISSUER => Ok("ISSUER".to_string()),
+            Role::VALIDATOR => Ok("VALIDATOR".to_string()),
+        }
+    }
+}
 
 impl McNodeData {
-    // TODO: remove this function
     #[allow(dead_code)]
     pub fn get_controller_id(&self) -> KeyIdentifier {
         KeyIdentifier::new(self.keys.get_key_derivator(), &self.keys.public_key_bytes())
     }
 
-    // TODO: remove this function
     #[allow(dead_code)]
     pub fn get_peer_id(&self) -> PeerId {
         self.peer_id.clone()
@@ -78,4 +83,58 @@ pub fn create_governance_request<S: Into<String>>(
         public_key,
     })
 }
-*/
+
+pub fn add_members_governance_request(
+    node_info: Vec<(KeyIdentifier, String, Option<Role>)>,
+    governance_id: DigestIdentifier,
+) -> EventRequest {
+    let mut operations: Vec<Value> = vec![];
+
+    // Add members
+    for (index, (public_key, name, _)) in node_info.iter().enumerate() {
+        let member_value = serde_json::json!({
+            "op":"add",
+            "path": format!("/members/{}", index),
+            "value":{
+                "id": public_key.to_string(),
+                "name": name,
+            }
+        });
+        operations.push(member_value);
+    }
+
+    // Add roles
+    for (index, (_, name, role)) in node_info.iter().enumerate() {
+        if role.is_none() {
+            continue;
+        }
+        let role_string = role.clone().unwrap().try_from().unwrap();
+        let member_value = serde_json::json!({
+            "op":"add",
+            "path": format!("/roles/{}", index),
+            "value":{
+                "namespace": "",
+                "role": role_string,
+                "schema": {
+                    "ID": "governance"
+                },
+                "who" : {
+                    "NAME": name,
+                }
+
+            }
+        });
+        operations.push(member_value);
+    }
+
+    let payload = serde_json::json!({
+        "Patch": {
+            "data": operations
+        }
+    });
+    // Compact the request
+    EventRequest::Fact(FactRequest {
+        subject_id: governance_id,
+        payload: ValueWrapper(payload),
+    })
+}

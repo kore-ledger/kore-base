@@ -1,20 +1,11 @@
 
-// TODO: Rewrite
-/*use thiserror::Error;
+
+use thiserror::Error;
 
 #[allow(dead_code)]
 #[derive(Error, Debug)]
-pub enum NotifierError {
-    #[error("Petition timeout")]
-    RequestTimeout,
-    #[error("Notification channel closed")]
-    NotificationChannelClosed,
-}
-
-#[allow(dead_code)]
-#[derive(Error, Debug)]
-pub enum TapleError {
-    #[error("Taple Start Error {0}")]
+pub enum KoreError {
+    #[error("Kore Start Error {0}")]
     StartError(kore_base::Error),
+    
 }
-*/
