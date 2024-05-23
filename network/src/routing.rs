@@ -47,7 +47,7 @@ pub struct Behaviour {
     local_peer_id: PeerId,
 
     /// Bootnodes to connect to.
-    boot_nodes: Vec<(PeerId, Multiaddr)>,
+    boot_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
 
     /// Nodes discovered with public address.
     public_nodes: HashMap<PeerId, Vec<Multiaddr>>,
@@ -141,8 +141,10 @@ impl Behaviour {
             let mut kad = Kademlia::with_config(peer_id, store, kad_config);
 
             // Add boot nodes to the Kademlia routing table.
-            for (peer_id, addr) in &boot_nodes {
-                kad.add_address(peer_id, addr.clone());
+            for (peer_id, addrs) in &boot_nodes {
+                for addr in addrs {
+                    kad.add_address(peer_id, addr.clone());
+                }
             }
 
             Some(kad)
@@ -186,7 +188,7 @@ impl Behaviour {
     }
 
     /// Bootstrap node list.
-    pub fn boot_nodes(&self) -> Vec<(PeerId, Multiaddr)> {
+    pub fn boot_nodes(&self) -> Vec<(PeerId, Vec<Multiaddr>)> {
         self.boot_nodes.clone()
     }
 
@@ -356,9 +358,11 @@ impl Behaviour {
     }
 
     /// Remove node from the DHT.
-    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Multiaddr) {
+    pub fn remove_node(&mut self, peer_id: &PeerId, address: &Vec<Multiaddr>) {
         if let Some(k) = self.kademlia.as_mut() {
-            k.remove_address(peer_id, address);
+            for addr in address {
+                k.remove_address(peer_id, addr);
+            }
         }
     }
     /*
@@ -949,11 +953,14 @@ impl NetworkBehaviour for Behaviour {
             return Ok(Vec::new());
         };
 
-        let mut list = self
-            .boot_nodes
-            .iter()
-            .filter_map(|(p, a)| (*p == peer_id).then_some(a.clone()))
-            .collect::<Vec<_>>();
+        let mut list: Vec<Multiaddr> = vec![];
+
+        for (peer, addrs) in self.boot_nodes.clone() {
+            if peer == peer_id {
+                list = addrs;
+                break;
+            }
+        }
 
         if let Some(ephemeral_addresses) = self.public_nodes.get(&peer_id) {
             list.extend(ephemeral_addresses.clone());
@@ -1123,7 +1130,7 @@ pub struct RoutingNode {
     /// Peer ID.
     pub peer_id: String,
     /// Address.
-    pub address: String,
+    pub address: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1174,7 +1181,7 @@ mod tests {
         let peer_id = *boot_swarm.local_peer_id();
         let boot_node = RoutingNode {
             peer_id: peer_id.to_base58(),
-            address: addr.to_string(),
+            address: vec![addr.to_string()],
         };
         boot_nodes.push(boot_node);
 
