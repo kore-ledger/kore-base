@@ -845,6 +845,7 @@ mod tests {
             tell: Default::default(),
             routing: config,
             listen_addresses: vec![],
+            port_reuse: false
         }
     }
 

@@ -42,6 +42,7 @@ pub fn build_transport(
     registry: &mut Registry,
     peer_id: PeerId,
     keys: &Keypair,
+    port_reuse: bool
 ) -> Result<(KoreTransport, RelayClient), Error> {
     // Build the relay client and transport.
     let (transport, relay_client) = new(peer_id);
@@ -52,7 +53,7 @@ pub fn build_transport(
 
     // Allow TCP transport.
     // port_reuse(true) for use the same port to send / receive communication.
-    let transport = transport.or_transport(tcp::tokio::Transport::new(Config::default().port_reuse(true)));
+    let transport = transport.or_transport(tcp::tokio::Transport::new(Config::default().port_reuse(port_reuse)));
 
     // Upgrade the transport with the noise authentication and yamux multiplexing.
     let transport = transport
@@ -81,7 +82,7 @@ mod tests {
         let keypair = Keypair::generate_ed25519();
         let peer_id = keypair.public().to_peer_id();
 
-        let result = build_transport(&mut registry, peer_id, &keypair);
+        let result = build_transport(&mut registry, peer_id, &keypair, false);
 
         assert!(result.is_ok());
     }
