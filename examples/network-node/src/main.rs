@@ -92,5 +92,6 @@ fn build_config(settings: &Settings) -> NetworkConfig {
         listen_addresses: settings.listen_addresses.clone(),
         tell: TellConfig::default(),
         routing: routing_config,    
+        port_reuse: false
     }
 }

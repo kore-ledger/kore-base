@@ -49,6 +49,9 @@ pub struct Config {
 
     /// Routing configuration.
     pub routing: routing::Config,
+
+    /// Configures port reuse for local sockets, which implies reuse of listening ports for outgoing connections to enhance NAT traversal capabilities.
+    pub port_reuse: bool
 }
 
 impl Config {
@@ -57,6 +60,7 @@ impl Config {
         node_type: NodeType,
         listen_addresses: Vec<String>,
         boot_nodes: Vec<RoutingNode>,
+        port_reuse: bool
     ) -> Self {
         Self {
             user_agent: "kore-node".to_owned(),
@@ -64,6 +68,7 @@ impl Config {
             listen_addresses,
             tell: tell::Config::default(),
             routing: routing::Config::new(boot_nodes),
+            port_reuse
         }
     }
 }

@@ -135,7 +135,7 @@ impl NetworkWorker {
         let max_attempts = config.routing.boot_nodes().len() as u16;
 
         // Build transport.
-        let (transport, relay_client) = build_transport(registry, local_peer_id, &key)?;
+        let (transport, relay_client) = build_transport(registry, local_peer_id, &key, config.port_reuse)?;
 
         // Create the shared external addresses.
         let shared_external_addresses = Arc::new(Mutex::new(external_addresses.clone()));
@@ -1197,7 +1197,7 @@ mod tests {
         } else {
             vec![]
         };
-        let config = create_config(boot_nodes, random_walk, node_type, listen_addresses);
+        let config = create_config(boot_nodes, random_walk, node_type, listen_addresses, false);
         let keys = KeyPair::default();
         let mut registry = Registry::default();
         let (event_sender, event_receiver) = mpsc::channel(100);
@@ -1211,6 +1211,7 @@ mod tests {
         random_walk: bool,
         node_type: NodeType,
         listen_addresses: Vec<String>,
+        port_reuse: bool
     ) -> Config {
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
@@ -1224,6 +1225,7 @@ mod tests {
             tell: Default::default(),
             routing: config,
             listen_addresses,
+            port_reuse
         }
     }
 }
