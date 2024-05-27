@@ -6,9 +6,6 @@ use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
 
 pub struct NodeBuilder {
-    p2p_port: Option<u32>,
-    access_points: Vec<String>,
-    pass_votation: Option<u8>,
     key_pair: KeyPair,
 }
 
@@ -21,9 +18,6 @@ pub enum VotationType {
 impl NodeBuilder {
     pub fn new(kp: KeyPair) -> Self {
         Self {
-            p2p_port: None,
-            access_points: Vec::new(),
-            pass_votation: None,
             key_pair: kp,
         }
     }

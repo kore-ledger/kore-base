@@ -1,5 +1,3 @@
-use std::mem;
-
 use kore_base::{
     keys::{KeyMaterial, KeyPair},
     request::{FactRequest, StartRequest},
@@ -8,9 +6,7 @@ use kore_base::{
 };
 use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
-use rand::seq::IteratorRandom;
 use serde_json::Value;
-use sha2::digest::generic_array::iter;
 
 #[derive(Debug, Clone)]
 pub struct McNodeData {
