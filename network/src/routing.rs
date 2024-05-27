@@ -109,7 +109,7 @@ impl Behaviour {
             kademlia_disjoint_query_paths,
             kademlia_replication_factor,
             protocol_names,
-            pre_routing
+            pre_routing,
         } = config;
 
         // Convert boot nodes to `PeerId` and `Multiaddr`.
@@ -183,7 +183,7 @@ impl Behaviour {
             records_to_publish: Default::default(),
             active_queries: Default::default(),
             pending_events: VecDeque::new(),
-            pre_routing
+            pre_routing,
         }
     }
 
@@ -617,7 +617,7 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
-    {   
+    {
         if let Some(ev) = self.pending_events.pop_front() {
             return Poll::Ready(ToSwarm::GenerateEvent(ev));
         }
@@ -645,13 +645,13 @@ impl NetworkBehaviour for Behaviour {
                                 );
                                 false
                             };
-    
+
                         // Schedule the next random query with exponentially increasing delay,
                         // capped at 60 seconds.
                         *next_random_walk = Delay::new(self.duration_to_next_kad);
                         self.duration_to_next_kad =
                             cmp::min(self.duration_to_next_kad * 2, Duration::from_secs(60));
-    
+
                         if actually_started {
                             let ev = Event::RandomKademliaStarted;
                             return Poll::Ready(ToSwarm::GenerateEvent(ev));
@@ -1050,7 +1050,7 @@ impl Config {
             kademlia_disjoint_query_paths: true,
             kademlia_replication_factor: None,
             protocol_names,
-            pre_routing: true
+            pre_routing: true,
         }
     }
 
@@ -1065,16 +1065,31 @@ impl Config {
         self
     }
 
+    /// Get discovery limits.
+    pub fn get_discovery_limit(&self) -> u64 {
+        self.discovery_only_if_under_num
+    }
+
     /// Sets the number of active connections over which we interrupt the discovery process.
     pub fn with_discovery_limit(mut self, num: u64) -> Self {
         self.discovery_only_if_under_num = num;
         self
     }
 
+    /// Get allow_non_globals_in_dht.
+    pub fn get_allow_non_globals_in_dht(&self) -> bool {
+        self.allow_non_globals_in_dht
+    }
+
     /// Whether to allow non-global addresses in the DHT.
     pub fn with_allow_non_globals_in_dht(mut self, allow: bool) -> Self {
         self.allow_non_globals_in_dht = allow;
         self
+    }
+
+    /// Get allow_private_ip
+    pub fn get_allow_private_ip(&self) -> bool {
+        self.allow_private_ip
     }
 
     /// If false, `addresses_of_peer` won't return any private IPv4/IPv6 address, except for the
@@ -1084,16 +1099,31 @@ impl Config {
         self
     }
 
+    /// Get allow mDNS
+    pub fn get_mdns(&self) -> bool {
+        self.enable_mdns
+    }
+
     /// Enables or disables mDNS.
     pub fn with_mdns(mut self, enable: bool) -> Self {
         self.enable_mdns = enable;
         self
     }
 
+    /// Get allow kademlia disjoint query paths
+    pub fn get_kademlia_disjoint_query_paths(&self) -> bool {
+        self.kademlia_disjoint_query_paths
+    }
+
     /// When enabled the number of disjoint paths used equals the configured parallelism.
     pub fn with_kademlia_disjoint_query_paths(mut self, enable: bool) -> Self {
         self.kademlia_disjoint_query_paths = enable;
         self
+    }
+
+    /// Get allow kademlia disjoint query paths
+    pub fn get_kademlia_replication_factor(&self) -> Option<NonZeroUsize> {
+        self.kademlia_replication_factor
     }
 
     /// Sets the replication factor for the Kademlia DHT.
@@ -1103,6 +1133,17 @@ impl Config {
         } else {
             self.kademlia_replication_factor = Some(NonZeroUsize::new(factor).expect("Can't fail"));
         }
+        self
+    }
+
+    /// Get protocol names
+    pub fn get_protocol_names(&self) -> Vec<String> {
+        self.protocol_names.clone()
+    }
+
+    /// Sets all protocols, used for config.
+    pub fn set_all_protocols(mut self, protocols: Vec<String>) -> Self {
+        self.protocol_names = protocols;
         self
     }
 

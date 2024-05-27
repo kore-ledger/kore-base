@@ -223,6 +223,16 @@ impl Config {
         self.max_concurrent_streams = num_streams;
         self
     }
+
+    /// Get message timeout
+    pub fn get_message_timeout(&self) -> Duration {
+        self.message_timeout
+    }
+
+    /// Get max concurrent streams
+    pub fn get_max_concurrent_streams(&self) -> usize {
+        self.max_concurrent_streams 
+    }
 }
 
 /// A tell protocol for some message codec.
