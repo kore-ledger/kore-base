@@ -91,25 +91,26 @@ pub fn create_governance_request<S: Into<String>>(
 pub fn add_members_governance_request(
     vec_nodes: &Vec<(Api, McNodeData, String)>,
     governance_id: DigestIdentifier,
+    creator_index: usize,
+    schema_name: String,
 ) -> EventRequest {
     let mut operations: Vec<Value> = vec![];
-    let mut first_iteration = true;
     let mut members = vec![];
     let mut iteration = 0;
 
-    for node in vec_nodes.iter() {
-        if first_iteration {
+    // Create members
+    for i in 0..vec_nodes.len() {
+        if i == creator_index {
             members.push((
-                node.1.get_controller_id(),
+                vec_nodes[i].1.get_controller_id(),
                 format!("test{}", iteration),
-                None,
+                Option::from(Role::CREATOR),
             ));
-            first_iteration = false;
         } else {
             members.push((
-                node.1.get_controller_id(),
+                vec_nodes[i].1.get_controller_id(),
                 format!("test{}", iteration),
-                Option::from(Role::WITNESS),
+                Option::from(Role::ISSUER),
             ));
         }
         iteration += 1;
@@ -141,7 +142,7 @@ pub fn add_members_governance_request(
                 "namespace": "",
                 "role": role_string,
                 "schema": {
-                    "ID": "governance"
+                    "ID": schema_name.clone()
                 },
                 "who" : {
                     "NAME": name,
@@ -152,11 +153,108 @@ pub fn add_members_governance_request(
         operations.push(member_value);
     }
 
+    operations.push(serde_json::json!(
+        {
+            "op":"add",
+            "path": format!("/roles/{}", members.len()),
+            "value":{
+                "namespace": "",
+                "role": "ISSUER",
+                "schema": {
+                    "ID": schema_name.clone()
+                },
+                "who" : {
+                    "NAME": format!("test{}", creator_index),
+                }
+
+            }
+        }
+    ));
+    // add policies
+    operations.push(serde_json::json!(
+        {
+            "op": "add",
+            "path": "/policies/1",
+            "value": {
+                "approve": {
+                    "quorum": {
+                        "FIXED": 1
+                    }
+                },
+                "evaluate": {
+                    "quorum": "MAJORITY"
+                },
+                "id": schema_name.clone(),
+                "validate": {
+                    "quorum": "MAJORITY"
+                }
+            }
+        }
+    ));
+    // add schemas
+    operations.push(serde_json::json!(
+        {
+                "op": "add",
+                "path": "/schemas/0",
+                "value": {
+                    "contract": {
+                        "raw": "dXNlIHRhcGxlX3NjX3J1c3QgYXMgc2RrOwp1c2Ugc2VyZGU6OntEZXNlcmlhbGl6ZSwgU2VyaWFsaXplfTsKCiNbZGVyaXZlKFNlcmlhbGl6ZSwgRGVzZXJpYWxpemUsIENsb25lKV0Kc3RydWN0IFN0YXRlIHsKICAgIHB1YiB3b3JrX2lkOiBTdHJpbmcsCiAgICBwdWIgdXNlcm5hbWU6IFN0cmluZywKICAgIHB1YiB3b3JrZXJfaWQ6IFN0cmluZywKICAgIHB1YiB3aGF0OiBWZWM8U3RyaW5nPiwKICAgIHB1YiBncm91cF9uYW1lOiBTdHJpbmcsCiAgICBwdWIgYXZlcmFnZV90cmFjZWFiaWxpdHk6IGYzMiwKfQoKCiNbZGVyaXZlKFNlcmlhbGl6ZSwgRGVzZXJpYWxpemUpXQplbnVtIFN0YXRlRXZlbnQgewogICAgUmVnaXN0ZXJPcmRlciB7CiAgICAgICAgd29ya19pZDogU3RyaW5nLAogICAgICAgIHVzZXJuYW1lOiBTdHJpbmcsCiAgICAgICAgd29ya2VyX2lkOiBTdHJpbmcsCiAgICAgICAgd2hhdDogVmVjPFN0cmluZz4sCiAgICAgICAgZ3JvdXBfbmFtZTogU3RyaW5nLAogICAgICAgIGF2ZXJhZ2VfdHJhY2VhYmlsaXR5OiBmMzIsCiAgICB9LAp9CgojW25vX21hbmdsZV0KcHViIHVuc2FmZSBmbiBtYWluX2Z1bmN0aW9uKHN0YXRlX3B0cjogaTMyLCBldmVudF9wdHI6IGkzMiwgaXNfb3duZXI6IGkzMikgLT4gdTMyIHsKICAgIHNkazo6ZXhlY3V0ZV9jb250cmFjdChzdGF0ZV9wdHIsIGV2ZW50X3B0ciwgaXNfb3duZXIsIGNvbnRyYWN0X2xvZ2ljKQp9CmZuIGNvbnRyYWN0X2xvZ2ljKAogICAgY29udGV4dDogJnNkazo6Q29udGV4dDxTdGF0ZSwgU3RhdGVFdmVudD4sCiAgICBjb250cmFjdF9yZXN1bHQ6ICZtdXQgc2RrOjpDb250cmFjdFJlc3VsdDxTdGF0ZT4sCikgewogICAgbGV0IHN0YXRlID0gJm11dCBjb250cmFjdF9yZXN1bHQuZmluYWxfc3RhdGU7CiAgICBtYXRjaCAmY29udGV4dC5ldmVudCB7CiAgICAgICAgU3RhdGVFdmVudDo6UmVnaXN0ZXJPcmRlciB7CiAgICAgICAgICAgIHdvcmtfaWQsCiAgICAgICAgICAgIHVzZXJuYW1lLAogICAgICAgICAgICB3b3JrZXJfaWQsCiAgICAgICAgICAgIHdoYXQsCiAgICAgICAgICAgIGdyb3VwX25hbWUsCiAgICAgICAgICAgIGF2ZXJhZ2VfdHJhY2VhYmlsaXR5LAogICAgICAgIH0gPT4gewogICAgICAgICAgICAgICAgc3RhdGUud29ya19pZCA9IHdvcmtfaWQudG9fc3RyaW5nKCk7CiAgICAgICAgICAgICAgICBzdGF0ZS51c2VybmFtZSA9IHVzZXJuYW1lLnRvX3N0cmluZygpOwogICAgICAgICAgICAgICAgc3RhdGUud29ya2VyX2lkID0gd29ya2VyX2lkLnRvX3N0cmluZygpOwogICAgICAgICAgICAgICAgc3RhdGUud2hhdCA9IHdoYXQudG9fdmVjKCk7CiAgICAgICAgICAgICAgICBzdGF0ZS5ncm91cF9uYW1lID0gZ3JvdXBfbmFtZS50b19zdHJpbmcoKTsKICAgICAgICAgICAgICAgIHN0YXRlLmF2ZXJhZ2VfdHJhY2VhYmlsaXR5ID0gKmF2ZXJhZ2VfdHJhY2VhYmlsaXR5OwogICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICBjb250cmFjdF9yZXN1bHQuc3VjY2VzcyA9IHRydWU7CiAgICAgICAgfQogICAgfQp9"
+                    },
+                    "id": schema_name.clone(),
+                    "initial_value": {
+                        "work_id": "",
+                        "username": "",
+                        "worker_id": "",
+                        "what": [],
+                        "group_name": "",
+                        "average_traceability": 0.0
+                    },
+                    "schema": {
+                                "description": "Traceability registration",
+                                "type": "object",
+                                "properties": {
+                                    "work_id": {
+                                        "description": "Work order identifier",
+                                        "type": "string"
+                                    },
+                                    "username": {
+                                        "description": "Worker username",
+                                        "type": "string"
+                                    },
+                                    "worker_id": {
+                                        "description": "Worker identifier",
+                                        "type": "string"
+                                    },
+                                    "what": {
+                                        "description": "Actions performed on the work order",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "group_name": {
+                                        "description": "Group of work order",
+                                        "type": "string"
+                                    },
+                                    "average_traceability": {
+                                        "description": "Average value of traceability of actions performed on the job",
+                                        "type": "number"
+                                    }
+                        },
+                        "required": [
+                            "work_id", "username", "worker_id", "what", "group_name", "average_traceability"
+                        ],
+                        "additionalProperties": false
+                    }
+                }
+    }));
+
     let payload = serde_json::json!({
         "Patch": {
             "data": operations
         }
     });
+    println!("Payload: {:?}", payload);
     // Compact the request
     EventRequest::Fact(FactRequest {
         subject_id: governance_id,
@@ -164,7 +262,7 @@ pub fn add_members_governance_request(
     })
 }
 
-fn create_genesis_event(
+pub fn create_genesis_event(
     governance_id: DigestIdentifier,
     namespace: String,
     public_key: KeyIdentifier,
@@ -179,20 +277,18 @@ fn create_genesis_event(
     })
 }
 
-fn send_register_event(subject_id: DigestIdentifier) -> EventRequest {
+pub fn create_register_event(subject_id: DigestIdentifier) -> EventRequest {
     EventRequest::Fact(FactRequest {
         subject_id: subject_id,
         payload: ValueWrapper(serde_json::json!(
             {
-                "payload": {
-                    "RegisterOrder": {
-                        "work_id": "26782378995634",
-                        "username": "pepe",
-                        "worker_id": "22",
-                        "what": ["Limpieza", "Sustitución de piezas"],
-                        "group_name": "oe3231",
-                        "average_traceability": 2
-                    }
+                "RegisterOrder": {
+                    "work_id": "26782378995634",
+                    "username": "pepe",
+                    "worker_id": "22",
+                    "what": ["Limpieza", "Sustitución de piezas"],
+                    "group_name": "oe3231",
+                    "average_traceability": 2
                 }
             }
         )),

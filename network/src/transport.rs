@@ -52,7 +52,7 @@ pub fn build_transport(
 
     // Allow TCP transport.
     // port_reuse(true) for use the same port to send / receive communication.
-    let transport = transport.or_transport(tcp::tokio::Transport::new(Config::default().port_reuse(true)));
+    let transport = transport.or_transport(tcp::tokio::Transport::new(Config::default().port_reuse(false)));
 
     // Upgrade the transport with the noise authentication and yamux multiplexing.
     let transport = transport

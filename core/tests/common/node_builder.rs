@@ -47,7 +47,7 @@ impl NodeBuilder {
 
         // node config
         settings.node.passvotation = votation as u8;
-        let path = format!("/tmp/.taple/sc");
+        let path = format!("/tmp/.kore/sc");
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
         let database = MemoryManager::new();
