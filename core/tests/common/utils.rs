@@ -8,6 +8,8 @@ use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
 use serde_json::Value;
 
+use super::NodeBuilder;
+
 #[derive(Debug, Clone)]
 pub struct McNodeData {
     keys: KeyPair,
@@ -85,7 +87,7 @@ pub fn create_governance_request<S: Into<String>>(
 }
 
 pub fn add_members_governance_request(
-    vec_nodes: &Vec<(Api, McNodeData, String)>,
+    vec_nodes: &Vec<(NodeBuilder, McNodeData)>,
     governance_id: DigestIdentifier,
     creator_index: usize,
     schema_name: String,
@@ -106,7 +108,7 @@ pub fn add_members_governance_request(
             members.push((
                 vec_nodes[i].1.get_controller_id(),
                 format!("test{}", iteration),
-                Option::from(Role::ISSUER),
+                Option::from(Role::WITNESS),
             ));
         }
         iteration += 1;

@@ -5,10 +5,15 @@ use kore_base::{keys::KeyPair, Node};
 use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
 
+#[derive(Clone, Debug)]
 pub struct NodeBuilder {
-    key_pair: KeyPair,
+    pub key_pair: KeyPair,
+    pub address: Vec<String>,
+    pub votation: VotationType,
+    pub api: Api,
 }
 
+#[derive(Clone, Debug)]
 pub enum VotationType {
     Normal,
     AlwaysAccept,
@@ -16,13 +21,7 @@ pub enum VotationType {
 }
 #[allow(dead_code)]
 impl NodeBuilder {
-    pub fn new(kp: KeyPair) -> Self {
-        Self {
-            key_pair: kp,
-        }
-    }
-
-    pub fn build(self, nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType) -> Result<Api, Error> {
+    pub fn build(nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType, key_pair: KeyPair) -> Result<Self, Error>{
         let mut settings = Settings::default();
 
         // routing network config
@@ -37,10 +36,10 @@ impl NodeBuilder {
         settings.network.user_agent = "kore::node".to_owned();
         settings.network.node_type = nodetype;
         settings.network.tell = Default::default();
-        settings.network.listen_addresses = listen_addresses;
+        settings.network.listen_addresses = listen_addresses.clone();
 
         // node config
-        settings.node.passvotation = votation as u8;
+        settings.node.passvotation = votation.clone() as u8;
         let path = format!("/tmp/.kore/sc");
         std::fs::create_dir_all(&path).expect("TMP DIR could not be created");
         settings.node.smartcontracts_directory = path;
@@ -48,8 +47,15 @@ impl NodeBuilder {
         let mut registry = Registry::default();
 
         // generate API to send events
-        let  api = Node::build(settings, self.key_pair, &mut registry, database)?;
-        Ok(api)
+        let  api = Node::build(settings, key_pair.clone(), &mut registry, database)?;
+
+        Ok(Self {
+            key_pair,
+            address: listen_addresses,
+            votation,
+            api,
+        })
+        
     }
 }
 
