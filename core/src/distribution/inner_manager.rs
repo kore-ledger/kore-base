@@ -371,7 +371,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection> InnerDistributionManager<G, 
         match self.db.get_witness_signatures(&msg.subject_id) {
             Ok((sn, signatures)) => {
                 // We check SN
-                match sn.cmp(&msg.sn) {
+                match msg.sn.cmp(&sn) {
                     Ordering::Equal => {
                         // We give the signatures
                         let requested = &msg.signatures_requested;
