@@ -1,4 +1,3 @@
-mod error;
 mod node_builder;
 mod utils;
 

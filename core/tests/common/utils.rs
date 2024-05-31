@@ -1,20 +1,21 @@
+use super::NodeBuilder;
 use kore_base::{
     keys::{KeyMaterial, KeyPair},
     request::{FactRequest, StartRequest},
     signature::{Signature, Signed},
-    Api, DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, ValueWrapper,
+    DigestDerivator, DigestIdentifier, EventRequest, KeyIdentifier, ValueWrapper,
 };
 use libp2p::identity::{ed25519, Keypair};
 use libp2p::PeerId;
 use serde_json::Value;
 
-use super::NodeBuilder;
-
+// Struct to store the node data
 #[derive(Debug, Clone)]
 pub struct McNodeData {
     keys: KeyPair,
     peer_id: PeerId,
 }
+// Enum to define the role
 #[derive(Debug, Clone)]
 pub enum Role {
     WITNESS,
@@ -26,14 +27,15 @@ pub enum Role {
 }
 
 impl Role {
-    fn try_from(&self) -> Result<String, String> {
+    // Function to convert the role to string
+    pub fn to_string(&self) -> String {
         match self {
-            Role::WITNESS => Ok("WITNESS".to_string()),
-            Role::APPROVER => Ok("APPROVER".to_string()),
-            Role::EVALUATOR => Ok("EVALUATOR".to_string()),
-            Role::CREATOR => Ok("CREATOR".to_string()),
-            Role::ISSUER => Ok("ISSUER".to_string()),
-            Role::VALIDATOR => Ok("VALIDATOR".to_string()),
+            Role::WITNESS => "WITNESS".to_string(),
+            Role::APPROVER => "APPROVER".to_string(),
+            Role::EVALUATOR => "EVALUATOR".to_string(),
+            Role::CREATOR => "CREATOR".to_string(),
+            Role::ISSUER => "ISSUER".to_string(),
+            Role::VALIDATOR => "VALIDATOR".to_string(),
         }
     }
 }
@@ -60,7 +62,7 @@ impl McNodeData {
         }
     }
 }
-
+// Function to generate the MC node data
 pub fn generate_mc(keys: KeyPair) -> McNodeData {
     let peer_id = {
         let sk =
@@ -71,21 +73,22 @@ pub fn generate_mc(keys: KeyPair) -> McNodeData {
     };
     McNodeData { keys, peer_id }
 }
-
-pub fn create_governance_request<S: Into<String>>(
-    namespace: S,
+// Function to create the governance request
+pub fn create_governance_request(
+    namespace: String,
     public_key: KeyIdentifier,
-    name: S,
+    name: String,
 ) -> EventRequest {
     EventRequest::Create(StartRequest {
         governance_id: DigestIdentifier::default(),
-        schema_id: "governance".into(),
-        namespace: namespace.into(),
-        name: name.into(),
+        schema_id: "governance".to_string(),
+        namespace: namespace,
+        name: name,
         public_key,
     })
 }
 
+// Create event SN1 to add members with role and schema with smart contract
 pub fn add_members_governance_request(
     vec_nodes: &Vec<(NodeBuilder, McNodeData)>,
     governance_id: DigestIdentifier,
@@ -132,7 +135,7 @@ pub fn add_members_governance_request(
         if role.is_none() {
             continue;
         }
-        let role_string = role.clone().unwrap().try_from().unwrap();
+        let role_string = role.clone().unwrap().to_string();
         let member_value = serde_json::json!({
             "op":"add",
             "path": format!("/roles/{}", index),
@@ -260,6 +263,7 @@ pub fn add_members_governance_request(
     })
 }
 
+// Create event to register new traceability subject
 pub fn create_genesis_event(
     governance_id: DigestIdentifier,
     namespace: String,
@@ -275,6 +279,7 @@ pub fn create_genesis_event(
     })
 }
 
+// Register new event for traceability subject
 pub fn create_register_event(subject_id: DigestIdentifier) -> EventRequest {
     EventRequest::Fact(FactRequest {
         subject_id: subject_id,

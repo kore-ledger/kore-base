@@ -5,6 +5,7 @@ use kore_base::{keys::KeyPair, Node};
 use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
 
+// Struct to build a node
 #[derive(Clone, Debug)]
 pub struct NodeBuilder {
     pub key_pair: KeyPair,
@@ -12,13 +13,14 @@ pub struct NodeBuilder {
     pub votation: VotationType,
     pub api: Api,
 }
-
+// Enum to define the votation type
 #[derive(Clone, Debug)]
 pub enum VotationType {
     Normal,
     AlwaysAccept,
     AlwaysReject,
 }
+// Implement the NodeBuilder struct
 #[allow(dead_code)]
 impl NodeBuilder {
     pub fn build(nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType, key_pair: KeyPair) -> Result<Self, Error>{
@@ -28,7 +30,7 @@ impl NodeBuilder {
         let config_routing = network::RoutingConfig::new(boot_nodes.clone())
         .with_allow_non_globals_in_dht(true)
         .with_allow_private_ip(true)
-        .with_discovery_limit(50)
+        .with_discovery_limit(100)
         .with_dht_random_walk(false);
  
         // network config

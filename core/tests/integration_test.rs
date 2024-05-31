@@ -5,13 +5,13 @@ use crate::common::{
     create_register_event,
 };
 use common::{generate_mc, McNodeData, NodeBuilder};
-use kore_base::request::KoreRequest;
+use kore_base::request::{KoreRequest, RequestState};
+use kore_base::ApprovalState;
 use kore_base::EventRequest;
 use kore_base::{
     keys::{Ed25519KeyPair, KeyGenerator, KeyPair},
     DigestDerivator, DigestIdentifier,
 };
-use kore_base::{Api, ApprovalState};
 use network::{NodeType, RoutingNode};
 use std::collections::HashSet;
 
@@ -42,7 +42,7 @@ async fn create_event_governance(node: NodeBuilder, mc_data_node: McNodeData) ->
         .add_keys(kore_base::KeyDerivator::Ed25519)
         .await
         .expect("MC creation failed");
-    let event_request = create_governance_request("", public_key, "");
+    let event_request = create_governance_request("".to_string(), public_key, "".to_string());
     let request_id = sign_events(event_request, node.clone(), mc_data_node).await;
     let subject_id = get_request_with_votation(request_id, node, VotationType::AlwaysAccept).await;
     subject_id.subject_id.unwrap()
@@ -101,14 +101,18 @@ async fn get_request_with_votation(
                     break;
                 }
                 VotationType::Normal => {
-                    let res = node
-                        .api
-                        .approval_request(request_id.clone(), true)
-                        .await
-                        .unwrap();
-                    if res.state == ApprovalState::RespondedAccepted {
-                        break;
+                    if res.state == RequestState::Processing {
+                        // obtain the pending requests
+                        let res = node.api.get_pending_requests().await.unwrap();
+                        // aprove or reject the request
+                        for request in res.iter() {
+                            node.api
+                                .approval_request(request.id.clone(), true)
+                                .await
+                                .unwrap();
+                        }
                     } else {
+                        assert!(val == true);
                         break;
                     }
                 }
@@ -153,6 +157,7 @@ async fn verify_copy_ledger(
                 .get_events(subject_id.clone(), None, None)
                 .await
                 .unwrap();
+            println!(" Response: {:?}", pre_response);
             if pre_response.len() > 0
                 && pre_response[pre_response.len() - 1].content.sn == sn.unwrap_or(0)
             {
@@ -322,6 +327,7 @@ async fn create_and_test_nodes(vec_nodes: Vec<(NodeBuilder, McNodeData)>, index_
         vec_nodes[index_governance].1.clone(),
     )
     .await;
+
     // Add members to governance
     let request_id = sign_events(
         add_members_governance_request(
@@ -426,6 +432,7 @@ async fn create_and_test_nodes_with_trazabilty(
 
 #[cfg(test)]
 mod test {
+    use common::Role;
     use kore_base::{request::FactRequest, ValueWrapper};
 
     use super::*;
@@ -447,7 +454,7 @@ mod test {
             "/ip4/127.0.0.1/tcp/4999".to_string(),
             NodeType::Bootstrap,
             vec![],
-            VotationType::AlwaysReject,
+            VotationType::AlwaysAccept,
         );
         let subject_id = create_event_governance(node.clone(), mc_data_node1.clone()).await;
         let request_id = sign_events(
@@ -461,12 +468,12 @@ mod test {
             mc_data_node1,
         )
         .await;
-        get_request_with_votation(request_id, node, VotationType::AlwaysReject).await;
+        get_request_with_votation(request_id, node, VotationType::AlwaysAccept).await;
     }
 
     #[tokio::test]
     async fn governance_and_member_with_bootstraps_node() {
-        let nodes = create_nodes_massive(3, 0, 0, 5001).await;
+        let nodes = create_nodes_massive(3, 0, 0, 3000).await;
         let mut vec_nodes = vec![];
         vec_nodes.extend(nodes[0].clone());
         vec_nodes.extend(nodes[1].clone());
@@ -538,7 +545,12 @@ mod test {
 
     #[tokio::test]
     async fn genesis_event_addresable() {
-        let nodes = create_nodes_and_connections(vec![vec![]], vec![vec![0]], vec![vec![0]], 5027);
+        let nodes = create_nodes_and_connections(
+            vec![vec![], vec![0], vec![0]],
+            vec![vec![0]],
+            vec![vec![0]],
+            5027,
+        );
         let vec_nodes = nodes
             .into_iter()
             .flatten()
@@ -548,7 +560,7 @@ mod test {
 
     #[tokio::test]
     async fn copy_of_ledger_with_hight_sn() {
-        let nodes = create_nodes_massive(1, 2, 0, 5030).await;
+        let nodes = create_nodes_massive(1, 1, 1, 5040).await;
         let vec_nodes = nodes
             .into_iter()
             .flatten()
@@ -556,7 +568,7 @@ mod test {
         // Create governance
         let subject_id =
             create_event_governance(vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
-        // Add members to governance
+        // Add members to governance with contract and roles
         let event0 = EventRequest::Fact(FactRequest {
             subject_id: subject_id.clone(),
             payload: ValueWrapper(serde_json::json!(
@@ -591,7 +603,7 @@ mod test {
                             "path": "/roles/1",
                             "value": {
                                 "namespace": "",
-                                "role": "CREATOR",
+                                "role": Role::CREATOR.to_string(),
                                 "schema": {
                                     "ID": "traceability"
                                 },
@@ -605,12 +617,12 @@ mod test {
                             "path": "/roles/2",
                             "value": {
                                 "namespace": "",
-                                "role": "APPROVER",
+                                "role": Role::EVALUATOR.to_string(),
                                 "schema": {
                                     "ID": "governance"
                                 },
                                 "who": {
-                                    "NAME": "KoreNode0"
+                                    "NAME": "KoreNode1"
                                 }
                             }
                         },
@@ -619,12 +631,40 @@ mod test {
                             "path": "/roles/3",
                             "value": {
                                 "namespace": "",
-                                "role": "APPROVER",
+                                "role": Role::VALIDATOR.to_string(),
                                 "schema": {
                                     "ID": "governance"
                                 },
                                 "who": {
                                     "NAME": "KoreNode1"
+                                }
+                            }
+                        },
+                        {
+                            "op": "add",
+                            "path": "/roles/4",
+                            "value": {
+                                "namespace": "",
+                                "role": Role::APPROVER.to_string(),
+                                "schema": {
+                                    "ID": "governance"
+                                },
+                                "who": {
+                                    "NAME": "KoreNode1"
+                                }
+                            }
+                        },
+                        {
+                            "op": "add",
+                            "path": "/roles/5",
+                            "value": {
+                                "namespace": "",
+                                "role": Role::ISSUER.to_string(),
+                                "schema": {
+                                    "ID": "governance"
+                                },
+                                "who": {
+                                    "NAME": "KoreNode2"
                                 }
                             }
                         },
@@ -708,6 +748,7 @@ mod test {
                 }
             )),
         });
+        // Verify de event completer
         let request_id = sign_events(event0, vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
         get_request_with_votation(
             request_id,
@@ -715,6 +756,7 @@ mod test {
             VotationType::AlwaysAccept,
         )
         .await;
+        // Add providers to governance
         let event1 = EventRequest::Fact(FactRequest {
             subject_id: subject_id.clone(),
             payload: ValueWrapper(serde_json::json!(
@@ -735,6 +777,7 @@ mod test {
                 }
             )),
         });
+        // Verify de event completer
         sign_events(event1, vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
         for i in 0..vec_nodes.len() {
             add_providers(vec_nodes[i].0.clone(), vec![], subject_id.clone()).await;
