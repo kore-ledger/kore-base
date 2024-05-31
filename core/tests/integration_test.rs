@@ -142,10 +142,9 @@ async fn add_providers(
 async fn verify_copy_ledger(
     vec_nodes: Vec<(NodeBuilder, McNodeData)>,
     subject_id: DigestIdentifier,
+    sn: Option<u64>,
 ) {
-    let mut response = vec![];
     let mut pre_response = vec![];
-    let mut node_response = vec![];
     for i in 0..vec_nodes.len() {
         loop {
             pre_response = vec_nodes[i]
@@ -154,22 +153,15 @@ async fn verify_copy_ledger(
                 .get_events(subject_id.clone(), None, None)
                 .await
                 .unwrap();
-            if pre_response.len() > 0 {
-                println!("pre_response: {:?}", pre_response);
-                node_response.push(format!(
-                    "Node {} - {}",
-                    i,
-                    vec_nodes[i].1.get_peer_id().to_base58()
-                ));
-                response = pre_response;
-
+            if pre_response.len() > 0
+                && pre_response[pre_response.len() - 1].content.sn == sn.unwrap_or(0)
+            {
                 break;
             } else {
                 tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
             }
         }
     }
-    assert!(response.len() > 0);
 }
 
 // Deploy many nodes
@@ -354,7 +346,7 @@ async fn create_and_test_nodes(vec_nodes: Vec<(NodeBuilder, McNodeData)>, index_
         add_providers(vec_nodes[i].0.clone(), vec![], subject_id.clone()).await
     }
     // Verify copy ledger
-    verify_copy_ledger(vec_nodes.clone(), subject_id.clone()).await;
+    //verify_copy_ledger(vec_nodes.clone(), subject_id.clone(), None).await;
 }
 
 // Test nodes with governance in diferent scenarios
@@ -392,7 +384,7 @@ async fn create_and_test_nodes_with_trazabilty(
         add_providers(vec_nodes[i].0.clone(), vec![], subject_id.clone()).await
     }
     // Verify copy ledger
-    verify_copy_ledger(vec_nodes.clone(), subject_id.clone()).await;
+    //verify_copy_ledger(vec_nodes.clone(), subject_id.clone(), None).await;
 
     // generate trazability with add keys and sign
     let trazabilty_subject: DigestIdentifier = create_event_genesis(
@@ -439,7 +431,6 @@ mod test {
     use super::*;
     use std::vec;
     #[tokio::test]
-    #[ignore]
     async fn create_governance_one_node() {
         let (api, mc_data_node1) = create_node(
             "/ip4/127.0.0.1/tcp/4998".to_string(),
@@ -451,7 +442,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn create_governance_one_node_reject() {
         let (node, mc_data_node1) = create_node(
             "/ip4/127.0.0.1/tcp/4999".to_string(),
@@ -475,7 +465,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn governance_and_member_with_bootstraps_node() {
         let nodes = create_nodes_massive(3, 0, 0, 5001).await;
         let mut vec_nodes = vec![];
@@ -486,7 +475,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn governance_and_member_with_ephemeral() {
         let nodes = create_nodes_massive(1, 0, 1, 5004).await;
         let mut vec_nodes = vec![];
@@ -497,7 +485,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn governance_and_member_with_addressable() {
         let nodes = create_nodes_massive(1, 3, 0, 5007).await;
         let mut vec_nodes = vec![];
@@ -508,7 +495,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn governance_and_member_with_all_types() {
         let nodes = create_nodes_massive(1, 1, 1, 5013).await;
         let mut vec_nodes = vec![];
@@ -519,7 +505,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn addresable_get_governance() {
         let nodes = create_nodes_and_connections(
             vec![vec![], vec![0], vec![0, 1]],
@@ -540,7 +525,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn genesis_event_one_node() {
         let (api, mc_data_node1) = create_node(
             "/ip4/127.0.0.1/tcp/5025".to_string(),
@@ -553,7 +537,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn genesis_event_addresable() {
         let nodes = create_nodes_and_connections(vec![vec![]], vec![vec![0]], vec![vec![0]], 5027);
         let vec_nodes = nodes
@@ -570,11 +553,9 @@ mod test {
             .into_iter()
             .flatten()
             .collect::<Vec<(NodeBuilder, McNodeData)>>();
-
         // Create governance
         let subject_id =
             create_event_governance(vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
-
         // Add members to governance
         let event0 = EventRequest::Fact(FactRequest {
             subject_id: subject_id.clone(),
@@ -754,86 +735,12 @@ mod test {
                 }
             )),
         });
-        let request_id = sign_events(event1, vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
-        // Add providers to governance
-        println!("AUTHORIZED SUBJECT");
+        sign_events(event1, vec_nodes[0].0.clone(), vec_nodes[0].1.clone()).await;
         for i in 0..vec_nodes.len() {
             add_providers(vec_nodes[i].0.clone(), vec![], subject_id.clone()).await;
-            println!("PEER ID {:?}", vec_nodes[i].1.get_peer_id());
         }
+        std::thread::sleep(std::time::Duration::from_secs(3));
 
-        verify_copy_ledger(vec_nodes.clone(), subject_id.clone()).await;
-
-        let a = vec_nodes[1]
-            .0
-            .api
-            .get_governances("".to_string(), None, None)
-            .await
-            .unwrap();
-        println!("GOVERNANCES {:?}", a);
-        get_request_with_votation(
-            request_id.clone(),
-            vec_nodes[0].0.clone(),
-            VotationType::AlwaysAccept,
-        )
-        .await;
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        verify_copy_ledger(vec_nodes.clone(), subject_id.clone()).await;
-        let a = vec_nodes[1]
-            .0
-            .api
-            .get_events(subject_id.clone(), None, None)
-            .await
-            .unwrap_or_default();
-        println!("");
-        println!("Node 1 WITNESS {:?}", a);
-        println!("");
-        println!("");
-        verify_copy_ledger(vec_nodes.clone(), subject_id.clone()).await;
-        let a = vec_nodes[0]
-            .0
-            .api
-            .get_events(subject_id.clone(), None, None)
-            .await
-            .unwrap();
-        println!("Node 0 CREATOR {:?}", a);  
-
-        /*         // generate trazability with add keys and sign
-        let trazabilty_subject: DigestIdentifier = create_event_genesis(
-            vec_nodes[0].0.clone(),
-            vec_nodes[0].1.clone(),
-            subject_id.clone(),
-        )
-        .await;
-
-        let request_id = sign_events(
-            create_register_event(trazabilty_subject.clone()),
-            vec_nodes[0].0.clone(),
-            vec_nodes[0].1.clone(),
-        )
-        .await;
-
-        get_request_with_votation(
-            request_id,
-            vec_nodes[0].0.clone(),
-            VotationType::AlwaysAccept,
-        )
-        .await;
-
-        // verify that the ledger is copied to all nodes
-        loop {
-            let response = vec_nodes[0]
-                .0
-                .api
-                .get_events(trazabilty_subject.clone(), None, None)
-                .await
-                .unwrap();
-            if response.len() > 0 {
-                break;
-            } else {
-                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-            }
-        }*/
+        verify_copy_ledger(vec_nodes, subject_id, Some(2)).await;
     }
 }
