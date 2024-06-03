@@ -451,10 +451,9 @@ pub async fn verify_copy_ledger(
     subject_id: DigestIdentifier,
     sn: Option<u64>,
 ) {
-    let mut pre_response = vec![];
     for i in 0..vec_nodes.len() {
         loop {
-            pre_response = vec_nodes[i]
+            let pre_response = vec_nodes[i]
                 .0
                 .api
                 .get_events(subject_id.clone(), None, None)

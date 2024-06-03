@@ -17,6 +17,17 @@ mod test {
 
     use super::*;
     use std::vec;
+    #[test]
+    fn test_votation() {
+        let normal_vote = VotationType::Normal;
+        let accept_vote = VotationType::AlwaysAccept;
+        let reject_vote = VotationType::AlwaysReject;
+        
+        assert!(matches!(normal_vote, VotationType::Normal));
+        assert!(matches!(accept_vote, VotationType::AlwaysAccept));
+        assert!(matches!(reject_vote, VotationType::AlwaysReject));
+    }
+
     #[tokio::test]
     async fn create_governance_one_node() {
         let (api, mc_data_node1) = create_node(
@@ -103,7 +114,7 @@ mod test {
             .into_iter()
             .flatten()
             .collect::<Vec<(NodeBuilder, McNodeData)>>();
-        let vec_copy = vec_nodes.clone();
+        //let vec_copy = vec_nodes.clone();
         /*         let first_governance = tokio::spawn(async move {
             create_and_test_nodes(vec_copy,3).await;
         }); */
