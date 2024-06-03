@@ -657,7 +657,7 @@ pub async fn create_and_test_nodes(vec_nodes: Vec<(NodeBuilder, McNodeData)>, in
         add_providers(vec_nodes[i].0.clone(), vec![], subject_id.clone()).await
     }
     // Verify copy ledger
-    //verify_copy_ledger(vec_nodes.clone(), subject_id.clone(), Some(1)).await;
+    // verify_copy_ledger(vec_nodes.clone(), subject_id.clone(), Some(1)).await;
 }
 
 // Test nodes with governance in diferent scenarios
