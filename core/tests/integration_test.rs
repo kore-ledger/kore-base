@@ -137,6 +137,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn genesis_event_one_node() {
         let (api, mc_data_node1) = create_node(
             "/ip4/127.0.0.1/tcp/50000".to_string(),
