@@ -6,6 +6,7 @@ use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
 
 // Struct to build a node
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct NodeBuilder {
     pub key_pair: KeyPair,
@@ -14,6 +15,7 @@ pub struct NodeBuilder {
     pub api: Api,
 }
 // Enum to define the votation type
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub enum VotationType {
     Normal,
@@ -21,7 +23,7 @@ pub enum VotationType {
     AlwaysReject,
 }
 // Implement the NodeBuilder struct
-#[allow(dead_code)]
+#[cfg(test)]
 impl NodeBuilder {
     pub fn build(nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType, key_pair: KeyPair) -> Result<Self, Error>{
         let mut settings = Settings::default();
