@@ -18,11 +18,25 @@ mod test {
     use super::*;
     use std::vec;
     #[test]
+    fn test_role() {
+        let creator = Role::CREATOR;
+        let evaluator = Role::EVALUATOR;
+        let validator = Role::VALIDATOR;
+        let approver = Role::APPROVER;
+        let issuer = Role::ISSUER;
+
+        assert!(matches!(creator, Role::CREATOR));
+        assert!(matches!(approver, Role::APPROVER));
+        assert!(matches!(issuer, Role::ISSUER));
+        assert!(matches!(evaluator, Role::EVALUATOR));
+        assert!(matches!(validator, Role::VALIDATOR));
+    }
+    #[test]
     fn test_votation() {
         let normal_vote = VotationType::Normal;
         let accept_vote = VotationType::AlwaysAccept;
         let reject_vote = VotationType::AlwaysReject;
-        
+
         assert!(matches!(normal_vote, VotationType::Normal));
         assert!(matches!(accept_vote, VotationType::AlwaysAccept));
         assert!(matches!(reject_vote, VotationType::AlwaysReject));
