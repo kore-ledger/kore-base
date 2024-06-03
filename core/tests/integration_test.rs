@@ -137,7 +137,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn genesis_event_one_node() {
         let (api, mc_data_node1) = create_node(
             "/ip4/127.0.0.1/tcp/5025".to_string(),
@@ -150,7 +149,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn genesis_event_addresable() {
         let nodes = create_nodes_and_connections(
             vec![vec![], vec![0], vec![0]],
