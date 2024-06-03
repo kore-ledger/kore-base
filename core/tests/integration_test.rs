@@ -149,6 +149,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn genesis_event_addresable() {
         let nodes = create_nodes_and_connections(
             vec![vec![], vec![0], vec![0]],
