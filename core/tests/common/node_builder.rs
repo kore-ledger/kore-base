@@ -32,7 +32,7 @@ impl NodeBuilder {
         let config_routing = network::RoutingConfig::new(boot_nodes.clone())
         .with_allow_non_globals_in_dht(true)
         .with_allow_private_ip(true)
-        .with_discovery_limit(100)
+        .with_discovery_limit(50)
         .with_dht_random_walk(false);
  
         // network config

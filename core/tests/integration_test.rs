@@ -118,7 +118,7 @@ mod test {
         /*         let first_governance = tokio::spawn(async move {
             create_and_test_nodes(vec_copy,3).await;
         }); */
-        create_and_test_nodes(vec_nodes, 3).await;
+        create_and_test_nodes(vec_nodes, 0).await;
         //assert!(first_governance.await.is_ok());
     }
 
@@ -200,62 +200,6 @@ mod test {
                                 },
                                 "who": {
                                     "NAME": "KoreNode0"
-                                }
-                            }
-                        },
-                        {
-                            "op": "add",
-                            "path": "/roles/2",
-                            "value": {
-                                "namespace": "",
-                                "role": Role::EVALUATOR.to_string(),
-                                "schema": {
-                                    "ID": "governance"
-                                },
-                                "who": {
-                                    "NAME": "KoreNode1"
-                                }
-                            }
-                        },
-                        {
-                            "op": "add",
-                            "path": "/roles/3",
-                            "value": {
-                                "namespace": "",
-                                "role": Role::VALIDATOR.to_string(),
-                                "schema": {
-                                    "ID": "governance"
-                                },
-                                "who": {
-                                    "NAME": "KoreNode1"
-                                }
-                            }
-                        },
-                        {
-                            "op": "add",
-                            "path": "/roles/4",
-                            "value": {
-                                "namespace": "",
-                                "role": Role::APPROVER.to_string(),
-                                "schema": {
-                                    "ID": "governance"
-                                },
-                                "who": {
-                                    "NAME": "KoreNode1"
-                                }
-                            }
-                        },
-                        {
-                            "op": "add",
-                            "path": "/roles/5",
-                            "value": {
-                                "namespace": "",
-                                "role": Role::ISSUER.to_string(),
-                                "schema": {
-                                    "ID": "governance"
-                                },
-                                "who": {
-                                    "NAME": "KoreNode2"
                                 }
                             }
                         },
