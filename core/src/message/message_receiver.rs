@@ -88,8 +88,9 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
                                 }
                             }
                            },
-                           NetworkEvent::Error(_) => {
+                           NetworkEvent::Error(e) => {
                             println!("NETWORK EVENT ERROR");
+                            println!("{:?}", e);
                            },
                         }
                 },
