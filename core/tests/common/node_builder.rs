@@ -1,12 +1,9 @@
-use kore_base::{
-    Api, Error, MemoryManager, Settings,
-};
 use kore_base::{keys::KeyPair, Node};
+use kore_base::{Api, Error, MemoryManager, Settings};
 use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
 
 // Struct to build a node
-#[cfg(test)]
 #[derive(Clone, Debug)]
 pub struct NodeBuilder {
     pub key_pair: KeyPair,
@@ -15,7 +12,6 @@ pub struct NodeBuilder {
     pub api: Api,
 }
 // Enum to define the votation type
-#[cfg(test)]
 #[derive(Clone, Debug)]
 pub enum VotationType {
     Normal,
@@ -23,18 +19,23 @@ pub enum VotationType {
     AlwaysReject,
 }
 // Implement the NodeBuilder struct
-#[cfg(test)]
 impl NodeBuilder {
-    pub fn build(nodetype:NodeType,boot_nodes: Vec<RoutingNode>, listen_addresses: Vec<String>, votation: VotationType, key_pair: KeyPair) -> Result<Self, Error>{
+    pub fn build(
+        nodetype: NodeType,
+        boot_nodes: Vec<RoutingNode>,
+        listen_addresses: Vec<String>,
+        votation: VotationType,
+        key_pair: KeyPair,
+    ) -> Result<Self, Error> {
         let mut settings = Settings::default();
 
         // routing network config
         let config_routing = network::RoutingConfig::new(boot_nodes.clone())
-        .with_allow_non_globals_in_dht(true)
-        .with_allow_private_ip(true)
-        .with_discovery_limit(50)
-        .with_dht_random_walk(false);
- 
+            .with_allow_non_globals_in_dht(true)
+            .with_allow_private_ip(true)
+            .with_discovery_limit(50)
+            .with_dht_random_walk(false);
+
         // network config
         settings.network.routing = config_routing;
         settings.network.user_agent = "kore::node".to_owned();
@@ -51,7 +52,7 @@ impl NodeBuilder {
         let mut registry = Registry::default();
 
         // generate API to send events
-        let  api = Node::build(settings, key_pair.clone(), &mut registry, database)?;
+        let api = Node::build(settings, key_pair.clone(), &mut registry, database)?;
 
         Ok(Self {
             key_pair,
@@ -59,7 +60,5 @@ impl NodeBuilder {
             votation,
             api,
         })
-        
     }
 }
-

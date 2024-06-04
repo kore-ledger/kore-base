@@ -14,14 +14,12 @@ use network::{NodeType, RoutingNode};
 use serde_json::Value;
 
 // Struct to store the node data
-#[cfg(test)]
 #[derive(Debug, Clone)]
 pub struct McNodeData {
     keys: KeyPair,
     peer_id: PeerId,
 }
 // Enum to define the role
-#[cfg(test)]
 #[derive(Debug, Clone)]
 pub enum Role {
     WITNESS,
@@ -32,7 +30,6 @@ pub enum Role {
     VALIDATOR,
 }
 
-#[cfg(test)]
 impl Role {
     // Function to convert the role to string
     pub fn to_string(&self) -> String {
@@ -47,7 +44,6 @@ impl Role {
     }
 }
 
-#[cfg(test)]
 impl McNodeData {
     #[allow(dead_code)]
     pub fn get_controller_id(&self) -> KeyIdentifier {
@@ -71,7 +67,6 @@ impl McNodeData {
     }
 }
 // Function to generate the MC node data
-#[cfg(test)]
 pub fn generate_mc(keys: KeyPair) -> McNodeData {
     let peer_id = {
         let sk =
@@ -83,7 +78,6 @@ pub fn generate_mc(keys: KeyPair) -> McNodeData {
     McNodeData { keys, peer_id }
 }
 // Function to create the governance request
-#[cfg(test)]
 pub fn create_governance_request(
     namespace: String,
     public_key: KeyIdentifier,
@@ -99,7 +93,6 @@ pub fn create_governance_request(
 }
 
 // Create event SN1 to add members with role and schema with smart contract
-#[cfg(test)]
 pub fn add_members_governance_request(
     vec_nodes: &Vec<(NodeBuilder, McNodeData)>,
     governance_id: DigestIdentifier,
@@ -275,7 +268,6 @@ pub fn add_members_governance_request(
 }
 
 // Create event to register new traceability subject
-#[cfg(test)]
 pub fn create_genesis_event(
     governance_id: DigestIdentifier,
     namespace: String,
@@ -292,7 +284,6 @@ pub fn create_genesis_event(
 }
 
 // Register new event for traceability subject
-#[cfg(test)]
 pub fn create_register_event(subject_id: DigestIdentifier) -> EventRequest {
     EventRequest::Fact(FactRequest {
         subject_id: subject_id,
@@ -312,7 +303,6 @@ pub fn create_register_event(subject_id: DigestIdentifier) -> EventRequest {
 }
 
 // Create node
-#[cfg(test)]
 pub fn create_node(
     addr: String,
     node: NodeType,
@@ -332,9 +322,11 @@ pub fn create_node(
     (result, mc_data_node1)
 }
 
-#[cfg(test)]
 // Create governance and add keys
-pub async fn create_event_governance(node: NodeBuilder, mc_data_node: McNodeData) -> DigestIdentifier {
+pub async fn create_event_governance(
+    node: NodeBuilder,
+    mc_data_node: McNodeData,
+) -> DigestIdentifier {
     let public_key = node
         .api
         .add_keys(kore_base::KeyDerivator::Ed25519)
@@ -347,7 +339,6 @@ pub async fn create_event_governance(node: NodeBuilder, mc_data_node: McNodeData
 }
 
 // Create genesis event
-#[cfg(test)]
 pub async fn create_event_genesis(
     node: NodeBuilder,
     mc_data_node: McNodeData,
@@ -370,7 +361,6 @@ pub async fn create_event_genesis(
 }
 
 // Sign events and verify response
-#[cfg(test)]
 pub async fn sign_events(
     event: EventRequest,
     node: NodeBuilder,
@@ -382,7 +372,6 @@ pub async fn sign_events(
         .unwrap()
 }
 
-#[cfg(test)]
 pub async fn get_request_with_votation(
     request_id: DigestIdentifier,
     node: NodeBuilder,
@@ -428,7 +417,6 @@ pub async fn get_request_with_votation(
 }
 
 // Authorize members to governance
-#[cfg(test)]
 pub async fn add_providers(
     node: NodeBuilder,
     vec_providers: Vec<McNodeData>,
@@ -445,7 +433,6 @@ pub async fn add_providers(
 }
 
 // Verify that the ledger is copied to all nodes
-#[cfg(test)]
 pub async fn verify_copy_ledger(
     vec_nodes: Vec<(NodeBuilder, McNodeData)>,
     subject_id: DigestIdentifier,
@@ -472,7 +459,6 @@ pub async fn verify_copy_ledger(
 }
 
 // Deploy many nodes
-#[cfg(test)]
 pub async fn create_nodes_massive(
     size_bootstrap: usize,
     size_addresable: usize,
@@ -534,7 +520,6 @@ pub async fn create_nodes_massive(
 }
 
 // Create nodes with specific connections
-#[cfg(test)]
 pub fn create_nodes_and_connections(
     boostrap: Vec<Vec<usize>>,
     addresable: Vec<Vec<usize>>,
@@ -624,8 +609,10 @@ pub fn create_nodes_and_connections(
 }
 
 // Test nodes with governance in diferent scenarios
-#[cfg(test)]
-pub async fn create_and_test_nodes(vec_nodes: Vec<(NodeBuilder, McNodeData)>, index_governance: usize) {
+pub async fn create_and_test_nodes(
+    vec_nodes: Vec<(NodeBuilder, McNodeData)>,
+    index_governance: usize,
+) {
     // Create governance
     let subject_id = create_event_governance(
         vec_nodes[index_governance].0.clone(),
@@ -661,7 +648,6 @@ pub async fn create_and_test_nodes(vec_nodes: Vec<(NodeBuilder, McNodeData)>, in
 }
 
 // Test nodes with governance in diferent scenarios
-#[cfg(test)]
 pub async fn create_and_test_nodes_with_trazabilty(
     vec_nodes: Vec<(NodeBuilder, McNodeData)>,
     index_governance: usize,
