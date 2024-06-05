@@ -126,7 +126,7 @@ impl<C: DatabaseCollection> EventCompleter<C> {
             own_identifier: signature_manager.get_own_identifier(),
             signature_manager,
             derivator,
-            protocol_channel: channels.protocol_channel
+            protocol_channel: channels.protocol_channel,
         }
     }
 

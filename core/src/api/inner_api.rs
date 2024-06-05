@@ -370,11 +370,7 @@ impl<C: DatabaseCollection> InnerApi<C> {
 }
 
 #[allow(dead_code)]
-fn get_init_and_end<T>(
-    from: Option<usize>,
-    quantity: Option<usize>,
-    data: &Vec<T>,
-) -> (usize, usize) {
+fn get_init_and_end<T>(from: Option<usize>, quantity: Option<usize>, data: &[T]) -> (usize, usize) {
     let init = if let Some(from) = from { from } else { 0 };
     let end = if quantity.is_some() {
         let to = quantity.unwrap() + init;

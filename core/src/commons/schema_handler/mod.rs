@@ -6,7 +6,7 @@ use std::str::FromStr;
 pub mod gov_models;
 pub mod initial_state;
 
-use crate::{commons::errors::Error,  identifier::KeyIdentifier};
+use crate::{commons::errors::Error, identifier::KeyIdentifier};
 
 #[derive(Debug)]
 #[allow(dead_code)]

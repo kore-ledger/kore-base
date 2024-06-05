@@ -1511,10 +1511,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                             witnesses.insert(subject.owner);
                             let msg =
                                 request_event(self.our_id.clone(), state_request.subject_id, 0);
-                                self.send_message(None, msg, witnesses,MessageConfig {
+                            self.send_message(
+                                None,
+                                msg,
+                                witnesses,
+                                MessageConfig {
                                     timeout: 2000,
                                     replication_factor: 0.8,
-                                }).await?
+                                },
+                            )
+                            .await?
                         } else {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
@@ -1958,10 +1964,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                             // Request next event to current_sn
                             witnesses.insert(subject.owner);
                             let msg = request_event(self.our_id.clone(), eol_request.subject_id, 0);
-                            self.send_message(None, msg, witnesses,MessageConfig {
-                                timeout: 2000,
-                                replication_factor: 0.8,
-                            }).await?
+                            self.send_message(
+                                None,
+                                msg,
+                                witnesses,
+                                MessageConfig {
+                                    timeout: 2000,
+                                    replication_factor: 0.8,
+                                },
+                            )
+                            .await?
                         } else {
                             // Repeated event case
                             return Err(LedgerError::EventAlreadyExists);
@@ -2302,10 +2314,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                                             subject_id,
                                             current_sn + 2,
                                         );
-                                        self.send_message(None, msg, witnesses,MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 0.8,
-                                        }).await?
+                                        self.send_message(
+                                            None,
+                                            msg,
+                                            witnesses,
+                                            MessageConfig {
+                                                timeout: 2000,
+                                                replication_factor: 0.8,
+                                            },
+                                        )
+                                        .await?
                                     }
                                     Ok(())
                                 } else {
@@ -2406,10 +2424,16 @@ impl<C: DatabaseCollection> Ledger<C> {
                                         witnesses
                                             .insert(event.content.event_request.signature.signer);
                                         let msg = request_event(self.our_id.clone(), subject_id, 1);
-                                        self.send_message(None, msg, witnesses,MessageConfig {
-                                            timeout: 2000,
-                                            replication_factor: 0.8,
-                                        }).await?
+                                        self.send_message(
+                                            None,
+                                            msg,
+                                            witnesses,
+                                            MessageConfig {
+                                                timeout: 2000,
+                                                replication_factor: 0.8,
+                                            },
+                                        )
+                                        .await?
                                     }
                                     Ok(())
                                 } else {

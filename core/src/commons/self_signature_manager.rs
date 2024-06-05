@@ -2,32 +2,27 @@
 
 use super::{errors::ProtocolErrors, models::HashId};
 use crate::{
-    commons::{
-        models::signature::Signature,
-        settings::Settings,
-    },
-    keys::{KeyMaterial, KeyPair},
+    commons::{models::signature::Signature, settings::Settings},
     identifier::{derive::digest::DigestDerivator, KeyIdentifier},
-
+    keys::{KeyMaterial, KeyPair},
 };
-
 
 /// Self signature trait.
 ///
 pub trait SelfSignature {
-    /* 
-    /// Change settings.
-    ///
-    /// # Arguments
-    ///
-    /// * `settings` - Settings.
-    ///
-    /// # Returns
-    ///
-    /// * `()` - Returns nothing.
-    ///
-    fn change_settings(&mut self, settings: &Settings);
-*/
+    /*
+        /// Change settings.
+        ///
+        /// # Arguments
+        ///
+        /// * `settings` - Settings.
+        ///
+        /// # Returns
+        ///
+        /// * `()` - Returns nothing.
+        ///
+        fn change_settings(&mut self, settings: &Settings);
+    */
     /// Get own identifier.
     ///
     /// # Returns
@@ -116,9 +111,9 @@ impl SelfSignature for SelfSignatureManager {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::commons::models::test::Content;
     use crate::commons::settings::Settings;
+    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
 
     #[test]
     fn test_self_signature_manager() {

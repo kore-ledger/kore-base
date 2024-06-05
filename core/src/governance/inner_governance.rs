@@ -12,8 +12,8 @@ use crate::{
             initial_state::get_governance_initial_state,
         },
     },
-    identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     database::Error as DbError,
+    identifier::{Derivable, DigestIdentifier, KeyIdentifier},
     ValueWrapper,
 };
 use base64::prelude::*;

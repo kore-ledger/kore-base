@@ -1,8 +1,8 @@
 //! Define the data structures related to signatures
 use crate::{
     commons::errors::SubjectError,
-    keys::{KeyMaterial, KeyPair, Payload, DSA},
     identifier::{DigestIdentifier, KeyIdentifier, SignatureIdentifier},
+    keys::{KeyMaterial, KeyPair, Payload, DSA},
     Derivable, DigestDerivator,
 };
 use borsh::{BorshDeserialize, BorshSerialize};

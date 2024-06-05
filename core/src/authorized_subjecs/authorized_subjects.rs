@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use identity::identifier::derive::digest::DigestDerivator;
 
 use crate::{
-    commons::{channel::SenderEnd, self_signature_manager::{SelfSignature, SelfSignatureManager}},
+    commons::{
+        channel::SenderEnd,
+        self_signature_manager::{SelfSignature, SelfSignatureManager},
+    },
     database::DB,
     ledger::LedgerCommand,
     message::{MessageConfig, MessageContent, MessageTaskCommand},
@@ -162,7 +165,7 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
                 message_config,
             ))
             .await
-            .map_err( AuthorizedSubjectsError::ChannelError)
+            .map_err(AuthorizedSubjectsError::ChannelError)
     }
 
     async fn send_message_local(
@@ -181,6 +184,6 @@ impl<C: DatabaseCollection> AuthorizedSubjects<C> {
         self.protocol_channel
             .tell(complete_message)
             .await
-            .map_err( AuthorizedSubjectsError::ChannelError)
+            .map_err(AuthorizedSubjectsError::ChannelError)
     }
 }

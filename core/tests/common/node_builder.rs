@@ -2,6 +2,7 @@ use kore_base::{keys::KeyPair, Node};
 use kore_base::{Api, Error, MemoryManager, Settings};
 use network::{NodeType, RoutingNode};
 use prometheus_client::registry::Registry;
+use tokio_util::sync::CancellationToken;
 
 // Struct to build a node
 #[derive(Clone, Debug)]
@@ -50,9 +51,10 @@ impl NodeBuilder {
         settings.node.smartcontracts_directory = path;
         let database = MemoryManager::new();
         let mut registry = Registry::default();
+        let token = CancellationToken::new();
 
         // generate API to send events
-        let api = Node::build(settings, key_pair.clone(), &mut registry, database)?;
+        let api = Node::build(settings, key_pair.clone(), &mut registry, database, token)?;
 
         Ok(Self {
             key_pair,

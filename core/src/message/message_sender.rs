@@ -1,5 +1,5 @@
-use crate::identifier::KeyIdentifier;
 use crate::commons::self_signature_manager::SelfSignatureManager;
+use crate::identifier::KeyIdentifier;
 use crate::signature::Signed;
 use crate::DigestDerivator;
 
@@ -31,7 +31,7 @@ impl MessageSender {
         sender: Sender<Command>,
         controller_id: KeyIdentifier,
         signature_manager: SelfSignatureManager,
-        derivator: DigestDerivator
+        derivator: DigestDerivator,
     ) -> Self {
         Self {
             sender,
@@ -57,24 +57,31 @@ impl MessageSender {
         )?;
         let bytes = rmp_serde::to_vec(&complete_message)
             .map_err(|error| Error::MsgPackSerialize { source: error })?;
-        self.sender.send(
-            Command::SendMessage { peer: target.public_key, message: bytes 
+        self.sender
+            .send(Command::SendMessage {
+                peer: target.public_key,
+                message: bytes,
             })
             .await
             .map_err(|_| Error::ChannelClosed)
     }
-    
 
     #[allow(dead_code)]
     /// Set node as a provider of keys
     pub async fn start_providing(&mut self, keys: Vec<String>) -> Result<(), Error> {
         debug!("{}: Starting Providing", LOG_TARGET);
-        self.sender.send(Command::StartProviding { keys }).await.map_err(|_| Error::ChannelClosed)
+        self.sender
+            .send(Command::StartProviding { keys })
+            .await
+            .map_err(|_| Error::ChannelClosed)
     }
 
     #[allow(dead_code)]
     pub async fn bootstrap(&mut self) -> Result<(), Error> {
         debug!("{}: Starting Bootstrap", LOG_TARGET);
-        self.sender.send(Command::Bootstrap).await.map_err(|_| Error::ChannelClosed)
+        self.sender
+            .send(Command::Bootstrap)
+            .await
+            .map_err(|_| Error::ChannelClosed)
     }
 }

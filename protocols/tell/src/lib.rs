@@ -231,7 +231,7 @@ impl Config {
 
     /// Get max concurrent streams
     pub fn get_max_concurrent_streams(&self) -> usize {
-        self.max_concurrent_streams 
+        self.max_concurrent_streams
     }
 }
 

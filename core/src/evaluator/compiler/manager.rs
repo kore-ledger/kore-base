@@ -33,7 +33,7 @@ impl<C: DatabaseCollection, G: GovernanceInterface + Send> KoreCompiler<C, G> {
             input_channel,
             inner_compiler: Compiler::<C, G>::new(database, gov_api, engine, contracts_path),
             token,
-         }
+        }
     }
 
     pub async fn start(mut self) {
@@ -111,7 +111,9 @@ impl<C: DatabaseCollection, G: GovernanceInterface> Compiler<C, G> {
         // If it does not exist, it compiles and saves it.
         let cargo_path = format!("{}/Cargo.toml", self.contracts_path);
         if !Path::new(&self.contracts_path).exists() {
-            fs::create_dir(self.contracts_path.clone()).await.map_err(|_| CompilerErrorResponses::WriteFileError)?;
+            fs::create_dir(self.contracts_path.clone())
+                .await
+                .map_err(|_| CompilerErrorResponses::WriteFileError)?;
         }
         if !Path::new(&cargo_path).exists() {
             let toml: String = get_toml();

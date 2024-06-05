@@ -49,9 +49,9 @@ impl<T: Hash + Eq> LruHashSet<T> {
 
 /// Convert boot nodes to `PeerId` and `Multiaddr`.
 pub fn convert_boot_nodes(boot_nodes: Vec<RoutingNode>) -> Vec<(PeerId, Vec<Multiaddr>)> {
-    let mut boot_nodes_aux: Vec<(PeerId,Vec<Multiaddr>)> = vec![];
+    let mut boot_nodes_aux: Vec<(PeerId, Vec<Multiaddr>)> = vec![];
     for node in boot_nodes {
-        let peer =  match bs58::decode(node.peer_id.clone()).into_vec() {
+        let peer = match bs58::decode(node.peer_id.clone()).into_vec() {
             Ok(peer) => match PeerId::from_bytes(peer.as_slice()) {
                 Ok(peer) => Some(peer),
                 Err(_) => None,

@@ -3,8 +3,8 @@ use std::collections::HashSet;
 
 use crate::{
     commons::errors::SubjectError,
-    keys::{KeyMaterial, KeyPair},
     identifier::{DigestIdentifier, KeyIdentifier},
+    keys::{KeyMaterial, KeyPair},
     request::EventRequest,
     signature::{Signature, Signed},
     ApprovalResponse, Derivable, DigestDerivator, EvaluationRequest, EvaluationResponse,
