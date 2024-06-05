@@ -1,20 +1,16 @@
-//
-
 #![doc = include_str!("../README.md")]
 
-use network::{
-    NetworkWorker, 
-    Config as NetworkConfig, 
-    NodeType, RoutingNode, RoutingConfig, TellConfig
-};
-use identity::keys::{KeyPair, KeyGenerator, Ed25519KeyPair};
 use config::Config;
-use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
+use identity::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
+use network::{
+    Config as NetworkConfig, NetworkWorker, NodeType, RoutingConfig, RoutingNode, TellConfig,
+};
 use prometheus_client::registry::Registry;
-use tracing_subscriber::EnvFilter;
 use serde::Deserialize;
 use std::error::Error;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+use tracing_subscriber::EnvFilter;
 
 /// Configuration
 #[derive(Debug, Deserialize)]
@@ -27,13 +23,15 @@ pub struct Settings {
     dht_random_walk: bool,
     allow_non_globals_in_dht: bool,
     allow_private_ip: bool,
-    mdns: bool,  
+    mdns: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Tracing
-    let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .try_init();
 
     // Load settings
     let settings = Config::builder()
@@ -53,7 +51,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let token = CancellationToken::new();
     let mut registry = Registry::default();
     let (event_sender, mut event_receiver) = mpsc::channel(100);
-    let mut worker = NetworkWorker::new(&mut registry, kp, network_config, event_sender, token.clone()).unwrap();
+    let mut worker = NetworkWorker::new(
+        &mut registry,
+        kp,
+        network_config,
+        event_sender,
+        token.clone(),
+    )
+    .unwrap();
 
     assert_eq!(worker.local_peer_id().to_string(), settings.peer_id);
 
@@ -64,7 +69,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::spawn(async move {
         worker.run_main().await;
     });
-    
+
     loop {
         tokio::select! {
             event = event_receiver.recv() => {
@@ -91,7 +96,7 @@ fn build_config(settings: &Settings) -> NetworkConfig {
         node_type: settings.node_type.clone(),
         listen_addresses: settings.listen_addresses.clone(),
         tell: TellConfig::default(),
-        routing: routing_config,    
-        port_reuse: false
+        routing: routing_config,
+        port_reuse: false,
     }
 }

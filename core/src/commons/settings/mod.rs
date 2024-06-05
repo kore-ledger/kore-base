@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 //use super::errors::ListenAddrErrors;
 use crate::identifier::derive::{digest::DigestDerivator, KeyDerivator};
-use network::Config as NetworkSettings;
 use config::Value;
+use network::Config as NetworkSettings;
 use serde::Deserialize;
 
 /// Configuration parameters of a TAPLE node divided into categories.
@@ -13,7 +13,7 @@ pub struct Settings {
     pub node: NodeSettings,
 }
 
-/* 
+/*
 fn default_max_concurrent_streams() -> usize {
     100
 }
@@ -254,8 +254,7 @@ impl Default for NodeSettings {
         Self {
             key_derivator: KeyDerivator::Ed25519,
             secret_key: String::from(""),
-            digest_derivator:
-                crate::identifier::derive::digest::DigestDerivator::Blake3_256,
+            digest_derivator: crate::identifier::derive::digest::DigestDerivator::Blake3_256,
             replication_factor: 0.25f64,
             timeout: 3000u32,
             passvotation: 0,

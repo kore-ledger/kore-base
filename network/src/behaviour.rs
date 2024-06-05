@@ -86,8 +86,9 @@ impl Behaviour {
                 (Toggle::from(Some(dcutr)), Toggle::from(Some(relay_server)))
             }
         };
-        let is_dht_random_walk = config.routing.get_dht_random_walk() && config.node_type == NodeType::Bootstrap;
-        let config_routing = config.routing.with_dht_random_walk( is_dht_random_walk);
+        let is_dht_random_walk =
+            config.routing.get_dht_random_walk() && config.node_type == NodeType::Bootstrap;
+        let config_routing = config.routing.with_dht_random_walk(is_dht_random_walk);
 
         Self {
             tell: binary::Behaviour::new(protocols, config.tell),
@@ -845,7 +846,7 @@ mod tests {
             tell: Default::default(),
             routing: config,
             listen_addresses: vec![],
-            port_reuse: false
+            port_reuse: false,
         }
     }
 

@@ -134,11 +134,13 @@ pub use error::Error;
 pub use node::Node;
 
 // Export identity
-pub use identity::keys;
-pub use identity::identifier;
-pub use identifier::{Derivable, DigestIdentifier, KeyIdentifier, SignatureIdentifier};
 pub use identifier::derive::{digest::DigestDerivator, KeyDerivator};
+pub use identifier::{Derivable, DigestIdentifier, KeyIdentifier, SignatureIdentifier};
+pub use identity::identifier;
+pub use identity::keys;
 
-pub use network::{Config as NetworkConfig, Event as NetworkEvent, NodeType, RoutingNode, RoutingConfig};
+pub use network::{
+    Config as NetworkConfig, Event as NetworkEvent, NodeType, RoutingConfig, RoutingNode,
+};
 
 pub use tell::Config as TellConfig;

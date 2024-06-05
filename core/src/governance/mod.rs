@@ -1,10 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    commons::{
-        models::event::Metadata,
-        schema_handler::gov_models::Contract,
-    },
+    commons::{models::event::Metadata, schema_handler::gov_models::Contract},
     identifier::{DigestIdentifier, KeyIdentifier},
     ValueWrapper,
 };
@@ -19,7 +16,7 @@ use error::RequestError;
 
 use self::stage::ValidationStage;
 
-/* 
+/*
 #[derive(Debug, Clone)]
 pub struct GovernanceMember {
     pub id: String,

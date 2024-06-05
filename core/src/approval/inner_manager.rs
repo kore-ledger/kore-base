@@ -17,7 +17,7 @@ use crate::{
 
 use super::error::{ApprovalErrorResponse, ApprovalManagerError};
 
-/* 
+/*
 pub trait NotifierInterface {
     fn request_reached(&self, id: &str, subject_id: &str, sn: u64);
     fn request_obsolete(&self, id: String, subject_id: String, sn: u64);
@@ -52,8 +52,7 @@ impl NotifierInterface for RequestNotifier {
 }
 */
 
-pub struct InnerApprovalManager<G: GovernanceInterface, C: DatabaseCollection>
-{
+pub struct InnerApprovalManager<G: GovernanceInterface, C: DatabaseCollection> {
     governance: G,
     database: DB<C>,
     signature_manager: SelfSignatureManager,
@@ -63,9 +62,7 @@ pub struct InnerApprovalManager<G: GovernanceInterface, C: DatabaseCollection>
     derivator: DigestDerivator,
 }
 
-impl<G: GovernanceInterface, C: DatabaseCollection>
-    InnerApprovalManager<G, C>
-{
+impl<G: GovernanceInterface, C: DatabaseCollection> InnerApprovalManager<G, C> {
     pub fn new(
         governance: G,
         database: DB<C>,
@@ -300,7 +297,7 @@ impl<G: GovernanceInterface, C: DatabaseCollection>
             return Err(ApprovalManagerError::DatabaseError);
         };
         /*self.notifier
-            .request_reached(&id.to_str(), &subject_id.to_str(), sn);*/
+        .request_reached(&id.to_str(), &subject_id.to_str(), sn);*/
 
         match self.pass_votation {
             VotationType::Normal => Ok(Ok(None)),

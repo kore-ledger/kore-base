@@ -6,10 +6,11 @@ use crate::approval::manager::ApprovalManagerChannels;
 use crate::approval::manager::{ApprovalAPI, ApprovalManager};
 #[cfg(feature = "approval")]
 use crate::approval::{inner_manager::InnerApprovalManager, ApprovalMessages, ApprovalResponses};
-use crate::authorized_subjecs::manager::{AuthorizedSubjectChannels, AuthorizedSubjectsAPI, AuthorizedSubjectsManager};
+use crate::authorized_subjecs::manager::{
+    AuthorizedSubjectChannels, AuthorizedSubjectsAPI, AuthorizedSubjectsManager,
+};
 use crate::authorized_subjecs::{AuthorizedSubjectsCommand, AuthorizedSubjectsResponse};
 use crate::commons::channel::MpscChannel;
-use crate::commons::models::notification::Notification;
 use crate::commons::self_signature_manager::{SelfSignature, SelfSignatureManager};
 use crate::commons::settings::Settings;
 use crate::database::{DatabaseCollection, DatabaseManager, DB};
@@ -19,8 +20,8 @@ use crate::distribution::manager::DistributionManager;
 use crate::distribution::DistributionMessagesNew;
 #[cfg(feature = "evaluation")]
 use crate::evaluator::{
-    compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager, EvaluatorManagerChannels,
-    EvaluatorMessage, EvaluatorResponse,
+    compiler::manager::KoreCompiler, runner::manager::KoreRunner, EvaluatorManager,
+    EvaluatorManagerChannels, EvaluatorMessage, EvaluatorResponse,
 };
 use crate::event::event_completer::{EventCompleter, EventCompleterChannels};
 use crate::event::manager::{EventAPI, EventManager};
@@ -45,7 +46,6 @@ use crate::validation::{ValidationCommand, ValidationResponse};
 
 use network::{Event as NetworkEvent, NetworkWorker};
 
-use ::futures::Future;
 use log::{error, info};
 use prometheus_client::registry::Registry;
 use std::marker::PhantomData;
@@ -65,8 +65,6 @@ const BUFFER_SIZE: usize = 1000;
 ///
 #[derive(Debug)]
 pub struct Node<M: DatabaseManager<C>, C: DatabaseCollection> {
-    notification_rx: mpsc::Receiver<Notification>,
-    token: CancellationToken,
     _m: PhantomData<M>,
     _c: PhantomData<C>,
 }
@@ -210,7 +208,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             DB::new(database.clone()),
             event_completer_channels,
             signature_manager.clone(),
-            settings.node.digest_derivator
+            settings.node.digest_derivator,
         );
 
         // Build event manager
@@ -221,11 +219,8 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             event_completer,
         );
 
-        let inner_ledger_channels = LedgerChannels::new(
-            task_tx.clone(),
-            distribution_tx,
-            protocol_tx.clone()
-        );
+        let inner_ledger_channels =
+            LedgerChannels::new(task_tx.clone(), distribution_tx, protocol_tx.clone());
 
         // Build inner ledger
         let inner_ledger = Ledger::new(
@@ -233,13 +228,14 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             DB::new(database.clone()),
             signature_manager.clone(),
             settings.node.digest_derivator,
-            inner_ledger_channels
+            inner_ledger_channels,
         );
 
         // Build ledger manager
         let ledger_manager = LedgerManager::new(ledger_rx, inner_ledger, token.clone());
 
-        let authorized_subjects_channels = AuthorizedSubjectChannels::new(as_rx, task_tx.clone(), protocol_tx.clone());
+        let authorized_subjects_channels =
+            AuthorizedSubjectChannels::new(as_rx, task_tx.clone(), protocol_tx.clone());
         // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
             DB::new(database.clone()),
@@ -287,22 +283,17 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             );
 
-            let evaluator_manager_channels = EvaluatorManagerChannels::new(
-                evaluation_rx,
-                task_tx.clone(),
-                protocol_tx.clone()
-            );
+            let evaluator_manager_channels =
+                EvaluatorManagerChannels::new(evaluation_rx, task_tx.clone(), protocol_tx.clone());
 
             // Build evaluation manager
             EvaluatorManager::new(
-                
                 compiler,
                 runner,
                 signature_manager.clone(),
                 token.clone(),
-            
                 settings.node.digest_derivator,
-                evaluator_manager_channels
+                evaluator_manager_channels,
             )
         };
 
@@ -318,7 +309,8 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 settings.node.digest_derivator,
             );
 
-            let approval_channels = ApprovalManagerChannels::new(approval_rx, task_tx.clone(), protocol_tx.clone());
+            let approval_channels =
+                ApprovalManagerChannels::new(approval_rx, task_tx.clone(), protocol_tx.clone());
 
             ApprovalManager::new(
                 token.clone(),
@@ -326,7 +318,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 inner_approval,
                 signature_manager.clone(),
                 settings.node.digest_derivator,
-                approval_channels
+                approval_channels,
             )
         };
         // Build inner distribution
@@ -337,7 +329,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             signature_manager.clone(),
             settings.clone(),
             settings.node.digest_derivator,
-            protocol_tx.clone()
+            protocol_tx.clone(),
         );
 
         // Build distribution manager
@@ -357,7 +349,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 signature_manager.clone(),
                 task_tx.clone(),
                 settings.node.digest_derivator,
-                protocol_tx.clone()
+                protocol_tx.clone(),
             );
 
             ValidationManager::new(validation_rx, inner_validation, token.clone())

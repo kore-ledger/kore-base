@@ -22,7 +22,6 @@ pub enum Error {
 
     //#[error("`{0}`")]
     //Payload(String),
-
     #[error("Base58 Decoding error")]
     Base64Decoding {
         #[from]
@@ -52,7 +51,6 @@ pub enum Error {
         #[from]
         source: rmp_serde::decode::Error,
     },
-
     //#[error("Event error: {0}")]
     //Event(String),
 

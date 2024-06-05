@@ -98,7 +98,7 @@ pub struct NetworkWorker {
     /// Messages metric.
     messages_metric: Family<MetricLabels, Counter>,
 
-    ///
+    /// Successful dials
     successful_dials: u64,
 }
 
@@ -135,7 +135,8 @@ impl NetworkWorker {
         let max_attempts = config.routing.boot_nodes().len() as u16;
 
         // Build transport.
-        let (transport, relay_client) = build_transport(registry, local_peer_id, &key, config.port_reuse)?;
+        let (transport, relay_client) =
+            build_transport(registry, local_peer_id, &key, config.port_reuse)?;
 
         // Create the shared external addresses.
         let shared_external_addresses = Arc::new(Mutex::new(external_addresses.clone()));
@@ -472,13 +473,13 @@ impl NetworkWorker {
                 peer_id: Some(peer_id),
                 error: _,
             } => {
-                    error!(TARGET_WORKER, "Error dialing peer {}", peer_id);
-                    if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer_id) {
-                        self.swarm
-                            .behaviour_mut()
-                            .remove_node(&peer_id, &self.boot_nodes[pos].1);
-                        self.boot_nodes.remove(pos);
-                    }
+                error!(TARGET_WORKER, "Error dialing peer {}", peer_id);
+                if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer_id) {
+                    self.swarm
+                        .behaviour_mut()
+                        .remove_node(&peer_id, &self.boot_nodes[pos].1);
+                    self.boot_nodes.remove(pos);
+                }
             }
             SwarmEvent::IncomingConnection {
                 local_addr,
@@ -1211,7 +1212,7 @@ mod tests {
         random_walk: bool,
         node_type: NodeType,
         listen_addresses: Vec<String>,
-        port_reuse: bool
+        port_reuse: bool,
     ) -> Config {
         let config = crate::routing::Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
@@ -1225,7 +1226,7 @@ mod tests {
             tell: Default::default(),
             routing: config,
             listen_addresses,
-            port_reuse
+            port_reuse,
         }
     }
 }

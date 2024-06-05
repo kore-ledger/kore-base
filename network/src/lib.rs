@@ -15,11 +15,11 @@ mod utils;
 mod worker;
 
 pub use error::Error;
+pub use libp2p::PeerId;
 pub use routing::{Config as RoutingConfig, RoutingNode};
 pub use service::NetworkService;
-pub use worker::{NetworkError, NetworkState, NetworkWorker};
-pub use libp2p::PeerId;
 pub use tell::Config as TellConfig;
+pub use worker::{NetworkError, NetworkState, NetworkWorker};
 
 use serde::Deserialize;
 
@@ -51,7 +51,7 @@ pub struct Config {
     pub routing: routing::Config,
 
     /// Configures port reuse for local sockets, which implies reuse of listening ports for outgoing connections to enhance NAT traversal capabilities.
-    pub port_reuse: bool
+    pub port_reuse: bool,
 }
 
 impl Config {
@@ -60,7 +60,7 @@ impl Config {
         node_type: NodeType,
         listen_addresses: Vec<String>,
         boot_nodes: Vec<RoutingNode>,
-        port_reuse: bool
+        port_reuse: bool,
     ) -> Self {
         Self {
             user_agent: "kore-node".to_owned(),
@@ -68,7 +68,7 @@ impl Config {
             listen_addresses,
             tell: tell::Config::default(),
             routing: routing::Config::new(boot_nodes),
-            port_reuse
+            port_reuse,
         }
     }
 }
@@ -84,8 +84,6 @@ pub enum NodeType {
     /// Ephemeral node.
     Ephemeral,
 }
-
-
 
 /// Command enumeration for the network service.
 pub enum Command {

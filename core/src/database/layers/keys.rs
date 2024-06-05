@@ -110,10 +110,10 @@ impl<C: DatabaseCollection> KeysDb<C> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::keys::KeyMaterial;
-    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::database::DatabaseManager;
     use crate::database::MemoryManager;
+    use crate::keys::KeyMaterial;
+    use crate::keys::{Ed25519KeyPair, KeyGenerator, KeyPair};
     use crate::KeyIdentifier;
     use std::sync::Arc;
 

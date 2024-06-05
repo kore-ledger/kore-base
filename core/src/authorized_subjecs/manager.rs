@@ -81,11 +81,17 @@ impl<C: DatabaseCollection> AuthorizedSubjectsManager<C> {
         token: CancellationToken,
         signature_manager: SelfSignatureManager,
         derivator: DigestDerivator,
-        channels: AuthorizedSubjectChannels
+        channels: AuthorizedSubjectChannels,
     ) -> Self {
         Self {
             input_channel: channels.input_channel,
-            inner_authorized_subjects: AuthorizedSubjects::new(database, channels.message_channel, signature_manager, derivator, channels.protocol_channel),
+            inner_authorized_subjects: AuthorizedSubjects::new(
+                database,
+                channels.message_channel,
+                signature_manager,
+                derivator,
+                channels.protocol_channel,
+            ),
             token,
         }
     }

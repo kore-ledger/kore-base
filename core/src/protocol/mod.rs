@@ -8,6 +8,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
+use crate::approval::ApprovalMessages;
 #[cfg(feature = "approval")]
 use crate::approval::ApprovalResponses;
 use crate::evaluator::EvaluatorMessage;
@@ -16,7 +17,6 @@ use crate::evaluator::EvaluatorResponse;
 use crate::validation::ValidationCommand;
 #[cfg(feature = "validation")]
 use crate::validation::ValidationResponse;
-use crate::approval::ApprovalMessages;
 use crate::{
     commons::channel::{ChannelData, MpscChannel, SenderEnd},
     distribution::{error::DistributionManagerError, DistributionMessagesNew},
@@ -69,14 +69,10 @@ pub struct ProtocolManager {
     approval_sx: SenderEnd<ApprovalMessages, ApprovalResponses>,
     ledger_sx: SenderEnd<LedgerCommand, LedgerResponse>,
     token: CancellationToken,
-
 }
 
 impl ProtocolManager {
-    pub fn new(
-        channels: ProtocolChannels,
-        token: CancellationToken,
-    ) -> Self {
+    pub fn new(channels: ProtocolChannels, token: CancellationToken) -> Self {
         Self {
             input: channels.input_channel,
             distribution_sx: channels.distribution_channel,
