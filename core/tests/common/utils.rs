@@ -369,7 +369,7 @@ pub async fn sign_events(
     node.api
         .external_request(mc_data_node.sign_event_request(&event, DigestDerivator::Blake3_512))
         .await
-        .unwrap()
+        .unwrap_or_default()
 }
 
 pub async fn get_request_with_votation(
@@ -440,17 +440,23 @@ pub async fn verify_copy_ledger(
 ) {
     for i in 0..vec_nodes.len() {
         loop {
-            let pre_response = vec_nodes[i]
-                .0
-                .api
-                .get_events(subject_id.clone(), None, None)
-                .await
-                .unwrap();
-            println!(" Response: {:?}", pre_response);
-            if pre_response.len() > 0
-                && pre_response[pre_response.len() - 1].content.sn == sn.unwrap_or(0)
-            {
-                break;
+            let pre_response = vec_nodes[i].0.api.get_subject(subject_id.clone()).await;
+            if pre_response.is_ok() {
+                let pre_response = pre_response.unwrap();
+                if pre_response.sn >= sn.unwrap_or(0) {
+                    let array = vec_nodes[i]
+                        .0
+                        .api
+                        .get_events(subject_id.clone(), None, None)
+                        .await
+                        .unwrap();
+                    for ele in array {
+                        println!("{}", ele.content.sn);
+                    }
+                    break;
+                } else {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                }
             } else {
                 tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
             }
