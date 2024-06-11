@@ -1500,6 +1500,8 @@ impl<C: DatabaseCollection> Ledger<C> {
                                 self.database
                                     .del_signatures(&state_request.subject_id, subject.sn)?;
                             }
+                            let current_sn = ledger_state.current_sn.unwrap_or_default();
+
                             self.ledger_state.insert(
                                 state_request.subject_id.clone(),
                                 LedgerState {
@@ -1510,7 +1512,7 @@ impl<C: DatabaseCollection> Ledger<C> {
                             // Request next event to current_sn
                             witnesses.insert(subject.owner);
                             let msg =
-                                request_event(self.our_id.clone(), state_request.subject_id, 0);
+                                request_event(self.our_id.clone(), state_request.subject_id, current_sn + 1);
                             self.send_message(
                                 None,
                                 msg,

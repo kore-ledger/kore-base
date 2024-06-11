@@ -6,11 +6,12 @@ use crate::common::{
     create_nodes_and_connections, create_nodes_massive, get_request_with_votation, sign_events,
     verify_copy_ledger,
 };
-use common::Role;
+use common::{create_event_genesis, create_register_event, Role};
 use common::{McNodeData, NodeBuilder};
+use instant::Duration;
 use kore_base::EventRequest;
 use kore_base::{request::FactRequest, ValueWrapper};
-use network::NodeType;
+use network::{NodeType, RoutingNode};
 use std::vec;
 #[test]
 fn test_role() {
@@ -325,4 +326,176 @@ async fn copy_of_ledger_with_hight_sn() {
     std::thread::sleep(std::time::Duration::from_secs(3));
 
     verify_copy_ledger(vec_nodes, subject_id, Some(2)).await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn copy_of_ledger_many_events_in_a_short_time() {
+    let (api_node1, mc_data_node1) = create_node(
+        "/ip4/127.0.0.1/tcp/50000".to_string(),
+        NodeType::Bootstrap,
+        vec![],
+        VotationType::AlwaysAccept,
+    );
+    let peer_node1 = mc_data_node1.get_peer_id().to_string();
+
+    let (api_node2, mc_data_node2) = create_node(
+        "/ip4/127.0.0.1/tcp/50001".to_string(),
+        NodeType::Bootstrap,
+        vec![RoutingNode {
+            address: vec!["/ip4/127.0.0.1/tcp/50000".to_owned()],
+            peer_id: peer_node1,
+        }],
+        VotationType::AlwaysAccept,
+    );
+    let gov = create_event_governance(api_node1.clone(), mc_data_node1.clone()).await;
+
+    let event0 = EventRequest::Fact(FactRequest {
+        subject_id: gov.clone(),
+        payload: ValueWrapper(serde_json::json!(
+            { "Patch": {
+                "data": [
+                    {
+                        "op": "add",
+                        "path": "/members/0",
+                        "value": {
+                            "id": mc_data_node1.get_controller_id(),
+                            "name": "KoreNode0"
+                        }
+                    },
+                    {
+                        "op": "add",
+                        "path": "/members/1",
+                        "value": {
+                            "id": mc_data_node2.get_controller_id(),
+                            "name": "KoreNode1"
+                        }
+                    },
+                    {
+                        "op": "add",
+                        "path": "/roles/1",
+                        "value": {
+                            "namespace": "",
+                            "role": Role::CREATOR.to_string(),
+                            "schema": {
+                                "ID": "traceability"
+                            },
+                            "who": {
+                                "NAME": "KoreNode0"
+                            }
+                        }
+                    },
+                    {
+                        "op": "add",
+                        "path": "/roles/2",
+                        "value": {
+                            "namespace": "",
+                            "role": "WITNESS",
+                            "schema": {
+                                "ID": "traceability"
+                            },
+                            "who": {
+                                "NAME": "KoreNode1"
+                            }
+                        }
+                    },
+                    {
+                        "op": "add",
+                        "path": "/policies/1",
+                        "value": {
+                            "approve": {
+                                "quorum": {
+                                    "FIXED": 1
+                                }
+                            },
+                            "evaluate": {
+                                "quorum": "MAJORITY"
+                            },
+                            "id": "traceability",
+                            "validate": {
+                                "quorum": "MAJORITY"
+                            }
+                        }
+                    },
+                    {
+                        "op": "add",
+                        "path": "/schemas/0",
+                        "value": {
+                            "contract": {
+                                "raw": "dXNlIHRhcGxlX3NjX3J1c3QgYXMgc2RrOwp1c2Ugc2VyZGU6OntEZXNlcmlhbGl6ZSwgU2VyaWFsaXplfTsKCiNbZGVyaXZlKFNlcmlhbGl6ZSwgRGVzZXJpYWxpemUsIENsb25lKV0Kc3RydWN0IFN0YXRlIHsKICAgIHB1YiB3b3JrX2lkOiBTdHJpbmcsCiAgICBwdWIgdXNlcm5hbWU6IFN0cmluZywKICAgIHB1YiB3b3JrZXJfaWQ6IFN0cmluZywKICAgIHB1YiB3aGF0OiBWZWM8U3RyaW5nPiwKICAgIHB1YiBncm91cF9uYW1lOiBTdHJpbmcsCiAgICBwdWIgYXZlcmFnZV90cmFjZWFiaWxpdHk6IGYzMiwKfQoKCiNbZGVyaXZlKFNlcmlhbGl6ZSwgRGVzZXJpYWxpemUpXQplbnVtIFN0YXRlRXZlbnQgewogICAgUmVnaXN0ZXJPcmRlciB7CiAgICAgICAgd29ya19pZDogU3RyaW5nLAogICAgICAgIHVzZXJuYW1lOiBTdHJpbmcsCiAgICAgICAgd29ya2VyX2lkOiBTdHJpbmcsCiAgICAgICAgd2hhdDogVmVjPFN0cmluZz4sCiAgICAgICAgZ3JvdXBfbmFtZTogU3RyaW5nLAogICAgICAgIGF2ZXJhZ2VfdHJhY2VhYmlsaXR5OiBmMzIsCiAgICB9LAp9CgojW25vX21hbmdsZV0KcHViIHVuc2FmZSBmbiBtYWluX2Z1bmN0aW9uKHN0YXRlX3B0cjogaTMyLCBldmVudF9wdHI6IGkzMiwgaXNfb3duZXI6IGkzMikgLT4gdTMyIHsKICAgIHNkazo6ZXhlY3V0ZV9jb250cmFjdChzdGF0ZV9wdHIsIGV2ZW50X3B0ciwgaXNfb3duZXIsIGNvbnRyYWN0X2xvZ2ljKQp9CmZuIGNvbnRyYWN0X2xvZ2ljKAogICAgY29udGV4dDogJnNkazo6Q29udGV4dDxTdGF0ZSwgU3RhdGVFdmVudD4sCiAgICBjb250cmFjdF9yZXN1bHQ6ICZtdXQgc2RrOjpDb250cmFjdFJlc3VsdDxTdGF0ZT4sCikgewogICAgbGV0IHN0YXRlID0gJm11dCBjb250cmFjdF9yZXN1bHQuZmluYWxfc3RhdGU7CiAgICBtYXRjaCAmY29udGV4dC5ldmVudCB7CiAgICAgICAgU3RhdGVFdmVudDo6UmVnaXN0ZXJPcmRlciB7CiAgICAgICAgICAgIHdvcmtfaWQsCiAgICAgICAgICAgIHVzZXJuYW1lLAogICAgICAgICAgICB3b3JrZXJfaWQsCiAgICAgICAgICAgIHdoYXQsCiAgICAgICAgICAgIGdyb3VwX25hbWUsCiAgICAgICAgICAgIGF2ZXJhZ2VfdHJhY2VhYmlsaXR5LAogICAgICAgIH0gPT4gewogICAgICAgICAgICAgICAgc3RhdGUud29ya19pZCA9IHdvcmtfaWQudG9fc3RyaW5nKCk7CiAgICAgICAgICAgICAgICBzdGF0ZS51c2VybmFtZSA9IHVzZXJuYW1lLnRvX3N0cmluZygpOwogICAgICAgICAgICAgICAgc3RhdGUud29ya2VyX2lkID0gd29ya2VyX2lkLnRvX3N0cmluZygpOwogICAgICAgICAgICAgICAgc3RhdGUud2hhdCA9IHdoYXQudG9fdmVjKCk7CiAgICAgICAgICAgICAgICBzdGF0ZS5ncm91cF9uYW1lID0gZ3JvdXBfbmFtZS50b19zdHJpbmcoKTsKICAgICAgICAgICAgICAgIHN0YXRlLmF2ZXJhZ2VfdHJhY2VhYmlsaXR5ID0gKmF2ZXJhZ2VfdHJhY2VhYmlsaXR5OwoKICAgICAgICAgICAgICAgIGNvbnRyYWN0X3Jlc3VsdC5hcHByb3ZhbF9yZXF1aXJlZCA9IHRydWU7CiAgICAgICAgICAgICAgICBjb250cmFjdF9yZXN1bHQuc3VjY2VzcyA9IHRydWU7CiAgICAgICAgfQogICAgfQp9Cg=="
+                            },
+                            "id": "traceability",
+                            "initial_value": {
+                                "work_id": "",
+                                "username": "",
+                                "worker_id": "",
+                                "what": [],
+                                "group_name": "",
+                                "average_traceability": 0.0
+                            },
+                            "schema": {
+                                        "description": "Traceability registration",
+                                        "type": "object",
+                                        "properties": {
+                                            "work_id": {
+                                                "description": "Work order identifier",
+                                                "type": "string"
+                                            },
+                                            "username": {
+                                                "description": "Worker username",
+                                                "type": "string"
+                                            },
+                                            "worker_id": {
+                                                "description": "Worker identifier",
+                                                "type": "string"
+                                            },
+                                            "what": {
+                                                "description": "Actions performed on the work order",
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "group_name": {
+                                                "description": "Group of work order",
+                                                "type": "string"
+                                            },
+                                            "average_traceability": {
+                                                "description": "Average value of traceability of actions performed on the job",
+                                                "type": "number"
+                                            }
+                                },
+                                "required": [
+                                    "work_id", "username", "worker_id", "what", "group_name", "average_traceability"
+                                ],
+                                "additionalProperties": false
+                            }
+                        }
+            },
+
+                ]
+            }
+
+            }
+        )),
+    });
+    add_providers(api_node2.clone(), vec![], gov.clone()).await;
+    // Verify de event completer
+    let _ = sign_events(event0, api_node1.clone(), mc_data_node1.clone()).await;
+    let subj = create_event_genesis(api_node1.clone(), mc_data_node1.clone(), gov.clone()).await;
+
+    let events = create_register_event(subj.clone());
+    for _ in 0..90 {
+        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;    
+    }
+    verify_copy_ledger(vec![(api_node1.clone(), mc_data_node1.clone())], subj.clone(), Some(40)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    verify_copy_ledger(vec![(api_node2.clone(), mc_data_node2.clone())], subj.clone(), Some(40)).await;
+
+    for _ in 0..90 {
+        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;    
+    }
+    verify_copy_ledger(vec![(api_node1.clone(), mc_data_node1.clone())], subj.clone(), Some(80)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    verify_copy_ledger(vec![(api_node2.clone(), mc_data_node2.clone())], subj.clone(), Some(80)).await;
 }
