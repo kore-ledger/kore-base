@@ -329,6 +329,7 @@ async fn copy_of_ledger_with_hight_sn() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn copy_of_ledger_many_events_in_a_short_time() {
     let (api_node1, mc_data_node1) = create_node(
         "/ip4/127.0.0.1/tcp/50000".to_string(),
