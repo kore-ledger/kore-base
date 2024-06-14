@@ -49,6 +49,7 @@ pub trait DatabaseCollection: Sync + Send {
         }
         let (mut iter, quantity) = match from {
             Some(key) => {
+                let key = format!("{}{}",char::MAX, key);
                 // Find the key
                 let iter = if quantity >= 0 {
                     self.iter(false, prefix)
