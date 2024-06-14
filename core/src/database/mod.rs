@@ -49,6 +49,7 @@ pub trait DatabaseCollection: Sync + Send {
         }
         let (mut iter, quantity) = match from {
             Some(key) => {
+                let key = format!("{}{}",char::MAX, key);
                 // Find the key
                 let iter = if quantity >= 0 {
                     self.iter(false, prefix)
@@ -201,11 +202,11 @@ macro_rules! test_database_manager_trait {
             #[allow(dead_code)]
             fn build_state(collection: &$type2) {
                 let data = get_data().unwrap();
-                let result = collection.put("a", &data[0]);
+                let result = collection.put(&format!("{}a",char::MAX), &data[0]);
                 assert!(result.is_ok());
-                let result = collection.put("b", &data[1]);
+                let result = collection.put(&format!("{}b",char::MAX), &data[1]);
                 assert!(result.is_ok());
-                let result = collection.put("c", &data[2]);
+                let result = collection.put(&format!("{}c",char::MAX), &data[2]);
                 assert!(result.is_ok());
             }
 
@@ -214,6 +215,22 @@ macro_rules! test_database_manager_trait {
                 let keys = vec!["a", "b", "c"];
                 let data = get_data().unwrap();
                 let values = vec![data[0].to_owned(), data[1].to_owned(), data[2].to_owned()];
+                println!("{:?}", keys);
+                (keys, values)
+            }
+
+            #[allow(dead_code)]
+            fn build_initial_data_char() -> (Vec<&'static str>, Vec<Vec<u8>>) {
+                let a = format!("{}a",char::MAX);
+                let a: &'static str = Box::leak(a.into_boxed_str());
+                let b = format!("{}b",char::MAX);
+                let b: &'static str = Box::leak(b.into_boxed_str());
+                let c = format!("{}c",char::MAX);
+                let c: &'static str = Box::leak(c.into_boxed_str());
+                let keys = vec![a, b, c];
+                let data = get_data().unwrap();
+                let values = vec![data[0].to_owned(), data[1].to_owned(), data[2].to_owned()];
+                println!("{:?}", keys);
                 (keys, values)
             }
 
@@ -226,7 +243,7 @@ macro_rules! test_database_manager_trait {
                 let mut iter = first_collection.iter(false, "");
                 //assert!(iter.next().is_some());
 
-                let (keys, data) = build_initial_data();
+                let (keys, data) = build_initial_data_char();
                 for i in 0..3 {
                     let (key, val) = iter.next().unwrap();
                     assert_eq!(keys[i], key);
@@ -242,7 +259,7 @@ macro_rules! test_database_manager_trait {
                 build_state(&first_collection);
                 // ITER TEST
                 let mut iter = first_collection.iter(true, "");
-                let (keys, data) = build_initial_data();
+                let (keys, data) = build_initial_data_char();
                 for i in (0..3).rev() {
                     let (key, val) = iter.next().unwrap();
                     assert_eq!(keys[i], key);
@@ -265,6 +282,7 @@ macro_rules! test_database_manager_trait {
                     assert_eq!(data[i], result[i]);
                     assert_eq!(data[i], result[i]);
                 }
+                println!("{}", key[1]);
                 let result = first_collection.get_by_range(Some(key[1].to_owned()), 1, "");
                 assert!(result.is_ok());
                 let result = result.unwrap();
