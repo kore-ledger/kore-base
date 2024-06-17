@@ -83,7 +83,10 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         registry: &mut Registry,
         database: M,
         token: CancellationToken,
+        password: &str
     ) -> Result<Api, Error> {
+        let password = Self::password_to_hash_array_32(password);
+
         let (api_rx, api_tx) = MpscChannel::new(BUFFER_SIZE);
 
         //let (notification_tx, notification_rx) = mpsc::channel(BUFFER_SIZE);
@@ -129,7 +132,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let database = Arc::new(database);
 
-        let controller_id = Self::register_node_key(key_pair.clone(), DB::new(database.clone()))?;
+        let controller_id = Self::register_node_key(key_pair.clone(), DB::new(database.clone(), password))?;
         info!("Controller ID: {}", &controller_id);
 
         let mut worker = match NetworkWorker::new(
@@ -196,7 +199,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let mut governance_manager = Governance::<M, C>::new(
             governance_rx,
             token.clone(),
-            DB::new(database.clone()),
+            DB::new(database.clone(), password),
             governance_update_sx.clone(),
         );
 
@@ -205,7 +208,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         // Build event completer
         let event_completer = EventCompleter::new(
             GovernanceAPI::new(governance_tx.clone()),
-            DB::new(database.clone()),
+            DB::new(database.clone(), password),
             event_completer_channels,
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -225,7 +228,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         // Build inner ledger
         let inner_ledger = Ledger::new(
             GovernanceAPI::new(governance_tx.clone()),
-            DB::new(database.clone()),
+            DB::new(database.clone(), password),
             signature_manager.clone(),
             settings.node.digest_derivator,
             inner_ledger_channels,
@@ -238,7 +241,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             AuthorizedSubjectChannels::new(as_rx, task_tx.clone(), protocol_tx.clone());
         // Build authorized subjects
         let as_manager = AuthorizedSubjectsManager::new(
-            DB::new(database.clone()),
+            DB::new(database.clone(), password),
             token.clone(),
             signature_manager.clone(),
             settings.node.digest_derivator,
@@ -250,7 +253,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             let inner_api = InnerApi::new(
                 EventAPI::new(event_tx),
                 AuthorizedSubjectsAPI::new(as_tx),
-                DB::new(database.clone()),
+                DB::new(database.clone(), password),
                 #[cfg(feature = "approval")]
                 ApprovalAPI::new(approval_tx),
                 EventManagerAPI::new(ledger_tx),
@@ -268,7 +271,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             // Build core compiler
             let compiler = KoreCompiler::new(
                 governance_update_sx.subscribe(),
-                DB::new(database.clone()),
+                DB::new(database.clone(), password),
                 GovernanceAPI::new(governance_tx.clone()),
                 settings.node.smartcontracts_directory.clone(),
                 engine.clone(),
@@ -277,7 +280,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
             // Build core runner
             let runner = KoreRunner::new(
-                DB::new(database.clone()),
+                DB::new(database.clone(), password),
                 engine,
                 GovernanceAPI::new(governance_tx.clone()),
                 settings.node.digest_derivator,
@@ -303,7 +306,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
             let passvotation = settings.node.passvotation.into();
             let inner_approval = InnerApprovalManager::new(
                 GovernanceAPI::new(governance_tx.clone()),
-                DB::new(database.clone()),
+                DB::new(database.clone(), password),
                 signature_manager.clone(),
                 passvotation,
                 settings.node.digest_derivator,
@@ -324,7 +327,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         // Build inner distribution
         let inner_distribution = InnerDistributionManager::new(
             GovernanceAPI::new(governance_tx.clone()),
-            DB::new(database.clone()),
+            DB::new(database.clone(), password),
             task_tx.clone(),
             signature_manager.clone(),
             settings.clone(),
@@ -345,7 +348,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let validation_manager = {
             let inner_validation = Validation::new(
                 GovernanceAPI::new(governance_tx.clone()),
-                DB::new(database.clone()),
+                DB::new(database.clone(), password),
                 signature_manager.clone(),
                 task_tx.clone(),
                 settings.node.digest_derivator,
@@ -452,5 +455,15 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
                 .map_err(|e| Error::DatabaseError(e.to_string()))?;
         }
         Ok(key_identifier)
+    }
+
+    fn password_to_hash_array_32(password: &str) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(password.as_bytes());
+        let result = hasher.finalize();
+        let mut array = [0u8; 32];
+        array.copy_from_slice(result.as_bytes());
+        
+        array
     }
 }

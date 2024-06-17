@@ -1,4 +1,6 @@
-use super::utils::{get_key, Element};
+use memsecurity::EncryptedMem;
+
+use super::utils::{decrypt, encrypt, get_key, Element};
 use crate::keys::KeyPair;
 use crate::utils::{deserialize, serialize};
 use crate::DbError;
@@ -10,6 +12,7 @@ use std::sync::Arc;
 pub(crate) struct KeysDb<C: DatabaseCollection> {
     collection: C,
     prefix: String,
+    key_box: EncryptedMem,
 }
 
 /// KeysDb implementation
@@ -24,11 +27,16 @@ impl<C: DatabaseCollection> KeysDb<C> {
     ///
     /// A new KeysDb instance
     ///
-    pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>) -> Self {
-        Self {
+    pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>, password: [u8; 32]) -> Result<Self, DbError> {
+        let mut key_box = EncryptedMem::new();
+            key_box.encrypt(&password).
+                map_err(|_| DbError::Encrypt(format!("Problem with password")))?;
+        
+        Ok(Self {
             collection: manager.create_collection("transfer"),
             prefix: "keys".to_string(),
-        }
+            key_box
+        })
     }
 
     /// Get the keypair for a given public key identifier.
@@ -52,7 +60,14 @@ impl<C: DatabaseCollection> KeysDb<C> {
         ];
         let key = get_key(key_elements)?;
         let value = self.collection.get(&key)?;
-        let result = deserialize::<KeyPair>(&value).map_err(|_| DbError::DeserializeError)?;
+
+        let pass = match self.key_box.decrypt() {
+            Ok(pass) => pass,
+            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e)))
+        };
+
+        let bytes = decrypt(pass.as_ref(), value.as_slice())?;
+        let result = deserialize::<KeyPair>(&bytes).map_err(|_| DbError::DeserializeError)?;
         Ok(result)
     }
 
@@ -80,7 +95,13 @@ impl<C: DatabaseCollection> KeysDb<C> {
         let Ok(data) = serialize::<KeyPair>(&keypair) else {
             return Err(DbError::SerializeError);
         };
-        self.collection.put(&key, &data)
+        let pass = match self.key_box.decrypt() {
+            Ok(pass) => pass,
+            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e)))
+        };
+
+        let bytes = encrypt(pass.as_ref(), data.as_slice())?;
+        self.collection.put(&key, &bytes)
     }
 
     /// Delete the keypair for a given public key identifier.
@@ -120,7 +141,8 @@ mod test {
     #[test]
     fn test_keys_db() {
         let manager = Arc::new(MemoryManager::default());
-        let db = KeysDb::new(&manager);
+        let key = [0u8; 32];
+        let db = KeysDb::new(&manager, key).unwrap();
         let keypair = KeyPair::Ed25519(Ed25519KeyPair::new());
         let public_key =
             KeyIdentifier::new(crate::KeyDerivator::Ed25519, &keypair.public_key_bytes());

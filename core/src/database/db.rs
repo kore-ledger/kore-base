@@ -62,7 +62,7 @@ pub struct DB<C: DatabaseCollection> {
 }
 
 impl<C: DatabaseCollection> DB<C> {
-    pub fn new<M: DatabaseManager<C>>(manager: Arc<M>) -> Self {
+    pub fn new<M: DatabaseManager<C>>(manager: Arc<M>, password: [u8; 32]) -> Self {
         let signature_db = SignatureDb::new(&manager);
         let subject_db = SubjectDb::new(&manager);
         let event_db = EventDb::new(&manager);
@@ -74,7 +74,7 @@ impl<C: DatabaseCollection> DB<C> {
         let contract_db = ContractDb::new(&manager);
         let witness_signatures_db = WitnessSignaturesDb::new(&manager);
         let subject_by_governance_db = SubjectByGovernanceDb::new(&manager);
-        let transfer_events_db = KeysDb::new(&manager);
+        let transfer_events_db = KeysDb::new(&manager, password).unwrap();
         let preauthorized_subjects_and_providers_db =
             PreauthorizedSbujectsAndProovidersDb::new(&manager);
         let lce_validation_proofs_db = LceValidationProofs::new(&manager);

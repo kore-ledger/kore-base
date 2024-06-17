@@ -26,4 +26,10 @@ pub enum Error {
     CustomError(String),
     #[error("State non existent, possibilities are: Pending or Voted.")]
     NonExistentStatus,
+    #[error("Encrypt could not be performed, {0}")]
+    Encrypt(String),
+    #[error("Decryption could not be performed, {0}")]
+    Decrypt(String),
+    #[error("Nonce is not found, {0}")]
+    Nonce(String),
 }

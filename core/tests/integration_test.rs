@@ -498,3 +498,19 @@ async fn copy_of_ledger_many_events_in_a_short_time() {
     tokio::time::sleep(Duration::from_secs(5)).await;
     verify_copy_ledger(vec![(api_node2.clone(), mc_data_node2.clone())], subj.clone(), Some(80)).await;
 }
+
+#[tokio::test]
+async fn create_governance_one_node_a() {
+    let (api, mc_data_node1) = create_node(
+        "/ip4/127.0.0.1/tcp/4998".to_string(),
+        NodeType::Bootstrap,
+        vec![],
+        VotationType::AlwaysAccept,
+    );
+    let subject_id = create_event_governance(api.clone(), mc_data_node1).await;
+
+    println!("/////////////////");
+    add_providers(api.clone(), vec![], subject_id.clone()).await;
+    let a  = api.api.get_all_allowed_subjects_and_providers(Some(format!("{}", subject_id.to_string())), None);
+    println!("{:?}",a.await);
+}

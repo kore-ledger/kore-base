@@ -1,8 +1,14 @@
 //
 
+use chacha20poly1305::{aead::Aead, AeadCore, ChaCha20Poly1305, KeyInit, Nonce};
+use rand::rngs::OsRng;
+
 use crate::DbError;
 
 const MAX_U64: usize = 17; // Max size u64
+
+/// Nonce size.
+const NONCE_SIZE: usize = 12;
 
 pub(crate) enum Element {
     N(u64),
@@ -35,6 +41,33 @@ pub(crate) fn get_key(key_elements: Vec<Element>) -> Result<String, DbError> {
     } else {
         Err(DbError::KeyElementsError)
     }
+}
+
+/// Encrypt bytes.
+///
+pub fn encrypt(key: &[u8], bytes: &[u8]) -> Result<Vec<u8>, DbError> {
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng); // 96-bits; unique per message
+    let ciphertext: Vec<u8> = cipher
+        .encrypt(&nonce, bytes.as_ref())
+        .map_err(|e| DbError::Encrypt(format!("Encrypt error: {}", e)))?;
+
+    Ok([nonce.to_vec(), ciphertext].concat())
+}
+
+/// Decrypt bytes
+///
+pub fn decrypt(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, DbError> {
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let nonce: [u8; 12] = ciphertext[..NONCE_SIZE]
+        .try_into()
+        .map_err(|e| DbError::Nonce(format!("Nonce error: {}", e)))?;
+    let nonce = Nonce::from_slice(&nonce);
+    let ciphertext = &ciphertext[NONCE_SIZE..];
+    let plaintext = cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|e| DbError::Decrypt(format!("Decrypt error: {}", e)))?;
+    Ok(plaintext)
 }
 
 /*pub(crate) fn get_by_range<C: DatabaseCollection>(
