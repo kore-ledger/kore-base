@@ -54,7 +54,7 @@ impl NodeBuilder {
         let token = CancellationToken::new();
 
         // generate API to send events
-        let api = Node::build(settings, key_pair.clone(), &mut registry, database, token)?;
+        let api = Node::build(settings, key_pair.clone(), &mut registry, database, token, "password")?;
 
         Ok(Self {
             key_pair,
