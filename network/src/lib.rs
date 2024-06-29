@@ -5,13 +5,16 @@
 
 #![warn(missing_docs)]
 
+//mod behaviour;
 mod behaviour;
 pub mod error;
 mod node;
 mod routing;
 mod service;
+//mod transport;
 mod transport;
 mod utils;
+//mod worker;
 mod worker;
 
 pub use error::Error;
@@ -21,7 +24,7 @@ pub use service::NetworkService;
 pub use tell::Config as TellConfig;
 pub use worker::{NetworkError, NetworkState, NetworkWorker};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The maximum allowed number of established connections per peer.
 ///
@@ -86,6 +89,7 @@ pub enum NodeType {
 }
 
 /// Command enumeration for the network service.
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
     /// Start providing the given keys.
     StartProviding {
@@ -104,7 +108,7 @@ pub enum Command {
 }
 
 /// Event enumeration for the network service.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
     /// Connected to a bootstrap node.
     ConnectedToBootstrap {
@@ -135,7 +139,7 @@ pub enum Event {
     },
 
     /// Network state changed.
-    StateChanged(NetworkState),
+    StateChanged(worker::NetworkState),
 
     /// Network error.
     Error(Error),

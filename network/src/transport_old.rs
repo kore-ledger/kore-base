@@ -15,11 +15,13 @@ use libp2p::{
     identity::Keypair,
     metrics::{BandwidthTransport, Registry},
     noise,
+    relay::client::{new, Behaviour},
     tcp::{self, Config},
     yamux, PeerId, Transport,
 };
 
 pub type KoreTransport = Boxed<(PeerId, StreamMuxerBox)>;
+pub type RelayClient = Behaviour;
 
 /// Builds the transport.
 ///
@@ -39,16 +41,22 @@ pub type KoreTransport = Boxed<(PeerId, StreamMuxerBox)>;
 ///
 pub fn build_transport(
     registry: &mut Registry,
+    peer_id: PeerId,
     keys: &Keypair,
     port_reuse: bool,
-) -> Result<KoreTransport, Error> {
+) -> Result<(KoreTransport, RelayClient), Error> {
+    // Build the relay client and transport.
+    let (transport, relay_client) = new(peer_id);
+
     // Build the noise authentication.
     let noise = noise::Config::new(keys)
         .map_err(|e| Error::Transport(format!("Noise authentication {:?}", e)))?;
 
     // Allow TCP transport.
     // port_reuse(true) for use the same port to send / receive communication.
-    let transport = tcp::tokio::Transport::new(Config::default().port_reuse(port_reuse));
+    let transport = transport.or_transport(tcp::tokio::Transport::new(
+        Config::default().port_reuse(port_reuse),
+    ));
 
     // Upgrade the transport with the noise authentication and yamux multiplexing.
     let transport = transport
@@ -64,7 +72,7 @@ pub fn build_transport(
     let transport = BandwidthTransport::new(transport, registry)
         .map(|(peer_id, conn), _| (peer_id, StreamMuxerBox::new(conn)));
 
-    Ok(transport.boxed())
+    Ok((transport.boxed(), relay_client))
 }
 
 #[cfg(test)]
@@ -75,7 +83,9 @@ mod tests {
     fn test_build_transport() {
         let mut registry = Registry::default();
         let keypair = Keypair::generate_ed25519();
-        let result = build_transport(&mut registry, &keypair, false);
+        let peer_id = keypair.public().to_peer_id();
+
+        let result = build_transport(&mut registry, peer_id, &keypair, false);
 
         assert!(result.is_ok());
     }

@@ -5,10 +5,10 @@
 //!
 
 use crate::{
-    behaviour::{Behaviour, Event as BehaviourEvent, ReqResMessage},
+    behaviour::{Behaviour, Event as BehaviourEvent},
     service::NetworkService,
     transport::build_transport,
-    utils::convert_external_addresses,
+    utils::{convert_external_addresses, is_relay_circuit},
     Command, Config, Error, Event as NetworkEvent, NodeType,
 };
 
@@ -16,11 +16,13 @@ use identity::keys::{KeyMaterial, KeyPair};
 
 use libp2p::{
     core::ConnectedPoint,
+    dcutr::Event as DcutrEvent,
     identity::{
         ed25519::{self, PublicKey as PublicKeyEd25519},
         Keypair, PublicKey,
     },
-    request_response::{self, OutboundRequestId, ResponseChannel},
+    multiaddr::Protocol,
+    relay::{client::Event as RelayClientEvent, Event as RelayServerEvent},
     swarm::{self, dial_opts::DialOpts, SwarmEvent},
     Multiaddr, PeerId, Swarm,
 };
@@ -35,11 +37,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    sync::{atomic::AtomicU16, Arc, Mutex, RwLock},
 };
 
 const TARGET_WORKER: &str = "KoreNetwork-Worker";
@@ -73,17 +75,26 @@ pub struct NetworkWorker {
     /// Node type.
     node_type: NodeType,
 
+    /// Dynamic list of relay nodes.
+    relay_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
+
     /// List of boot noodes.
     boot_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
+
+    /// Relay circuits.
+    relay_circuits: HashMap<PeerId, Multiaddr>,
+
+    /// Pending reservartions.
+    pending_reservations: HashMap<PeerId, PeerId>,
 
     /// Pendings outbound messages to the peer
     pending_outbound_messages: HashMap<PeerId, VecDeque<Vec<u8>>>,
 
-    /// Requests sent to the peer
-    request_sent: HashMap<PeerId, Vec<OutboundRequestId>>,
+    /// Connect attempts.
+    _connect_attempts: Arc<AtomicU16>,
 
-    /// Ephemeral responses.
-    ephemeral_responses: HashMap<PeerId, VecDeque<ResponseChannel<ReqResMessage>>>,
+    /// Maximum attempts to dial a peer or request a circuit relay.
+    _max_attempts: u16,
 
     /// Messages metric.
     messages_metric: Family<MetricLabels, Counter>,
@@ -121,8 +132,12 @@ impl NetworkWorker {
         // Is Ephemeral?
         let node_type = config.node_type.clone();
 
+        // Set the maximum attempts.
+        let max_attempts = config.routing.boot_nodes().len() as u16;
+
         // Build transport.
-        let transport = build_transport(registry, &key, config.port_reuse)?;
+        let (transport, relay_client) =
+            build_transport(registry, local_peer_id, &key, config.port_reuse)?;
 
         // Create the shared external addresses.
         let shared_external_addresses = Arc::new(Mutex::new(external_addresses.clone()));
@@ -134,6 +149,7 @@ impl NetworkWorker {
                 &key.public(),
                 config.clone(),
                 shared_external_addresses.clone(),
+                relay_client,
             ),
             local_peer_id,
             swarm::Config::with_tokio_executor(),
@@ -196,9 +212,12 @@ impl NetworkWorker {
             cancel,
             node_type,
             boot_nodes,
+            relay_nodes: Vec::new(),
+            relay_circuits: HashMap::default(),
+            pending_reservations: HashMap::default(),
             pending_outbound_messages: HashMap::default(),
-            request_sent: HashMap::default(),
-            ephemeral_responses: HashMap::default(),
+            _connect_attempts: Arc::new(AtomicU16::new(0)),
+            _max_attempts: max_attempts,
             messages_metric,
             successful_dials: 0,
         })
@@ -212,24 +231,64 @@ impl NetworkWorker {
     /// Send message to a peer.
     ///
     ///
-    fn send_message(&mut self, peer: PeerId, message: Vec<u8>) -> Result<(), Error> {
-        // Checks if the peer has a response channel.
-        if let Some(responses) = self.ephemeral_responses.get_mut(&peer) {
-            if let Some(response_channel) = responses.pop_front() {
-                if responses.is_empty() {
-                    self.ephemeral_responses.remove(&peer);
-                }
-                return self
-                    .swarm
-                    .behaviour_mut()
-                    .send_response(response_channel, message);
+    fn send_message(&mut self, peer: PeerId, message: Vec<u8>) {
+        self.add_pending_outbound_message(peer, message.clone());
+        // It the peer has a relay circuit, dial it.
+        if let Some(relay_addr) = self.relay_circuits.get(&peer) {
+            //let relay_addr = relay_addr.clone().with(Protocol::P2p(peer));
+            if self.swarm.dial(relay_addr.clone()).is_err() {
+                error!(
+                    TARGET_WORKER,
+                    "Error dialing relay node {} for peer {}.", relay_addr, peer
+                );
+                // TODO: Event PeerDisconnected
+            } else {
+                info!(
+                    TARGET_WORKER,
+                    "Dialing relay node {} for peer {}.", relay_addr, peer
+                );
+                return;
             }
         }
-        // Add message to pending messages.
-        self.add_pending_outbound_message(peer, message.clone());
+        // If the node is ephemeral, request a circuit reservation.
+        if self.node_type == NodeType::Ephemeral {
+            self.request_circuit_reservation(peer);
+            return;
+        }
         // Send pending messages.
         self.send_pending_outbound_messages(peer);
-        Ok(())
+    }
+
+    /// Request circuit reservation.
+    fn request_circuit_reservation(&mut self, peer: PeerId) {
+        trace!(
+            TARGET_WORKER,
+            "Requesting circuit reservation to peer {}.",
+            peer
+        );
+        let (relay_peer, relay_addr) = match self.relay_node() {
+            Some(relay) => relay,
+            None => {
+                error!(TARGET_WORKER, "No relay nodes available");
+                return;
+            }
+        };
+        for addrs in relay_addr {
+            // Listen on the relay address.
+            let listen_addr = addrs
+                .with(Protocol::P2p(relay_peer))
+                .with(Protocol::P2pCircuit);
+            if self.swarm.listen_on(listen_addr.clone()).is_err() {
+                error!(
+                    TARGET_WORKER,
+                    "Transport does not support the listening addresss: {:?}.", listen_addr
+                );
+            } else {
+                // Pending reservation to the peer.
+                self.pending_reservations.insert(relay_peer, peer);
+                break;
+            }
+        }
     }
 
     /// Add pending message to peer.
@@ -238,41 +297,14 @@ impl NetworkWorker {
         pending_messages.push_back(message);
     }
 
-    /// Add request sent to peer.
-    fn add_request_sent(&mut self, peer: PeerId, request_id: OutboundRequestId) {
-        let requests = self.request_sent.entry(peer).or_default();
-        requests.push(request_id);
-    }
-
-    /// Remove request sent to peer.
-    fn remove_request_sent(&mut self, peer: PeerId, request_id: OutboundRequestId) {
-        if let Some(requests) = self.request_sent.get_mut(&peer) {
-            if let Some(pos) = requests.iter().position(|val| *val == request_id) {
-                requests.remove(pos);
-            }
-        }
-    }
-
-    /// Add ephemeral response.
-    fn add_ephemeral_response(&mut self, peer: PeerId, response_channel: ResponseChannel<ReqResMessage>) {
-        let responses = self.ephemeral_responses.entry(peer).or_default();
-        responses.push_back(response_channel);
-    }
-
     /// Send pending messages to peer.
     fn send_pending_outbound_messages(&mut self, peer: PeerId) {
         if self.swarm.behaviour_mut().is_known_peer(&peer) {
             if let Some(messages) = self.pending_outbound_messages.remove(&peer) {
                 for message in messages.iter() {
-                    if self.node_type == NodeType::Ephemeral {
-                        let id = self
-                            .swarm
-                            .behaviour_mut()
-                            .send_request(&peer, message.clone());
-                        self.add_request_sent(peer, id);
-                    } else {
-                        self.swarm.behaviour_mut().send_tell(&peer, message.clone());
-                    }
+                    self.swarm
+                        .behaviour_mut()
+                        .send_message(&peer, message.clone());
                 }
             } else {
                 trace!(
@@ -290,6 +322,24 @@ impl NetworkWorker {
             // TODO: After three attempts, remove the peer from the pending messages and
             // send a netwokr event `PeerDisconnected`.
             self.swarm.behaviour_mut().discover(&peer);
+        }
+    }
+
+    /// Gets the next relay node.
+    fn relay_node(&mut self) -> Option<(PeerId, Vec<Multiaddr>)> {
+        trace!(TARGET_WORKER, "Getting next boot node.");
+        if self.relay_nodes.is_empty() {
+            self.relay_nodes = self.swarm.behaviour_mut().boot_nodes();
+        }
+        loop {
+            if let Some((peer_id, addr)) = self.relay_nodes.pop() {
+                if peer_id == self.local_peer_id {
+                    continue;
+                }
+                return Some((peer_id, addr));
+            } else {
+                return None;
+            }
         }
     }
 
@@ -493,10 +543,7 @@ impl NetworkWorker {
             Command::SendMessage { peer, message } => {
                 if let Ok(public_key) = PublicKeyEd25519::try_from_bytes(peer.as_slice()) {
                     let peer = PublicKey::from(public_key);
-                    if let Err(error) = self.send_message(peer.to_peer_id(), message) {
-                        error!(TARGET_WORKER, "Response error: {:?}", error);
-                        self.send_event(NetworkEvent::Error(error)).await;
-                    }
+                    self.send_message(peer.to_peer_id(), message);
                 } else {
                     error!(TARGET_WORKER, "Invalid peer id");
                 }
@@ -577,14 +624,48 @@ impl NetworkWorker {
                     .behaviour_mut()
                     .add_identified_peer(peer_id, *info.clone());
 
+                // If identified peer has relay address, add it to the relay circuits.
+                let mut is_relay = false;
+                for addr in info.listen_addrs.iter() {
+                    if is_relay_circuit(addr) {
+                        info!(
+                            TARGET_WORKER,
+                            "Peer {} added to relay circuits with address {}", peer_id, addr
+                        );
+                        //let addr = addr.clone().with(Protocol::P2p(self.local_peer_id));
+                        self.relay_circuits.insert(peer_id, addr.clone());
+                        is_relay = true;
+                        break;
+                    }
+                }
+
                 // Send pending messages.
-                if self.pending_outbound_messages.contains_key(&peer_id) {
+                if !is_relay && self.pending_outbound_messages.contains_key(&peer_id) {
                     trace!(
                         TARGET_WORKER,
                         "Sending pending messages to peer {}.",
                         peer_id
                     );
                     self.send_pending_outbound_messages(peer_id);
+                }
+            }
+            SwarmEvent::Behaviour(BehaviourEvent::Dcutr(DcutrEvent {
+                remote_peer_id,
+                result,
+            })) => {
+                if result.is_ok() {
+                    // Send pending messages for ephemeral peer.
+                    trace!(
+                        TARGET_WORKER,
+                        "Sending pending messages to peer {} via dcutr.",
+                        remote_peer_id
+                    );
+                    self.send_pending_outbound_messages(remote_peer_id);
+                } else {
+                    error!(
+                        TARGET_WORKER,
+                        "Error in dcutr connection to peer {}.", remote_peer_id
+                    );
                 }
             }
             SwarmEvent::Behaviour(BehaviourEvent::TellMessage { peer_id, message }) => {
@@ -611,79 +692,7 @@ impl NetworkWorker {
                         .inc();
                 }
             }
-            SwarmEvent::Behaviour(BehaviourEvent::ReqresMessage { peer_id, message }) => {
-                debug!(
-                    TARGET_WORKER,
-                    "Request-response message received from peer {}", peer_id
-                );
-                match message {
-                    request_response::Message::Request {
-                        request, channel, ..
-                    } => {
-                        self.add_ephemeral_response(peer_id, channel);
-                        if self
-                            .event_sender
-                            .send(NetworkEvent::MessageReceived {
-                                peer: peer_id.to_string(),
-                                message: request.0,
-                            })
-                            .await
-                            .is_err()
-                        {
-                            error!(
-                                TARGET_WORKER,
-                                "Could not receive request from peer {}", peer_id
-                            );
-                        } else {
-                            trace!(TARGET_WORKER, "Request received from peer {}.", peer_id);
-                            self.messages_metric
-                                .get_or_create(&MetricLabels {
-                                    fact: Fact::Received,
-                                    peer_id: peer_id.to_string(),
-                                })
-                                .inc();
-                        }
-                    }
-                    request_response::Message::Response {
-                        request_id,
-                        response,
-                    } => {
-                        if let Some(reqs) = self.request_sent.get_mut(&peer_id) {
-                            if let Some(pos) = reqs.iter().position(|x| *x == request_id) {
-                                reqs.remove(pos);
-                                debug!(TARGET_WORKER, "Message response from peer {}", peer_id);
-                                self.send_event(NetworkEvent::MessageReceived {
-                                    peer: peer_id.to_string(),
-                                    message: response.0,
-                                })
-                                .await;
-                            } else {
-                                error!(
-                                    TARGET_WORKER,
-                                    "Request outbound for peer {} not found.", peer_id
-                                );
-                                self.send_event(NetworkEvent::Error(Error::Worker(format!(
-                                    "Request outbound for peer {} not found.",
-                                    peer_id
-                                ))))
-                                .await;
-                            }
-                        } else {
-                            error!(
-                                TARGET_WORKER,
-                                "There are no pending responses for peer {}.", peer_id
-                            );
-                            self.send_event(NetworkEvent::Error(Error::Worker(format!(
-                                "There are no pending responses for peer {}.",
-                                peer_id
-                            ))))
-                            .await;
-                        }
-                    }
-                }
-            }
-            SwarmEvent::Behaviour(BehaviourEvent::TellMessageSent { peer_id, .. })
-            | SwarmEvent::Behaviour(BehaviourEvent::ReqresMessageSent { peer_id, .. }) => {
+            SwarmEvent::Behaviour(BehaviourEvent::MessageSent { peer_id, .. }) => {
                 trace!(TARGET_WORKER, "Message sent to peer {}", peer_id);
                 self.messages_metric
                     .get_or_create(&MetricLabels {
@@ -703,64 +712,63 @@ impl NetworkWorker {
                         "Error with message sent event to {}", peer_id
                     );
                 }
-            }
-            SwarmEvent::Behaviour(BehaviourEvent::TellMessageProcessed { peer_id, .. }) => {
-                trace!(TARGET_WORKER, "Message processed from peer {}", peer_id);
-            }
-            SwarmEvent::Behaviour(BehaviourEvent::TellOutboundFailure {
-                peer_id, error, ..
-            }) => {
-                error!(
-                    TARGET_WORKER,
-                    "Error sending message to peer {}: {}", peer_id, error
-                );
-                self.send_event(NetworkEvent::Error(Error::Network(format!(
-                    "Error sending message to peer {}: {}",
-                    peer_id, error
-                ))))
-                .await;
-            }
-            SwarmEvent::Behaviour(BehaviourEvent::ReqresOutboundFailure {
-                peer_id,
-                outbound_id,
-                error,
-            }) => {
-                error!(
-                    TARGET_WORKER,
-                    "Error sending message to peer {}: {}", peer_id, error
-                );
-                self.send_event(NetworkEvent::Error(Error::Network(format!(
-                    "Error sending message to peer {}: {}",
-                    peer_id, error
-                ))))
-                .await;
-                self.remove_request_sent(peer_id, outbound_id);
-            }
-            SwarmEvent::Behaviour(BehaviourEvent::TellInboundFailure {
-                peer_id, error, ..
-            })
-            | SwarmEvent::Behaviour(BehaviourEvent::ReqresInboundFailure {
-                peer_id, error, ..
-            }) => {
-                error!(
-                    TARGET_WORKER,
-                    "Error receiving message from peer {}: {}", peer_id, error
-                );
-                self.send_event(NetworkEvent::Error(Error::Network(format!(
-                    "Error receiving message from peer {}: {}",
-                    peer_id, error
-                ))))
-                .await;
-            }
-            SwarmEvent::NewExternalAddrCandidate { address } => {
-                info!(TARGET_WORKER, "New external address candidate: {}.", address);
-                if self.node_type == NodeType::Addressable {
-                    debug!(TARGET_WORKER, "Adding external address for addressable node: {}.", address);
-                    self.swarm.add_external_address(address);
+                // Is the node ephemeral?
+                if self.node_type == NodeType::Ephemeral {
+                    // Request circuit reservation.
+                    self.request_circuit_reservation(peer_id);
                 }
             }
-            SwarmEvent::OutgoingConnectionError { .. } => {
-                // TODO.
+            SwarmEvent::Behaviour(BehaviourEvent::MessageProcessed { peer_id, .. }) => {
+                trace!(TARGET_WORKER, "Message processed from peer {}", peer_id);
+            }
+            SwarmEvent::Behaviour(BehaviourEvent::RelayServer(
+                RelayServerEvent::ReservationReqAccepted { src_peer_id, .. },
+            )) => {
+                // Relay server started.
+                info!(
+                    TARGET_WORKER,
+                    "Accepted relay server from peer {}", src_peer_id
+                );
+            }
+            SwarmEvent::Behaviour(BehaviourEvent::RelayClient(
+                RelayClientEvent::ReservationReqAccepted { relay_peer_id, .. },
+            )) => {
+                // Circuit reservation accepted. Remove pending reservation.
+                if let Some(peer_id) = self.pending_reservations.remove(&relay_peer_id) {
+                    trace!(
+                        TARGET_WORKER,
+                        "Reservation accepted from relay {}. Removing pending reservation.",
+                        relay_peer_id
+                    );
+                    self.send_pending_outbound_messages(peer_id);
+                } else {
+                    warn!(
+                        TARGET_WORKER,
+                        "Reservation accepted from relay {} but no pending reservation.",
+                        relay_peer_id
+                    );
+                }
+            }
+            SwarmEvent::OutgoingConnectionError {
+                peer_id: Some(peer),
+                ..
+            } => {
+                if self.pending_reservations.contains_key(&peer) {
+                    // We must retry with another relay node when we have an error due to a pending
+                    // reservation.
+                    warn!(
+                        TARGET_WORKER,
+                        "Error connecting to peer {} for circuit reservation", peer
+                    );
+                    self.request_circuit_reservation(peer);
+                } else if self.relay_circuits.remove(&peer).is_some() {
+                    warn!(
+                        TARGET_WORKER,
+                        "Error connecting to dctur to node {}. Removing relay circuit.", peer
+                    );
+                    self.send_event(NetworkEvent::Error(Error::Relay("Dctur error".to_owned())))
+                        .await;
+                }
             }
             _ => {}
         }

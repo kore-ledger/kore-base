@@ -83,7 +83,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         registry: &mut Registry,
         database: M,
         token: CancellationToken,
-        password: &str
+        password: &str,
     ) -> Result<Api, Error> {
         let password = Self::password_to_hash_array_32(password);
 
@@ -132,7 +132,8 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
 
         let database = Arc::new(database);
 
-        let controller_id = Self::register_node_key(key_pair.clone(), DB::new(database.clone(), password))?;
+        let controller_id =
+            Self::register_node_key(key_pair.clone(), DB::new(database.clone(), password))?;
         info!("Controller ID: {}", &controller_id);
 
         let mut worker = match NetworkWorker::new(
@@ -463,7 +464,7 @@ impl<M: DatabaseManager<C> + 'static, C: DatabaseCollection + 'static> Node<M, C
         let result = hasher.finalize();
         let mut array = [0u8; 32];
         array.copy_from_slice(result.as_bytes());
-        
+
         array
     }
 }

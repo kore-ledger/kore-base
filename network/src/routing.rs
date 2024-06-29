@@ -202,18 +202,14 @@ impl Behaviour {
             || self.known_peers().contains(peer_id)
             || self.relay_nodes.contains_key(peer_id)
     }
-
+/* 
     /// Sets the DHT random walk delay.
     #[cfg(test)]
     pub fn set_random_walk(&mut self, delay: Duration) {
         self.next_random_walk = Some(Delay::new(delay));
     }
-
-    /// Get relay node.
-    pub fn get_relay_node(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
-        self.relay_nodes.get(peer_id)
-    }
-
+*/
+     /* 
     /// Returns the list of known external addresses of a peer.
     /// If the peer is not known, returns an empty list.
     ///
@@ -225,6 +221,7 @@ impl Behaviour {
         }
         addrs
     }
+    */
 
     /// Bootstrap node.
     pub fn bootstrap(&mut self) -> Result<(), Error> {
@@ -292,14 +289,6 @@ impl Behaviour {
 
         self.pending_events.push_back(Event::Discovered(peer_id));
         addrs_list.push(addr);
-    }
-
-    /// Adds a relay node.
-    /// If we didn't know this address before, also generates a `Discovered` event.
-    pub fn add_relay_node(&mut self, peer_id: PeerId, addr: Multiaddr) {
-        if self.relay_nodes.insert(peer_id, addr.clone()).is_none() {
-            self.pending_events.push_back(Event::Discovered(peer_id));
-        }
     }
 
     /// Add a self-reported address of a remote peer to the k-buckets of the DHT
@@ -1039,7 +1028,14 @@ pub struct Config {
 impl Config {
     /// Creates a new configuration for the discovery behaviour.
     pub fn new(boot_nodes: Vec<RoutingNode>) -> Self {
-        let protocol_names = vec!["/kore/routing/1.0.0".to_owned()];
+        let protocol_names = vec![
+            "/kore/routing/1.0.0".to_owned(),
+            "/ipfs/ping/1.0.0".to_owned(),
+            "/kore/tell/1.0.0".to_owned(),
+            "/kore/reqres/1.0.0".to_owned(),  
+            "/ipfs/id/push/1.0.0".to_owned(),
+            "/ipfs/id/id/1.0.0".to_owned(),
+            ];
         Self {
             boot_nodes,
             dht_random_walk: true,

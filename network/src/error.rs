@@ -4,10 +4,11 @@
 //! # Network errors.
 //!
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Network errors.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub enum Error {
     /// Worker error.
     #[error("Worker error: {0}")]

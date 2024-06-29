@@ -87,7 +87,7 @@ pub enum Event<TMessage> {
 /// Note: [`InboundTellId`]'s uniqueness is only guaranteed between
 /// inbound tells of the same originating [`Behaviour`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct InboundTellId(u64);
+pub struct InboundTellId(pub u64);
 
 impl fmt::Display for InboundTellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -100,7 +100,7 @@ impl fmt::Display for InboundTellId {
 /// Note: [`OutboundTellId`]'s uniqueness is only guaranteed between
 /// outbound tells of the same originating [`Behaviour`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct OutboundTellId(u64);
+pub struct OutboundTellId(pub u64);
 
 impl fmt::Display for OutboundTellId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
