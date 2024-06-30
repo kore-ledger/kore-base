@@ -126,14 +126,6 @@ pub fn is_memory(addr: &Multiaddr) -> bool {
     false
 }
 
-/// Check if the given `Multiaddr` is a relay circuit address.
-///
-/// A relay circuit address is a `Multiaddr` that contains a `P2pCircuit` protocol.
-///
-pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
-    addr.iter().any(|p| matches!(p, Protocol::P2pCircuit))
-}
-
 /// Compare generic arrays.
 ///
 /// If `b_subset` is `true`, then `b` is a subset of `a`.

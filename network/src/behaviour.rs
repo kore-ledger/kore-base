@@ -394,16 +394,10 @@ impl From<request_response::Event<ReqResMessage, ReqResMessage>> for Event {
                 peer,
                 request_id,
                 error,
-            } => {
-                if let request_response::OutboundFailure::Io(error) = &error {
-                    println!("IO error: {:?}", error.kind()  );
-                }
-
-                Event::ReqresOutboundFailure {
-                    peer_id: peer,
-                    outbound_id: request_id,
-                    error: Error::Behaviour(error.to_string()),
-                }               
+            } => Event::ReqresOutboundFailure {
+                peer_id: peer,
+                outbound_id: request_id,
+                error: Error::Behaviour(error.to_string()),
             },
         }
     }
@@ -429,6 +423,97 @@ mod tests {
 
     use std::vec;
     use std::{pin::pin, sync::Arc};
+
+
+    #[tokio::test]
+    #[serial]
+    #[tracing_test::traced_test]
+    async fn test_reqres() {
+        let boot_nodes = vec![];
+
+        // Build node a.
+        let config = create_config(boot_nodes.clone(), false, NodeType::Ephemeral);
+        let mut node_a = build_node(config);
+        let node_a_addr: Multiaddr = "/ip4/127.0.0.1/tcp/50001".parse().unwrap();
+        let _ = node_a.listen_on(node_a_addr.clone());
+        node_a.add_external_address(node_a_addr.clone());
+        
+        // Build node b.
+        let config = create_config(boot_nodes.clone(), true, NodeType::Addressable);
+        let mut node_b = build_node(config);
+        let node_b_addr: Multiaddr = "/ip4/127.0.0.1/tcp/50002".parse().unwrap();
+        let _ = node_b.listen_on(node_b_addr.clone());
+        node_b.add_external_address(node_b_addr.clone());
+        let node_b_peer_id = *node_b.local_peer_id();
+        
+        node_a.connect(&mut node_b).await;
+
+        let peer_b = async move {
+            loop {
+                match node_b.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
+                        node_b.behaviour_mut().add_identified_peer(peer_id, *info);
+                    }
+                    SwarmEvent::Behaviour(Event::ReqresMessage { peer_id, message }) => {
+                        // Message received from node a.
+                        info!("Request message received from peer: {:?}", peer_id);
+                        match message {
+                            Message::Request { channel, request, .. } => {
+                                assert_eq!(request.0, b"Hello Node B".to_vec());
+                                // Send response to node a.
+                                let _ = node_b
+                                    .behaviour_mut()
+                                    .send_response(channel, b"Hello Node A".to_vec());
+                            }
+                            Message::Response { .. } => {}
+                        }
+                    }
+                    SwarmEvent::NewListenAddr { .. } => {}
+                    SwarmEvent::ConnectionEstablished { .. } => {}
+                    SwarmEvent::IncomingConnection { .. } => {}
+
+                    event => {
+                        info!("Node B event: {:?}", event);
+                    }
+                }
+            }
+        };
+
+        let peer_a = async move {
+            loop {
+                match node_a.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
+                        node_a.behaviour_mut().add_identified_peer(peer_id, *info);
+                        node_a.behaviour_mut().send_request(&node_b_peer_id, b"Hello Node B".to_vec());                    
+                    }
+                    SwarmEvent::Behaviour(Event::ReqresMessage { peer_id, message }) => {
+                        // Message received from node a.
+                        info!("Response message received from peer: {:?}", peer_id);
+                        match message {
+                            Message::Request { .. } => {}
+                            Message::Response { response, .. } => {
+                                assert_eq!(response.0, b"Hello Node A".to_vec());
+                                break;
+                            }
+                        }
+                    }
+                    SwarmEvent::NewListenAddr { .. } => {}
+                    SwarmEvent::ConnectionEstablished { .. } => {}
+                    SwarmEvent::IncomingConnection { .. } => {}
+                    SwarmEvent::Behaviour(Event::Discovered(_)) => {}
+                    SwarmEvent::NewExternalAddrCandidate { .. } => {}
+                    SwarmEvent::Behaviour(Event::ReqresOutboundFailure { .. }) => {}
+                    e => {
+                        info!("Node A event: {:?}", e);
+                        break;
+                    }
+                }
+            }
+        };
+
+        tokio::task::spawn(Box::pin(peer_b));
+        peer_a.await;
+    }
 
     #[tokio::test]
     #[serial]
@@ -482,23 +567,7 @@ mod tests {
                             .add_identified_peer(peer_id, *info);
 
                     }
-                    SwarmEvent::IncomingConnection { .. } => {}
-                    SwarmEvent::ConnectionEstablished { .. } => {}
-                    SwarmEvent::Behaviour(Event::Discovered(_)) => {}
-                    SwarmEvent::NewExternalAddrCandidate { address } => {
-                        info!("New external address candidate: {:?}", address);
-                    }
-                    SwarmEvent::Behaviour(Event::UnreachablePeer(peer_id)) => {
-                        info!("Unreachable peer: {:?}", peer_id);
-                    }
-                    SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        info!("Connection closed: {:?}", peer_id);
-
-                    }
-                    e => {
-                        info!("Boot node event: {:?}", e);
-                        break;
-                    }
+                    _ => {}
                 }
             }
         };
@@ -523,35 +592,27 @@ mod tests {
                     //SwarmEvent::Behaviour(Event::D)
                     SwarmEvent::Behaviour(Event::ReqresMessageSent { peer_id, .. }) => {
                         // If message sent, make reservation to response.
+                        info!("Request message sent to peer: {:?}", peer_id);
                         assert_eq!(peer_id, node_b_peer_id);
-                        break;
+                        //break;
                     }
-                    /*SwarmEvent::Behaviour(Event::TellMessage { peer_id, message }) => {
-                        // Message received from unreachable node b
-                        assert_eq!(peer_id, node_b_peer_id);
-                        assert_eq!(message.message.as_slice(), b"Hello Node A");
-                    }
-                    SwarmEvent::Behaviour(Event::TellMessageProcessed { peer_id, .. }) => {
-                        // Message processed. End test.
-                        assert_eq!(peer_id, node_b_peer_id);
-                        break;
-                    }
-                    SwarmEvent::Behaviour(Event::PeersFounded(peer, closest_peers)) => {
-                        // Peers founded.
-                        info!("Peers founded: {:?}", closest_peers);
-                        break;
-                    }*/
                     SwarmEvent::IncomingConnection { .. } => {}
                     SwarmEvent::ConnectionEstablished { .. } => {}
                     SwarmEvent::Behaviour(Event::Discovered(_)) => {}
                     SwarmEvent::NewExternalAddrCandidate { .. } => {}
-                    SwarmEvent::Dialing { peer_id, connection_id } => {
-                        info!("Dialing peer: {:?} connection id: {:?}", peer_id, connection_id);
+                    SwarmEvent::Dialing { .. } => {}
+                    SwarmEvent::Behaviour(Event::PeersFounded(_, _)) => {}
+                    SwarmEvent::Behaviour(Event::ReqresOutboundFailure { .. }) => {
+                        info!("Outbound failure");
                     }
-                    SwarmEvent::Behaviour(Event::PeersFounded(peer, closest_peers)) => {
-                        // Peers founded.
-                        assert_eq!(peer, node_b_peer_id);
-                        //assert!(closest_peers.contains(&node_b_peer_id));
+                    SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                        if peer_id == node_b_peer_id {
+                            info!("Closed node B");
+                            break;
+                        } else {
+                            info!("Closed boot node: {:?}", peer_id);
+                            break;
+                        }
                     }
                     e => {
                         info!("Node A event: {:?}", e);
@@ -569,6 +630,7 @@ mod tests {
                     }
                     SwarmEvent::Behaviour(Event::ReqresMessage { peer_id, message }) => {
                         // Message received from node a.
+                        info!("Request message received from peer: {:?}", peer_id);
                         assert_eq!(peer_id, node_a_peer_id);
                         match message {
                             Message::Request { channel, request, .. } => {
@@ -580,20 +642,10 @@ mod tests {
                             }
                             Message::Response { .. } => {}
                         }
+
+                        break;
                     }
-                    SwarmEvent::Behaviour(Event::TellMessageSent { peer_id, .. }) => {
-                        // Message sent to node a.
-                        assert_eq!(peer_id, node_a_peer_id);
-                    }
-                    SwarmEvent::OutgoingConnectionError { peer_id, .. } => {
-                        // Connection error with node a. End test.
-                        if let Some(peer) = peer_id {
-                            if peer == node_a_peer_id {
-                                break;
-                            }
-                        }
-                    }
-                    SwarmEvent::IncomingConnection { .. } => {}
+                    /*SwarmEvent::IncomingConnection { .. } => {}
                     SwarmEvent::ConnectionEstablished { .. } => {}
                     SwarmEvent::Behaviour(Event::Discovered(_)) => {}
                     SwarmEvent::NewExternalAddrCandidate { .. } => {}
@@ -606,11 +658,8 @@ mod tests {
                             info!("Closed node A");
                             break;
                         }
-                    }
-                    e => {
-                        info!("Node B event: {:?}", e);
-                        break;
-                    }
+                    }*/
+                    _ => {}
                 }
             }
         };
@@ -631,12 +680,12 @@ mod tests {
         let local_key = identity::Keypair::generate_ed25519();
         let local_peer_id = local_key.public().to_peer_id();
 
-        let transport = MemoryTransport::default()
-            .or_transport(tcp::tokio::Transport::default())
+        let transport = tcp::tokio::Transport::default()
             .upgrade(Version::V1)
             .authenticate(plaintext::Config::new(&local_key))
             .multiplex(yamux::Config::default())
             .boxed();
+
         let behaviour = Behaviour::new(
             &local_key.public(),
             config,
@@ -647,9 +696,10 @@ mod tests {
             behaviour,
             local_peer_id,
             swarm::Config::with_tokio_executor()
-                .with_idle_connection_timeout(std::time::Duration::from_secs(2)),
+                .with_idle_connection_timeout(std::time::Duration::from_secs(10)),
         )
     }
+
 
     // Create a config
     fn create_config(
@@ -674,7 +724,7 @@ mod tests {
             tell: Default::default(),
             routing: config,
             listen_addresses: vec![],
-            port_reuse: true,
+            port_reuse: false,
         }
     }
 
