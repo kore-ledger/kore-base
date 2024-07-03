@@ -381,28 +381,28 @@ impl NetworkWorker {
                             }
                             error!(TARGET_WORKER, "Can't connect to kore network");
                             self.change_state(NetworkState::Disconnected).await;
-                        }
-
-                        let copy_boot_nodes = self.boot_nodes.clone();
-                        for node in copy_boot_nodes {
-                            if self
-                                .swarm
-                                .dial(DialOpts::peer_id(node.0).addresses(node.1.clone()).build())
-                                .is_err()
-                            {
-                                error!(TARGET_WORKER, "Error dialing boot node {}", node.0);
-                                self.swarm.behaviour_mut().remove_node(&node.0, &node.1);
-                                if let Some(pos) = self
-                                    .boot_nodes
-                                    .iter()
-                                    .position(|val| val.clone() == (node.0, node.1.clone()))
+                        } else {
+                            let copy_boot_nodes = self.boot_nodes.clone();
+                            for node in copy_boot_nodes {
+                                if self
+                                    .swarm
+                                    .dial(DialOpts::peer_id(node.0).addresses(node.1.clone()).build())
+                                    .is_err()
                                 {
-                                    self.boot_nodes.remove(pos);
+                                    error!(TARGET_WORKER, "Error dialing boot node {}", node.0);
+                                    self.swarm.behaviour_mut().remove_node(&node.0, &node.1);
+                                    if let Some(pos) = self
+                                        .boot_nodes
+                                        .iter()
+                                        .position(|val| val.clone() == (node.0, node.1.clone()))
+                                    {
+                                        self.boot_nodes.remove(pos);
+                                    }
                                 }
                             }
+    
+                            self.change_state(NetworkState::Dialing).await;
                         }
-
-                        self.change_state(NetworkState::Dialing).await;
                     }
                     NetworkState::Dialing => {
                         // No more bootnodes to send dial and none was successful
@@ -422,12 +422,14 @@ impl NetworkWorker {
                     }
                     _ => {}
                 }
-                tokio::select! {
-                    event = self.swarm.select_next_some() => {
-                        self.handle_connection_events(event).await;
-                    }
-                    _ = self.cancel.cancelled() => {
-                        break;
+                if self.state != NetworkState::Disconnected {
+                    tokio::select! {
+                        event = self.swarm.select_next_some() => {
+                            self.handle_connection_events(event).await;
+                        }
+                        _ = self.cancel.cancelled() => {
+                            break;
+                        }
                     }
                 }
             }
@@ -490,7 +492,12 @@ impl NetworkWorker {
                 }
             }
             SwarmEvent::Behaviour(BehaviourEvent::Discovered(_)) => {}
-            SwarmEvent::ConnectionClosed { peer_id ,.. } => {
+            SwarmEvent::ConnectionClosed { peer_id , cause, .. } => {
+                println!("");
+                println!("");
+                println!("CAUSE: {:?}", cause);
+                println!("");
+                println!("");
                 info!(TARGET_WORKER, "Connection closed to peer {}", peer_id);
                 self.remove_boot_node(peer_id);
                 
@@ -994,7 +1001,7 @@ mod tests {
         // Build a node.
         let node_addr = "/ip4/127.0.0.1/tcp/54422";
         let (mut node, mut node_receiver) = build_worker(
-            boot_nodes.clone(),
+            boot_nodes,
             false,
             NodeType::Ephemeral,
             token.clone(),
@@ -1008,12 +1015,8 @@ mod tests {
             boot.run_main().await;
         });
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
         // Wait for connection.
-        if node.run_connection().await.is_err() {
-            error!(TARGET_WORKER, "Error connecting to the network");
-        }
+        node.run_connection().await.unwrap();
 /* 
         // Spawn the node
         tokio::spawn(async move {
