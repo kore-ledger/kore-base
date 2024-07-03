@@ -45,11 +45,11 @@ pub struct Behaviour {
     /// The `request-response` behaviour.
     req_res: request_response::cbor::Behaviour<ReqResMessage, ReqResMessage>,
 
-    /// The `node` behaviour.
-    node: node::Behaviour,
-
     /// The `routing` behaviour.
     routing: routing::Behaviour,
+    
+        /// The `node` behaviour.
+    node: node::Behaviour,
 }
 
 impl Behaviour {
@@ -119,6 +119,7 @@ impl Behaviour {
             debug!("Adding self reported address to DHT: {:?}", addr);
             self.routing
                 .add_self_reported_address(&peer_id, &info.protocols, addr.clone());
+            self.routing.add_known_address( peer_id, addr);
         }
     }
 
