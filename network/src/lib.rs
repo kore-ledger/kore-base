@@ -5,7 +5,6 @@
 
 #![warn(missing_docs)]
 
-//mod behaviour;
 mod behaviour;
 pub mod error;
 mod node;

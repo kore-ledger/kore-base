@@ -52,9 +52,6 @@ pub struct Behaviour {
     /// Nodes discovered with public address.
     public_nodes: HashMap<PeerId, Vec<Multiaddr>>,
 
-    /// Circuit relay nodes.
-    relay_nodes: HashMap<PeerId, Multiaddr>,
-
     /// Boolean that activates the random walk if the node has already finished the initial pre-routing phase.
     pre_routing: bool,
 
@@ -156,7 +153,6 @@ impl Behaviour {
             local_peer_id: peer_id,
             boot_nodes,
             public_nodes: HashMap::new(),
-            relay_nodes: HashMap::new(),
             kademlia: Toggle::from(kademlia),
             mdns: if enable_mdns {
                 match MdnsTokio::new(MdnsConfig::default(), peer_id) {
@@ -200,16 +196,15 @@ impl Behaviour {
     pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
         self.public_nodes.contains_key(peer_id)
             || self.known_peers().contains(peer_id)
-            || self.relay_nodes.contains_key(peer_id)
     }
-/* 
-    /// Sets the DHT random walk delay.
-    #[cfg(test)]
-    pub fn set_random_walk(&mut self, delay: Duration) {
-        self.next_random_walk = Some(Delay::new(delay));
-    }
-*/
-     /* 
+    /*
+        /// Sets the DHT random walk delay.
+        #[cfg(test)]
+        pub fn set_random_walk(&mut self, delay: Duration) {
+            self.next_random_walk = Some(Delay::new(delay));
+        }
+    */
+    /*
     /// Returns the list of known external addresses of a peer.
     /// If the peer is not known, returns an empty list.
     ///
@@ -325,6 +320,7 @@ impl Behaviour {
                 //println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
                 //addr, peer_id, matching_protocol);
                 kademlia.add_address(peer_id, addr.clone());
+                self.pending_events.push_back(Event::Discovered(peer_id.clone()));
             } else {
                 trace!(
                     target: TARGET_ROUTING,
@@ -955,10 +951,6 @@ impl NetworkBehaviour for Behaviour {
             list.extend(ephemeral_addresses.clone());
         }
 
-        if let Some(relay_address) = self.relay_nodes.get(&peer_id) {
-            list.push(relay_address.clone());
-        }
-
         {
             let mut list_to_filter = self.kademlia.handle_pending_outbound_connection(
                 connection_id,
@@ -1032,10 +1024,10 @@ impl Config {
             "/kore/routing/1.0.0".to_owned(),
             "/ipfs/ping/1.0.0".to_owned(),
             "/kore/tell/1.0.0".to_owned(),
-            "/kore/reqres/1.0.0".to_owned(),  
+            "/kore/reqres/1.0.0".to_owned(),
             "/ipfs/id/push/1.0.0".to_owned(),
             "/ipfs/id/id/1.0.0".to_owned(),
-            ];
+        ];
         Self {
             boot_nodes,
             dht_random_walk: true,
@@ -1209,7 +1201,7 @@ mod tests {
         let config = Config::new(boot_nodes.clone())
             .with_allow_non_globals_in_dht(true)
             .with_allow_private_ip(true)
-            .with_discovery_limit(50)
+            .with_discovery_limit(100)
             .with_dht_random_walk(true)
             .set_protocol("/kad/tell/1.0.0");
 
@@ -1222,12 +1214,12 @@ mod tests {
         };
         boot_nodes.push(boot_node);
 
-        let mut swarms = (1..25)
+        let mut swarms = (1..40)
             .map(|_| {
                 let config = Config::new(boot_nodes.clone())
                     .with_allow_non_globals_in_dht(true)
                     .with_allow_private_ip(true)
-                    .with_discovery_limit(50);
+                    .with_discovery_limit(100);
                 build_node(config)
             })
             .collect::<Vec<_>>();

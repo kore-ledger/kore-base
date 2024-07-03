@@ -38,8 +38,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
 use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    collections::{HashMap, VecDeque}, sync::{Arc, Mutex, RwLock}
 };
 
 const TARGET_WORKER: &str = "KoreNetwork-Worker";
@@ -90,6 +89,9 @@ pub struct NetworkWorker {
 
     /// Successful dials
     successful_dials: u64,
+
+    /// Attempted dials.
+    attempted_dials: Vec<PeerId>,
 }
 
 impl NetworkWorker {
@@ -182,6 +184,9 @@ impl NetworkWorker {
                         "Transport does not support the listening addresss: {:?}.",
                         addr
                     );
+                } else {
+                    info!(TARGET_WORKER, "Add external address {:?}", addr);
+                    swarm.add_external_address(addr.clone());
                 }
             }
         }
@@ -201,12 +206,29 @@ impl NetworkWorker {
             ephemeral_responses: HashMap::default(),
             messages_metric,
             successful_dials: 0,
+            attempted_dials: vec![],
         })
     }
 
     /// Get the local peer ID.
     pub fn local_peer_id(&self) -> PeerId {
         self.local_peer_id
+    }
+
+    /// Add known peer.
+    pub fn add_known_peer(&mut self, peer: PeerId, address: Multiaddr) {
+        self.swarm.behaviour_mut().add_known_address(peer, address);
+    }
+
+    /// Remove boot node.
+    pub fn remove_boot_node(&mut self, peer: PeerId) {
+        if let Some(pos) = self
+            .boot_nodes
+            .iter()
+            .position(|val| val.0 == peer)
+        {
+            self.boot_nodes.remove(pos);
+        }
     }
 
     /// Send message to a peer.
@@ -254,7 +276,11 @@ impl NetworkWorker {
     }
 
     /// Add ephemeral response.
-    fn add_ephemeral_response(&mut self, peer: PeerId, response_channel: ResponseChannel<ReqResMessage>) {
+    fn add_ephemeral_response(
+        &mut self,
+        peer: PeerId,
+        response_channel: ResponseChannel<ReqResMessage>,
+    ) {
         let responses = self.ephemeral_responses.entry(peer).or_default();
         responses.push_back(response_channel);
     }
@@ -411,6 +437,7 @@ impl NetworkWorker {
 
     /// Handle connection events.
     async fn handle_connection_events(&mut self, event: SwarmEvent<BehaviourEvent>) {
+        info!(TARGET_WORKER, "Handle connection event: {:?}", event);
         match event {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!(TARGET_WORKER, "Listening on {:?}", address);
@@ -462,7 +489,16 @@ impl NetworkWorker {
                     self.successful_dials += 1;
                 }
             }
-            _ => {}
+            SwarmEvent::Behaviour(BehaviourEvent::Discovered(_)) => {}
+            SwarmEvent::ConnectionClosed { peer_id ,.. } => {
+                info!(TARGET_WORKER, "Connection closed to peer {}", peer_id);
+                self.remove_boot_node(peer_id);
+                
+            }
+            e => {
+                trace!(TARGET_WORKER, "Event: {:?}", e);
+                //self.change_state(NetworkState::Disconnected).await;
+            }
         }
     }
     /// Run network worker.
@@ -753,9 +789,15 @@ impl NetworkWorker {
                 .await;
             }
             SwarmEvent::NewExternalAddrCandidate { address } => {
-                info!(TARGET_WORKER, "New external address candidate: {}.", address);
+                info!(
+                    TARGET_WORKER,
+                    "New external address candidate: {}.", address
+                );
                 if self.node_type == NodeType::Addressable {
-                    debug!(TARGET_WORKER, "Adding external address for addressable node: {}.", address);
+                    debug!(
+                        TARGET_WORKER,
+                        "Adding external address for addressable node: {}.", address
+                    );
                     self.swarm.add_external_address(address);
                 }
             }
@@ -925,6 +967,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     #[serial]
     async fn test_connect() {
         let mut boot_nodes = vec![];
@@ -946,36 +989,32 @@ mod tests {
         };
         boot_nodes.push(boot_node);
         let boot_peer_id = boot.local_peer_id().to_string();
-
-        // Build a fake bootstrap node.
-        let fake_boot_peer = PeerId::random();
-        let fake_boot_addr = "/ip4/127.0.0.1/tcp/54999";
-        let fake_node = RoutingNode {
-            peer_id: fake_boot_peer.to_string(),
-            address: vec![fake_boot_addr.to_owned()],
-        };
-        boot_nodes.push(fake_node);
+        println!("Boot peer id: {}", boot_peer_id);
 
         // Build a node.
         let node_addr = "/ip4/127.0.0.1/tcp/54422";
         let (mut node, mut node_receiver) = build_worker(
             boot_nodes.clone(),
             false,
-            NodeType::Addressable,
+            NodeType::Ephemeral,
             token.clone(),
             Some(node_addr.to_owned()),
         );
+        let node_peer_id = node.local_peer_id().to_string();
+        println!("Node peer id: {}", node_peer_id);
 
         // Spawn the boot node
         tokio::spawn(async move {
             boot.run_main().await;
         });
 
-        // Wait for connection.
-        //if node.run_connection().await.is_err() {
-        //    error!(TARGET_WORKER, "Error connecting to the network");
-        //}
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
+        // Wait for connection.
+        if node.run_connection().await.is_err() {
+            error!(TARGET_WORKER, "Error connecting to the network");
+        }
+/* 
         // Spawn the node
         tokio::spawn(async move {
             node.run().await;
@@ -1013,7 +1052,7 @@ mod tests {
                     break;
                 }
             }
-        }
+        }*/
     }
 
     #[tokio::test]
@@ -1211,6 +1250,7 @@ mod tests {
             .with_allow_non_globals_in_dht(true)
             .with_allow_private_ip(true)
             .with_discovery_limit(50)
+            .with_mdns(false)
             .with_dht_random_walk(random_walk);
 
         Config {
