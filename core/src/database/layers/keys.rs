@@ -27,15 +27,19 @@ impl<C: DatabaseCollection> KeysDb<C> {
     ///
     /// A new KeysDb instance
     ///
-    pub fn new<M: DatabaseManager<C>>(manager: &Arc<M>, password: [u8; 32]) -> Result<Self, DbError> {
+    pub fn new<M: DatabaseManager<C>>(
+        manager: &Arc<M>,
+        password: [u8; 32],
+    ) -> Result<Self, DbError> {
         let mut key_box = EncryptedMem::new();
-            key_box.encrypt(&password).
-                map_err(|_| DbError::Encrypt(format!("Problem with password")))?;
-        
+        key_box
+            .encrypt(&password)
+            .map_err(|_| DbError::Encrypt(format!("Problem with password")))?;
+
         Ok(Self {
             collection: manager.create_collection("transfer"),
             prefix: "keys".to_string(),
-            key_box
+            key_box,
         })
     }
 
@@ -63,7 +67,7 @@ impl<C: DatabaseCollection> KeysDb<C> {
 
         let pass = match self.key_box.decrypt() {
             Ok(pass) => pass,
-            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e)))
+            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e))),
         };
 
         let bytes = decrypt(pass.as_ref(), value.as_slice())?;
@@ -97,7 +101,7 @@ impl<C: DatabaseCollection> KeysDb<C> {
         };
         let pass = match self.key_box.decrypt() {
             Ok(pass) => pass,
-            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e)))
+            Err(e) => return Err(DbError::Decrypt(format!("Decrypt error: {:?}", e))),
         };
 
         let bytes = encrypt(pass.as_ref(), data.as_slice())?;

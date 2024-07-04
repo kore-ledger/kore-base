@@ -79,11 +79,11 @@ pub fn convert_boot_nodes(boot_nodes: Vec<RoutingNode>) -> Vec<(PeerId, Vec<Mult
 }
 
 /// Gets the list of external (public) addresses for the node from string array.
-pub fn convert_external_addresses(addresses: &[String]) -> Result<HashSet<Multiaddr>, Error> {
-    let mut external_addresses = HashSet::new();
+pub fn convert_addresses(addresses: &[String]) -> Result<HashSet<Multiaddr>, Error> {
+    let mut addrs = HashSet::new();
     for address in addresses {
         if let Some(value) = multiaddr(address) {
-            external_addresses.insert(value);
+            addrs.insert(value);
         } else {
             return Err(Error::Address(format!(
                 "Invalid MultiAddress conversion in External Address: {}",
@@ -91,7 +91,7 @@ pub fn convert_external_addresses(addresses: &[String]) -> Result<HashSet<Multia
             )));
         }
     }
-    Ok(external_addresses)
+    Ok(addrs)
 }
 
 /// Parses a string into a `Multiaddr` if possible.
@@ -124,14 +124,6 @@ pub fn is_memory(addr: &Multiaddr) -> bool {
         return true;
     }
     false
-}
-
-/// Check if the given `Multiaddr` is a relay circuit address.
-///
-/// A relay circuit address is a `Multiaddr` that contains a `P2pCircuit` protocol.
-///
-pub fn is_relay_circuit(addr: &Multiaddr) -> bool {
-    addr.iter().any(|p| matches!(p, Protocol::P2pCircuit))
 }
 
 /// Compare generic arrays.

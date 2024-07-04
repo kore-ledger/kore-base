@@ -10,8 +10,10 @@ pub mod error;
 mod node;
 mod routing;
 mod service;
+//mod transport;
 mod transport;
 mod utils;
+//mod worker;
 mod worker;
 
 pub use error::Error;
@@ -21,7 +23,7 @@ pub use service::NetworkService;
 pub use tell::Config as TellConfig;
 pub use worker::{NetworkError, NetworkState, NetworkWorker};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The maximum allowed number of established connections per peer.
 ///
@@ -44,6 +46,9 @@ pub struct Config {
     /// Listen addresses.
     pub listen_addresses: Vec<String>,
 
+    /// External addresses.
+    pub external_addresses: Vec<String>,
+
     /// Message telling configuration.
     pub tell: tell::Config,
 
@@ -59,6 +64,7 @@ impl Config {
     pub fn new(
         node_type: NodeType,
         listen_addresses: Vec<String>,
+        external_addresses: Vec<String>,
         boot_nodes: Vec<RoutingNode>,
         port_reuse: bool,
     ) -> Self {
@@ -66,6 +72,7 @@ impl Config {
             user_agent: "kore-node".to_owned(),
             node_type,
             listen_addresses,
+            external_addresses,
             tell: tell::Config::default(),
             routing: routing::Config::new(boot_nodes),
             port_reuse,
@@ -86,6 +93,7 @@ pub enum NodeType {
 }
 
 /// Command enumeration for the network service.
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Command {
     /// Start providing the given keys.
     StartProviding {
@@ -104,7 +112,7 @@ pub enum Command {
 }
 
 /// Event enumeration for the network service.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
     /// Connected to a bootstrap node.
     ConnectedToBootstrap {
@@ -135,7 +143,7 @@ pub enum Event {
     },
 
     /// Network state changed.
-    StateChanged(NetworkState),
+    StateChanged(worker::NetworkState),
 
     /// Network error.
     Error(Error),

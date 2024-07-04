@@ -19,6 +19,7 @@ pub struct Settings {
     peer_id: String,
     private_key: String,
     listen_addresses: Vec<String>,
+    external_addresses: Vec<String>,
     boot_nodes: Vec<RoutingNode>,
     dht_random_walk: bool,
     allow_non_globals_in_dht: bool,
@@ -94,6 +95,7 @@ fn build_config(settings: &Settings) -> NetworkConfig {
     NetworkConfig {
         user_agent: "kore-node".to_owned(),
         node_type: settings.node_type.clone(),
+        external_addresses: settings.external_addresses.clone(),
         listen_addresses: settings.listen_addresses.clone(),
         tell: TellConfig::default(),
         routing: routing_config,

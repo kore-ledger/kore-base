@@ -49,7 +49,7 @@ pub trait DatabaseCollection: Sync + Send {
         }
         let (mut iter, quantity) = match from {
             Some(key) => {
-                let key = format!("{}{}",char::MAX, key);
+                let key = format!("{}{}", char::MAX, key);
                 // Find the key
                 let iter = if quantity >= 0 {
                     self.iter(false, prefix)
@@ -202,11 +202,11 @@ macro_rules! test_database_manager_trait {
             #[allow(dead_code)]
             fn build_state(collection: &$type2) {
                 let data = get_data().unwrap();
-                let result = collection.put(&format!("{}a",char::MAX), &data[0]);
+                let result = collection.put(&format!("{}a", char::MAX), &data[0]);
                 assert!(result.is_ok());
-                let result = collection.put(&format!("{}b",char::MAX), &data[1]);
+                let result = collection.put(&format!("{}b", char::MAX), &data[1]);
                 assert!(result.is_ok());
-                let result = collection.put(&format!("{}c",char::MAX), &data[2]);
+                let result = collection.put(&format!("{}c", char::MAX), &data[2]);
                 assert!(result.is_ok());
             }
 
@@ -221,11 +221,11 @@ macro_rules! test_database_manager_trait {
 
             #[allow(dead_code)]
             fn build_initial_data_char() -> (Vec<&'static str>, Vec<Vec<u8>>) {
-                let a = format!("{}a",char::MAX);
+                let a = format!("{}a", char::MAX);
                 let a: &'static str = Box::leak(a.into_boxed_str());
-                let b = format!("{}b",char::MAX);
+                let b = format!("{}b", char::MAX);
                 let b: &'static str = Box::leak(b.into_boxed_str());
-                let c = format!("{}c",char::MAX);
+                let c = format!("{}c", char::MAX);
                 let c: &'static str = Box::leak(c.into_boxed_str());
                 let keys = vec![a, b, c];
                 let data = get_data().unwrap();

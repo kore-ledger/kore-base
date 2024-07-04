@@ -1511,8 +1511,11 @@ impl<C: DatabaseCollection> Ledger<C> {
                             );
                             // Request next event to current_sn
                             witnesses.insert(subject.owner);
-                            let msg =
-                                request_event(self.our_id.clone(), state_request.subject_id, current_sn + 1);
+                            let msg = request_event(
+                                self.our_id.clone(),
+                                state_request.subject_id,
+                                current_sn + 1,
+                            );
                             self.send_message(
                                 None,
                                 msg,

@@ -280,7 +280,9 @@ impl<C: DatabaseCollection> InnerApi<C> {
             .get_allowed_subjects_and_providers(data.from, quantity)
         {
             Ok(data) => Ok(ApiResponses::GetAllPreauthorizedSubjects(Ok(data))),
-            Err(error) => Ok(ApiResponses::GetAllPreauthorizedSubjects(Err(ApiError::DatabaseError(error.to_string())))),
+            Err(error) => Ok(ApiResponses::GetAllPreauthorizedSubjects(Err(
+                ApiError::DatabaseError(error.to_string()),
+            ))),
         }
     }
 

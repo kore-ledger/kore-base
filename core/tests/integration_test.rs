@@ -486,18 +486,38 @@ async fn copy_of_ledger_many_events_in_a_short_time() {
 
     let events = create_register_event(subj.clone());
     for _ in 0..90 {
-        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;    
+        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;
     }
-    verify_copy_ledger(vec![(api_node1.clone(), mc_data_node1.clone())], subj.clone(), Some(40)).await;
+    verify_copy_ledger(
+        vec![(api_node1.clone(), mc_data_node1.clone())],
+        subj.clone(),
+        Some(40),
+    )
+    .await;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    verify_copy_ledger(vec![(api_node2.clone(), mc_data_node2.clone())], subj.clone(), Some(40)).await;
+    verify_copy_ledger(
+        vec![(api_node2.clone(), mc_data_node2.clone())],
+        subj.clone(),
+        Some(40),
+    )
+    .await;
 
     for _ in 0..90 {
-        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;    
+        let _ = sign_events(events.clone(), api_node1.clone(), mc_data_node1.clone()).await;
     }
-    verify_copy_ledger(vec![(api_node1.clone(), mc_data_node1.clone())], subj.clone(), Some(80)).await;
+    verify_copy_ledger(
+        vec![(api_node1.clone(), mc_data_node1.clone())],
+        subj.clone(),
+        Some(80),
+    )
+    .await;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    verify_copy_ledger(vec![(api_node2.clone(), mc_data_node2.clone())], subj.clone(), Some(80)).await;
+    verify_copy_ledger(
+        vec![(api_node2.clone(), mc_data_node2.clone())],
+        subj.clone(),
+        Some(80),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -512,6 +532,8 @@ async fn create_governance_one_node_a() {
 
     println!("/////////////////");
     add_providers(api.clone(), vec![], subject_id.clone()).await;
-    let a  = api.api.get_all_allowed_subjects_and_providers(Some(format!("{}", subject_id.to_string())), None);
-    println!("{:?}",a.await);
+    let a = api
+        .api
+        .get_all_allowed_subjects_and_providers(Some(format!("{}", subject_id.to_string())), None);
+    println!("{:?}", a.await);
 }

@@ -35,7 +35,9 @@ libp2p = { workspace = true, default_features = false, features = [
 	"relay",
 	"dcutr",
 	"quic",
-	"plaintext"
+	"plaintext",
+	"request-response",
+	"cbor"
 ] }
 linked_hash_set = { workspace = true }
 metrics = { workspace = true }
