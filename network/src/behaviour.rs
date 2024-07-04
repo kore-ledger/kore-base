@@ -706,6 +706,7 @@ mod tests {
             node_type,
             tell: Default::default(),
             routing: config,
+            external_addresses: vec![],
             listen_addresses: vec![],
             port_reuse: false,
         }

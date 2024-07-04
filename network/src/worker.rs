@@ -8,7 +8,7 @@ use crate::{
     behaviour::{Behaviour, Event as BehaviourEvent, ReqResMessage},
     service::NetworkService,
     transport::build_transport,
-    utils::convert_external_addresses,
+    utils::convert_addresses,
     Command, Config, Error, Event as NetworkEvent, NodeType,
 };
 
@@ -25,7 +25,7 @@ use libp2p::{
     Multiaddr, PeerId, Swarm,
 };
 
-use futures::StreamExt;
+use futures::{future::Shared, StreamExt};
 use prometheus_client::{
     encoding::{EncodeLabelSet, EncodeLabelValue},
     metrics::{counter::Counter, family::Family},
@@ -118,7 +118,10 @@ impl NetworkWorker {
         let local_peer_id = key.public().to_peer_id();
 
         // Create the listen addressess.
-        let external_addresses = convert_external_addresses(&config.listen_addresses)?;
+        let addresses = convert_addresses(&config.listen_addresses)?;
+
+        // Create the listen addressess.
+        let external_addresses = convert_addresses(&config.external_addresses)?;
 
         // Is Ephemeral?
         let node_type = config.node_type.clone();
@@ -126,8 +129,14 @@ impl NetworkWorker {
         // Build transport.
         let transport = build_transport(registry, &key, config.port_reuse)?;
 
+        let shared_external_addresses = if external_addresses.is_empty() {
+            external_addresses.clone()
+        } else {
+            addresses.clone()
+        };
+
         // Create the shared external addresses.
-        let shared_external_addresses = Arc::new(Mutex::new(external_addresses.clone()));
+        let shared_external_addresses = Arc::new(Mutex::new(shared_external_addresses.clone()));
 
         // Create the swarm.
         let mut swarm = Swarm::new(
@@ -144,7 +153,7 @@ impl NetworkWorker {
         // Add confirmed external addresses.
         match config.node_type {
             NodeType::Bootstrap | NodeType::Addressable => {
-                for addr in external_addresses.iter() {
+                for addr in addresses.iter() {
                     swarm.add_external_address(addr.clone());
                 }
             }
@@ -163,7 +172,7 @@ impl NetworkWorker {
 
         let service = Arc::new(RwLock::new(NetworkService::new(command_sender)?));
 
-        if external_addresses.is_empty() {
+        if addresses.is_empty() {
             // Listen on all tcp addresses.
             if swarm
                 .listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap())
@@ -174,7 +183,7 @@ impl NetworkWorker {
             }
         } else {
             // Listen on the external addresses.
-            for addr in external_addresses.iter() {
+            for addr in addresses.iter() {
                 if swarm.listen_on(addr.clone()).is_err() {
                     error!(
                         TARGET_WORKER,
@@ -184,10 +193,14 @@ impl NetworkWorker {
                         "Transport does not support the listening addresss: {:?}.",
                         addr
                     );
-                } else {
-                    info!(TARGET_WORKER, "Add external address {:?}", addr);
-                    swarm.add_external_address(addr.clone());
                 }
+            }
+        }
+
+        if !external_addresses.is_empty() {
+            for addr in external_addresses.iter() {
+                info!(TARGET_WORKER, "Add external address {:?}", addr);
+                swarm.add_external_address(addr.clone());
             }
         }
 
@@ -1261,6 +1274,7 @@ mod tests {
             node_type,
             tell: Default::default(),
             routing: config,
+            external_addresses: vec![],
             listen_addresses,
             port_reuse,
         }

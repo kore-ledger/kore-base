@@ -320,7 +320,7 @@ impl Behaviour {
                 //println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
                 //addr, peer_id, matching_protocol);
                 kademlia.add_address(peer_id, addr.clone());
-                self.pending_events.push_back(Event::Discovered(peer_id.clone())); 
+                // self.pending_events.push_back(Event::Discovered(peer_id.clone())); 
             } else {
                 trace!(
                     target: TARGET_ROUTING,

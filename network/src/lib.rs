@@ -46,6 +46,9 @@ pub struct Config {
     /// Listen addresses.
     pub listen_addresses: Vec<String>,
 
+    /// External addresses.
+    pub external_addresses: Vec<String>,
+
     /// Message telling configuration.
     pub tell: tell::Config,
 
@@ -61,6 +64,7 @@ impl Config {
     pub fn new(
         node_type: NodeType,
         listen_addresses: Vec<String>,
+        external_addresses: Vec<String>,
         boot_nodes: Vec<RoutingNode>,
         port_reuse: bool,
     ) -> Self {
@@ -68,6 +72,7 @@ impl Config {
             user_agent: "kore-node".to_owned(),
             node_type,
             listen_addresses,
+            external_addresses,
             tell: tell::Config::default(),
             routing: routing::Config::new(boot_nodes),
             port_reuse,
