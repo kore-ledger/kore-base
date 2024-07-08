@@ -25,7 +25,7 @@ use libp2p::{
     Multiaddr, PeerId, Swarm,
 };
 
-use futures::{future::Shared, StreamExt};
+use futures::StreamExt;
 use prometheus_client::{
     encoding::{EncodeLabelSet, EncodeLabelValue},
     metrics::{counter::Counter, family::Family},
@@ -38,7 +38,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 
 use std::{
-    collections::{HashMap, VecDeque}, sync::{Arc, Mutex, RwLock}
+    collections::{HashMap, VecDeque},
+    sync::{Arc, Mutex, RwLock},
 };
 
 const TARGET_WORKER: &str = "KoreNetwork-Worker";
@@ -91,7 +92,7 @@ pub struct NetworkWorker {
     successful_dials: u64,
 
     /// Attempted dials.
-    attempted_dials: Vec<PeerId>,
+    _attempted_dials: Vec<PeerId>,
 }
 
 impl NetworkWorker {
@@ -219,7 +220,7 @@ impl NetworkWorker {
             ephemeral_responses: HashMap::default(),
             messages_metric,
             successful_dials: 0,
-            attempted_dials: vec![],
+            _attempted_dials: vec![],
         })
     }
 
@@ -235,11 +236,7 @@ impl NetworkWorker {
 
     /// Remove boot node.
     pub fn remove_boot_node(&mut self, peer: PeerId) {
-        if let Some(pos) = self
-            .boot_nodes
-            .iter()
-            .position(|val| val.0 == peer)
-        {
+        if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer) {
             self.boot_nodes.remove(pos);
         }
     }
@@ -399,7 +396,9 @@ impl NetworkWorker {
                             for node in copy_boot_nodes {
                                 if self
                                     .swarm
-                                    .dial(DialOpts::peer_id(node.0).addresses(node.1.clone()).build())
+                                    .dial(
+                                        DialOpts::peer_id(node.0).addresses(node.1.clone()).build(),
+                                    )
                                     .is_err()
                                 {
                                     error!(TARGET_WORKER, "Error dialing boot node {}", node.0);
@@ -413,7 +412,7 @@ impl NetworkWorker {
                                     }
                                 }
                             }
-    
+
                             self.change_state(NetworkState::Dialing).await;
                         }
                     }
@@ -505,15 +504,9 @@ impl NetworkWorker {
                 }
             }
             SwarmEvent::Behaviour(BehaviourEvent::Discovered(_)) => {}
-            SwarmEvent::ConnectionClosed { peer_id , cause, .. } => {
-                println!("");
-                println!("");
-                println!("CAUSE: {:?}", cause);
-                println!("");
-                println!("");
+            SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 info!(TARGET_WORKER, "Connection closed to peer {}", peer_id);
                 self.remove_boot_node(peer_id);
-                
             }
             e => {
                 trace!(TARGET_WORKER, "Event: {:?}", e);
@@ -1030,7 +1023,7 @@ mod tests {
 
         // Wait for connection.
         node.run_connection().await.unwrap();
-/* 
+        /*
         // Spawn the node
         tokio::spawn(async move {
             node.run().await;

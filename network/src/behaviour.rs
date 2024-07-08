@@ -38,7 +38,6 @@ use tracing::{debug, info};
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 pub struct Behaviour {
-
     /// The `tell` behaviour.
     tell: binary::Behaviour,
 
@@ -47,8 +46,8 @@ pub struct Behaviour {
 
     /// The `routing` behaviour.
     routing: routing::Behaviour,
-    
-        /// The `node` behaviour.
+
+    /// The `node` behaviour.
     node: node::Behaviour,
 }
 
@@ -106,7 +105,7 @@ impl Behaviour {
     pub fn remove_node(&mut self, peer_id: &PeerId, address: &Vec<Multiaddr>) {
         self.routing.remove_node(peer_id, address);
     }
-        
+
     /// Add identified peer to routing table.
     pub fn add_identified_peer(&mut self, peer_id: PeerId, info: IdentifyInfo) {
         info!("Adding identified peer to routing table: {:?}", peer_id);
@@ -119,7 +118,7 @@ impl Behaviour {
             debug!("Adding self reported address to DHT: {:?}", addr);
             self.routing
                 .add_self_reported_address(&peer_id, &info.protocols, addr.clone());
-            self.routing.add_known_address( peer_id, addr);
+            self.routing.add_known_address(peer_id, addr);
         }
     }
 
@@ -138,12 +137,11 @@ impl Behaviour {
         info!("Sending tell message to peer: {:?}", peer_id);
         self.tell.send_message(peer_id, message)
     }
-    
+
     /// Send request messasge to peer.
     pub fn send_request(&mut self, peer_id: &PeerId, message: Vec<u8>) -> OutboundRequestId {
         info!("Sending request message to peer: {:?}", peer_id);
-        let result = self.req_res.send_request(peer_id, ReqResMessage(message));
-        result
+        self.req_res.send_request(peer_id, ReqResMessage(message))
     }
 
     /// Send response message to peer.
@@ -363,12 +361,12 @@ mod tests {
         swarm::{self, SwarmEvent},
         tcp, yamux, Swarm,
     };
-    
+
     use request_response::Message;
     use serial_test::serial;
 
-    use std::vec;
     use std::sync::Arc;
+    use std::vec;
 
     #[tokio::test]
     #[serial]
@@ -433,7 +431,7 @@ mod tests {
                         //node_a.behaviour_mut().add_identified_peer(peer_id, *info);
                         node_a
                             .behaviour_mut()
-                            .send_request(&node_b_peer_id, b"Hello Node B".to_vec());        
+                            .send_request(&node_b_peer_id, b"Hello Node B".to_vec());
                     }
                     SwarmEvent::Behaviour(Event::ReqresMessage { peer_id, message }) => {
                         // Message received from node a.
@@ -513,16 +511,16 @@ mod tests {
         let peer_a = async move {
             let mut counter = 0;
             loop {
-               match node_a.select_next_some().await {
-                SwarmEvent::Behaviour(Event::Identified { peer_id, .. }) => {
-                    // Peer identified.
-                    info!("Peer identified: {:?}", peer_id);
-                    //node_a.behaviour_mut().add_identified_peer(peer_id, *info);
-                    node_a
-                        .behaviour_mut()
-                        .send_tell(&node_b_peer_id, b"Hello Node B".to_vec());    
-                }
-                SwarmEvent::Behaviour(Event::TellMessage { peer_id, message }) => {
+                match node_a.select_next_some().await {
+                    SwarmEvent::Behaviour(Event::Identified { peer_id, .. }) => {
+                        // Peer identified.
+                        info!("Peer identified: {:?}", peer_id);
+                        //node_a.behaviour_mut().add_identified_peer(peer_id, *info);
+                        node_a
+                            .behaviour_mut()
+                            .send_tell(&node_b_peer_id, b"Hello Node B".to_vec());
+                    }
+                    SwarmEvent::Behaviour(Event::TellMessage { peer_id, message }) => {
                         // Message received from node a.
                         info!("Tell message received from peer: {:?}", peer_id);
                         assert_eq!(message.message, b"Hello Node A".to_vec());
@@ -565,7 +563,7 @@ mod tests {
         let node_a_addr: Multiaddr = "/ip4/127.0.0.1/tcp/50002".parse().unwrap();
         let _ = node_a.listen_on(node_a_addr.clone());
         node_a.add_external_address(node_a_addr.clone());
-        
+
         // Build node b.
         let config = create_config(boot_nodes.clone(), true, NodeType::Addressable);
         let mut node_b = build_node(config);
@@ -584,9 +582,11 @@ mod tests {
                     SwarmEvent::Behaviour(Event::Identified { peer_id, info }) => {
                         // Peer identified.
                         info!("Peer identified: {:?}", peer_id);
-                        boot_node.behaviour_mut().add_identified_peer(peer_id, *info);
+                        boot_node
+                            .behaviour_mut()
+                            .add_identified_peer(peer_id, *info);
                     }
-                   _ => {}
+                    _ => {}
                 }
             }
         };
@@ -628,7 +628,9 @@ mod tests {
                         info!("Peer identified: {:?}", peer_id);
                         node_a.behaviour_mut().add_identified_peer(peer_id, *info);
                         if peer_id == node_b_peer_id {
-                            node_a.behaviour_mut().send_request(&peer_id, b"Hello Node B".to_vec());
+                            node_a
+                                .behaviour_mut()
+                                .send_request(&peer_id, b"Hello Node B".to_vec());
                         } else {
                             node_a.behaviour_mut().discover(&node_b_peer_id);
                         }
@@ -656,7 +658,6 @@ mod tests {
         tokio::task::spawn(Box::pin(boot_peer));
         tokio::task::spawn(Box::pin(peer_b));
         peer_a.await;
-       
     }
 
     // Build node.
