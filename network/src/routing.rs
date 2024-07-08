@@ -194,8 +194,7 @@ impl Behaviour {
 
     /// Returns true if the given peer is known.
     pub fn is_known_peer(&mut self, peer_id: &PeerId) -> bool {
-        self.public_nodes.contains_key(peer_id)
-            || self.known_peers().contains(peer_id)
+        self.public_nodes.contains_key(peer_id) || self.known_peers().contains(peer_id)
     }
     /*
         /// Sets the DHT random walk delay.
@@ -320,7 +319,7 @@ impl Behaviour {
                 //println!("Adding self-reported address {} from {} to Kademlia DHT {}.",
                 //addr, peer_id, matching_protocol);
                 kademlia.add_address(peer_id, addr.clone());
-                // self.pending_events.push_back(Event::Discovered(peer_id.clone())); 
+                // self.pending_events.push_back(Event::Discovered(peer_id.clone()));
             } else {
                 trace!(
                     target: TARGET_ROUTING,

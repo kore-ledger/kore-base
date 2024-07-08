@@ -34,7 +34,7 @@ impl<C: DatabaseCollection> KeysDb<C> {
         let mut key_box = EncryptedMem::new();
         key_box
             .encrypt(&password)
-            .map_err(|_| DbError::Encrypt(format!("Problem with password")))?;
+            .map_err(|_| DbError::Encrypt("Problem with password".to_owned()))?;
 
         Ok(Self {
             collection: manager.create_collection("transfer"),

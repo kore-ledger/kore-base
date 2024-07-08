@@ -49,14 +49,20 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
                                 // Deserialize the message
                                 let cur = Cursor::new(message);
                                 let mut de = Deserializer::new(cur);
-                                let message: Signed<MessageContent<T>> = Deserialize::deserialize(&mut de).expect("Fallo de deserializaciÃ³n");
-                                // Check message signature
-                                if message.verify().is_err() || message.content.sender_id != message.signature.signer {
-                                    log::error!("Invalid signature in message");
-                                } else if message.content.receiver != self.own_id {
-                                    log::error!("Message not for me");
-                                } else {
-                                    self.sender.tell(message).await.expect("Channel Error");
+                                match Deserialize::deserialize(&mut de) {
+                                    Ok(message) => {
+                                        let  message: Signed<MessageContent<T>> = message;
+                                        if message.verify().is_err() || message.content.sender_id != message.signature.signer {
+                                            log::error!("Invalid signature in message");
+                                        } else if message.content.receiver != self.own_id {
+                                            log::error!("Message not for me");
+                                        } else {
+                                            self.sender.tell(message).await.expect("Channel Error");
+                                        }
+                                    },
+                                    Err(e) => {
+                                        log::error!("Message received error: {}", e);
+                                    }
                                 }
                             },
                             NetworkEvent::ConnectedToBootstrap { .. } => {
