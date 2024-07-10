@@ -1022,10 +1022,6 @@ impl Config {
         let protocol_names = vec![
             "/kore/routing/1.0.0".to_owned(),
             "/ipfs/ping/1.0.0".to_owned(),
-            "/kore/tell/1.0.0".to_owned(),
-            "/kore/reqres/1.0.0".to_owned(),
-            "/ipfs/id/push/1.0.0".to_owned(),
-            "/ipfs/id/id/1.0.0".to_owned(),
         ];
         Self {
             boot_nodes,
