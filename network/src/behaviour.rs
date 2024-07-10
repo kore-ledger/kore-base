@@ -38,11 +38,11 @@ use tracing::{debug, info};
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 pub struct Behaviour {
-    /// The `tell` behaviour.
-    tell: binary::Behaviour,
-
     /// The `request-response` behaviour.
     req_res: request_response::cbor::Behaviour<ReqResMessage, ReqResMessage>,
+
+    /// The `tell` behaviour.
+    tell: binary::Behaviour,
 
     /// The `routing` behaviour.
     routing: routing::Behaviour,

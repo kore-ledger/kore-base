@@ -76,6 +76,9 @@ pub struct NetworkWorker {
     /// List of boot noodes.
     boot_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
 
+    /// nodes with which it has not been possible to establish a connection by keepAliveTimeout in pre-routing.
+    retry_boot_nodes: Vec<(PeerId, Vec<Multiaddr>)>,
+
     /// Pendings outbound messages to the peer
     pending_outbound_messages: HashMap<PeerId, VecDeque<Vec<u8>>>,
 
@@ -215,6 +218,7 @@ impl NetworkWorker {
             cancel,
             node_type,
             boot_nodes,
+            retry_boot_nodes: vec![],
             pending_outbound_messages: HashMap::default(),
             request_sent: HashMap::default(),
             ephemeral_responses: HashMap::default(),
@@ -417,8 +421,17 @@ impl NetworkWorker {
                         }
                     }
                     NetworkState::Dialing => {
+                        // No more bootnodes to send dial, none was successful nut one or more Dial fail by keepalivetimeout
+                        if self.boot_nodes.is_empty()
+                            && self.successful_dials == 0
+                            && !self.retry_boot_nodes.is_empty()
+                        {
+                            self.boot_nodes.clone_from(&self.retry_boot_nodes);
+                            self.retry_boot_nodes = vec![];
+                            self.change_state(NetworkState::Dial).await;
+                        }
                         // No more bootnodes to send dial and none was successful
-                        if self.boot_nodes.is_empty() && self.successful_dials == 0 {
+                        else if self.boot_nodes.is_empty() && self.successful_dials == 0 {
                             self.change_state(NetworkState::Disconnected).await;
                         // No more bootnodes to send dial and one or more was successful
                         } else if self.boot_nodes.is_empty() {
@@ -499,14 +512,29 @@ impl NetworkWorker {
                 .await;
 
                 if let Some(pos) = self.boot_nodes.iter().position(|val| val.0 == peer_id) {
-                    self.boot_nodes.remove(pos);
                     self.successful_dials += 1;
+                    self.boot_nodes.remove(pos);
                 }
             }
             SwarmEvent::Behaviour(BehaviourEvent::Discovered(_)) => {}
-            SwarmEvent::ConnectionClosed { peer_id, .. } => {
+            SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 info!(TARGET_WORKER, "Connection closed to peer {}", peer_id);
-                self.remove_boot_node(peer_id);
+                if cause.is_some() {
+                    match cause.unwrap() {
+                        swarm::ConnectionError::KeepAliveTimeout => {
+                            if let Some(pos) =
+                                self.boot_nodes.iter().position(|val| val.0 == peer_id)
+                            {
+                                self.retry_boot_nodes.push(self.boot_nodes[pos].clone());
+                                self.boot_nodes.remove(pos);
+                            }
+                        }
+                        swarm::ConnectionError::IO(e) => {
+                            self.remove_boot_node(peer_id);
+                            error!("Error in Dialing with {}, {}", peer_id, e);
+                        }
+                    }
+                }
             }
             e => {
                 trace!(TARGET_WORKER, "Event: {:?}", e);
@@ -1023,7 +1051,7 @@ mod tests {
 
         // Wait for connection.
         node.run_connection().await.unwrap();
-        /*
+
         // Spawn the node
         tokio::spawn(async move {
             node.run().await;
@@ -1061,7 +1089,7 @@ mod tests {
                     break;
                 }
             }
-        }*/
+        }
     }
 
     #[tokio::test]
