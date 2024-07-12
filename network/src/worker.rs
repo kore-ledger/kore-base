@@ -787,7 +787,7 @@ impl NetworkWorker {
             SwarmEvent::Behaviour(BehaviourEvent::TellOutboundFailure {
                 peer_id, error, ..
             }) => {
-                error!(
+                warn!(
                     TARGET_WORKER,
                     "Error sending message to peer {}: {}", peer_id, error
                 );
@@ -802,7 +802,7 @@ impl NetworkWorker {
                 outbound_id,
                 error,
             }) => {
-                error!(
+                warn!(
                     TARGET_WORKER,
                     "Error sending message to peer {}: {}", peer_id, error
                 );
@@ -819,7 +819,7 @@ impl NetworkWorker {
             | SwarmEvent::Behaviour(BehaviourEvent::ReqresInboundFailure {
                 peer_id, error, ..
             }) => {
-                error!(
+                warn!(
                     TARGET_WORKER,
                     "Error receiving message from peer {}: {}", peer_id, error
                 );
