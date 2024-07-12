@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     iter,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex}, time::Duration,
 };
 use tracing::{debug, info};
 
@@ -69,7 +69,7 @@ impl Behaviour {
         let is_dht_random_walk =
             config.routing.get_dht_random_walk() && config.node_type == NodeType::Bootstrap;
         let config_routing = config.routing.with_dht_random_walk(is_dht_random_walk);
-        let config_req_res = ReqResConfig::default();
+        let config_req_res = ReqResConfig::default().with_request_timeout(Duration::from_secs(2));
 
         Self {
             routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config_routing),

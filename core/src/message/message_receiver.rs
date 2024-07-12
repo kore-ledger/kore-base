@@ -66,37 +66,37 @@ impl<T: TaskCommandContent + Serialize + DeserializeOwned + 'static> MessageRece
                                 }
                             },
                             NetworkEvent::ConnectedToBootstrap { .. } => {
-                                println!("NETWORK EVENT CONNECTEDTOBOOTSTRAP");
+                                log::debug!("NETWORK EVENT CONNECTEDTOBOOTSTRAP");
                             },
                             NetworkEvent::MessageSent { .. } => {
-                                println!("NETWORK EVENT MESSAGESENT");
+                                log::debug!("NETWORK EVENT MESSAGESENT");
                             },
                             NetworkEvent::PeerIdentified { .. } => {
-                                println!("NETWORK EVENT PEERIDENTIFIED");
+                                log::debug!("NETWORK EVENT PEERIDENTIFIED");
                             },
                             NetworkEvent::StateChanged(state) => {
                             match state {
                                 NetworkState::Start=> {
-                                    println!("NETWORK EVENT STATECHANGED START");
+                                    log::debug!("NETWORK EVENT STATECHANGED START");
                                 },
                                 NetworkState::Dial => {
-                                    println!("NETWORK EVENT STATECHANGED DIAL");
+                                    log::debug!("NETWORK EVENT STATECHANGED DIAL");
                                 },
                                 NetworkState::Dialing => {
-                                    println!("NETWORK EVENT STATECHANGED DIALING");
+                                    log::debug!("NETWORK EVENT STATECHANGED DIALING");
                                 },
                                 NetworkState::Running => {
-                                    println!("NETWORK EVENT STATECHANGED RUNNING");
+                                    log::debug!("NETWORK EVENT STATECHANGED RUNNING");
                                 },
                                 NetworkState::Disconnected => {
-                                    println!("NETWORK EVENT STATECHANGED DISCONNECTED");
+                                    log::debug!("NETWORK EVENT STATECHANGED DISCONNECTED");
                                     break;
                                 }
                             }
                            },
                            NetworkEvent::Error(e) => {
-                            println!("NETWORK EVENT ERROR");
-                            println!("{:?}", e);
+                            log::debug!("NETWORK EVENT ERROR");
+                            log::debug!("{:?}", e);
                            },
                         }
                 },
