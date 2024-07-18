@@ -100,5 +100,6 @@ fn build_config(settings: &Settings) -> NetworkConfig {
         tell: TellConfig::default(),
         routing: routing_config,
         port_reuse: false,
+        ..Default::default()
     }
 }

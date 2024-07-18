@@ -1298,6 +1298,7 @@ mod tests {
             external_addresses: vec![],
             listen_addresses,
             port_reuse,
+            control_list: Default::default(),
         }
     }
 }

@@ -6,14 +6,13 @@
 #![warn(missing_docs)]
 
 mod behaviour;
+mod control_list;
 pub mod error;
 mod node;
 mod routing;
 mod service;
-//mod transport;
 mod transport;
 mod utils;
-//mod worker;
 mod worker;
 
 pub use error::Error;
@@ -57,6 +56,9 @@ pub struct Config {
 
     /// Configures port reuse for local sockets, which implies reuse of listening ports for outgoing connections to enhance NAT traversal capabilities.
     pub port_reuse: bool,
+
+    /// Control List configuration.
+    pub control_list: control_list::Config,
 }
 
 impl Config {
@@ -76,6 +78,7 @@ impl Config {
             tell: tell::Config::default(),
             routing: routing::Config::new(boot_nodes),
             port_reuse,
+            control_list: control_list::Config::default(),
         }
     }
 }
