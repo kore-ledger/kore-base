@@ -143,4 +143,5 @@ pub use network::{
     Config as NetworkConfig, Event as NetworkEvent, NodeType, RoutingConfig, RoutingNode,
 };
 
+pub use network::ControlListConfig;
 pub use tell::Config as TellConfig;

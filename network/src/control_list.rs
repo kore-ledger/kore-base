@@ -76,6 +76,35 @@ impl Config {
         self.interval_request = interval;
         self.clone()
     }
+
+    /// Set interval request
+    pub fn get_interval_request(&self) -> Duration {
+        self.interval_request
+    }
+
+    /// Get enable
+    pub fn get_enable(&self) -> bool {
+        self.enable
+    }
+
+    /// Get allow list
+    pub fn get_allow_list(&self) -> Vec<String> {
+        self.allow_list.clone()
+    }
+
+    /// Get block list
+    pub fn get_block_list(&self) -> Vec<String> {
+        self.block_list.clone()
+    }
+
+    /// Get Service list to consult allow list
+    pub fn get_service_allow_list(&self) -> Vec<String> {
+        self.service_allow_list.clone()
+    }
+    /// Get Service list to consult block list
+    pub fn get_service_block_list(&self) -> Vec<String> {
+        self.service_block_list.clone()
+    }
 }
 
 #[derive(Default, Debug, Clone)]

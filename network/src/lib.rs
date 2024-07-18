@@ -15,6 +15,7 @@ mod transport;
 mod utils;
 mod worker;
 
+pub use control_list::Config as ControlListConfig;
 pub use error::Error;
 pub use libp2p::PeerId;
 pub use routing::{Config as RoutingConfig, RoutingNode};
