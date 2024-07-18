@@ -5,7 +5,7 @@
 //!
 
 use crate::{
-    node,
+    control_list, node,
     routing::{self, DhtValue},
     utils::is_memory,
     Config, Error, NodeType,
@@ -30,7 +30,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     iter,
-    sync::{Arc, Mutex}, time::Duration,
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 use tracing::{debug, info};
 
@@ -38,6 +39,8 @@ use tracing::{debug, info};
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 pub struct Behaviour {
+    control_list: control_list::Behaviour,
+
     /// The `request-response` behaviour.
     req_res: request_response::cbor::Behaviour<ReqResMessage, ReqResMessage>,
 
@@ -66,12 +69,14 @@ impl Behaviour {
             StreamProtocol::new("/kore/reqres/1.0.0"),
             ProtocolSupport::Full,
         ));
+        let boot_nodes = config.routing.boot_nodes();
         let is_dht_random_walk =
             config.routing.get_dht_random_walk() && config.node_type == NodeType::Bootstrap;
         let config_routing = config.routing.with_dht_random_walk(is_dht_random_walk);
         let config_req_res = ReqResConfig::default().with_request_timeout(Duration::from_secs(2));
 
         Self {
+            control_list: control_list::Behaviour::new(config.control_list, &boot_nodes),
             routing: routing::Behaviour::new(PeerId::from_public_key(public_key), config_routing),
             node: node::Behaviour::new(&config.user_agent, public_key, external_addresses),
             tell: binary::Behaviour::new(protocol_tell, config.tell),
@@ -241,6 +246,15 @@ pub enum Event {
 
     /// UnreachablePeer.
     UnreachablePeer(PeerId),
+
+    /// Dummy Event for control_list
+    Dummy,
+}
+
+impl From<control_list::Event> for Event {
+    fn from(_: control_list::Event) -> Self {
+        Event::Dummy
+    }
 }
 
 impl From<routing::Event> for Event {
@@ -710,6 +724,7 @@ mod tests {
             external_addresses: vec![],
             listen_addresses: vec![],
             port_reuse: false,
+            control_list: Default::default(),
         }
     }
 }
