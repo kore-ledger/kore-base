@@ -112,7 +112,7 @@ impl Config {
 pub struct Behaviour {
     allow_peers: Arc<Mutex<HashSet<PeerId>>>,
     block_peers: Arc<Mutex<HashSet<PeerId>>>,
-    close_connections: VecDeque<PeerId>,
+    close_connections: Arc<Mutex<VecDeque<PeerId>>>,
     waker: Option<Waker>,
     enable: bool,
 }
@@ -308,8 +308,11 @@ impl Behaviour {
         if let Ok(mut allow_peer) = self.allow_peers.lock() {
             let close_peers: Vec<PeerId> = allow_peer.difference(&new_list).cloned().collect();
 
-            // Close connections with not allowed peers
-            self.close_connections.extend(close_peers);
+            // Close connections with new blocked peers
+            if let Ok(mut close_connections) = self.close_connections.lock() {
+                close_connections.extend(close_peers.clone());
+            }
+
             // Update new allow list
             allow_peer.clone_from(&new_list);
 
@@ -335,7 +338,9 @@ impl Behaviour {
         );
 
         // Close connections with new blocked peers
-        self.close_connections.extend(new_list.clone());
+        if let Ok(mut close_connections) = self.close_connections.lock() {
+            close_connections.extend(new_list.clone());
+        }
 
         // Update new block list
         if let Ok(mut block_peers) = self.block_peers.lock() {
@@ -480,12 +485,15 @@ impl NetworkBehaviour for Behaviour {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
-        if let Some(peer) = self.close_connections.pop_front() {
-            return Poll::Ready(ToSwarm::CloseConnection {
-                peer_id: peer,
-                connection: CloseConnection::All,
-            });
+        if let Ok(mut close_connections) = self.close_connections.lock() {
+            if let Some(peer) = close_connections.pop_front() {
+                return Poll::Ready(ToSwarm::CloseConnection {
+                    peer_id: peer,
+                    connection: CloseConnection::All,
+                });
+            }
         }
+        
 
         self.waker = Some(cx.waker().clone());
         Poll::Pending
@@ -507,7 +515,7 @@ mod tests {
     impl Behaviour {
         pub fn block_peer(&mut self, peer: PeerId) {
             self.block_peers.lock().unwrap().insert(peer);
-            self.close_connections.push_back(peer);
+            self.close_connections.lock().unwrap().push_back(peer);
 
             if let Some(waker) = self.waker.take() {
                 waker.wake()
