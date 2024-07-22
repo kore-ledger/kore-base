@@ -183,7 +183,7 @@ impl Behaviour {
 
                 // If at least 1 update of the list was possible
                 if successful_block != 0 {
-                    info!(TARGET_CONTROL_LIST, "Updating the allow list.");
+                    info!(TARGET_CONTROL_LIST, "Updating the block list.");
                     clone.update_block_peers(&vec_block_peers);
                 } else {
                     warn!(
@@ -303,7 +303,7 @@ impl Behaviour {
                 .iter()
                 .filter_map(|e| PeerId::from_str(e).ok()),
         );
-    
+
         // Access to state
         if let Ok(mut allow_peer) = self.allow_peers.lock() {
             let close_peers: Vec<PeerId> = allow_peer.difference(&new_list).cloned().collect();
@@ -317,8 +317,10 @@ impl Behaviour {
                 waker.wake()
             }
         } else {
-            error!(TARGET_CONTROL_LIST, "Access to allowed nodes state is not possible");
-            return;
+            error!(
+                TARGET_CONTROL_LIST,
+                "Access to allowed nodes state is not possible"
+            );
         };
     }
 
@@ -356,8 +358,11 @@ impl Behaviour {
             }
         }
 
-        warn!(TARGET_CONTROL_LIST, "Node {} has been blocked, it is not in the allowed list.", peer);
-        return Err(ConnectionDenied::new(NotAllowed { peer: *peer }));
+        warn!(
+            TARGET_CONTROL_LIST,
+            "Node {} has been blocked, it is not in the allowed list.", peer
+        );
+        Err(ConnectionDenied::new(NotAllowed { peer: *peer }))
     }
 
     /// Method that check if a peer is in block list
@@ -368,8 +373,11 @@ impl Behaviour {
             }
         }
 
-        warn!(TARGET_CONTROL_LIST, "Node {} has been blocked, it is in the blocked list.", peer);
-        return Err(ConnectionDenied::new(Blocked { peer: *peer }));
+        warn!(
+            TARGET_CONTROL_LIST,
+            "Node {} has been blocked, it is in the blocked list.", peer
+        );
+        Err(ConnectionDenied::new(Blocked { peer: *peer }))
     }
 
     /// Method that check all List
@@ -457,8 +465,7 @@ impl NetworkBehaviour for Behaviour {
         Ok(dummy::ConnectionHandler)
     }
 
-    fn on_swarm_event(&mut self, _: libp2p::swarm::FromSwarm) {
-    }
+    fn on_swarm_event(&mut self, _: libp2p::swarm::FromSwarm) {}
 
     fn on_connection_handler_event(
         &mut self,
