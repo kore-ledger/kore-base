@@ -208,6 +208,7 @@ impl NetworkWorker {
             }
         }
 
+        info!(TARGET_WORKER, "LOCAL PEERID {}", local_peer_id);
         Ok(Self {
             local_peer_id,
             service,

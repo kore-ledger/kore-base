@@ -7,6 +7,7 @@ use std::{
     collections::{HashSet, VecDeque},
     fmt,
     str::FromStr,
+    sync::{Arc, Mutex},
     task::{Poll, Waker},
     time::Duration,
 };
@@ -109,9 +110,9 @@ impl Config {
 
 #[derive(Default, Debug, Clone)]
 pub struct Behaviour {
-    allow_peers: HashSet<PeerId>,
-    block_peers: HashSet<PeerId>,
-    close_connections: VecDeque<PeerId>,
+    allow_peers: Arc<Mutex<HashSet<PeerId>>>,
+    block_peers: Arc<Mutex<HashSet<PeerId>>>,
+    close_connections: Arc<Mutex<VecDeque<PeerId>>>,
     waker: Option<Waker>,
     enable: bool,
 }
@@ -127,17 +128,17 @@ impl Behaviour {
 
             Self {
                 enable: true,
-                allow_peers: HashSet::from_iter(
+                allow_peers: Arc::new(Mutex::new(HashSet::from_iter(
                     full_allow_list
                         .iter()
                         .filter_map(|e| PeerId::from_str(e).ok()),
-                ),
-                block_peers: HashSet::from_iter(
+                ))),
+                block_peers: Arc::new(Mutex::new(HashSet::from_iter(
                     config
                         .block_list
                         .iter()
                         .filter_map(|e| PeerId::from_str(e).ok()),
-                ),
+                ))),
                 ..Default::default()
             }
             .spawn_update_lists(
@@ -182,7 +183,7 @@ impl Behaviour {
 
                 // If at least 1 update of the list was possible
                 if successful_block != 0 {
-                    info!(TARGET_CONTROL_LIST, "Updating the allow list.");
+                    info!(TARGET_CONTROL_LIST, "Updating the block list.");
                     clone.update_block_peers(&vec_block_peers);
                 } else {
                     warn!(
@@ -302,18 +303,28 @@ impl Behaviour {
                 .iter()
                 .filter_map(|e| PeerId::from_str(e).ok()),
         );
-        // Peer that were allowed but no longer
-        let close_peers: Vec<PeerId> = self.allow_peers.difference(&new_list).cloned().collect();
 
-        // Close connections with not allowed peers
-        self.close_connections.extend(close_peers);
-        // Update new allow list
-        self.allow_peers = new_list;
+        // Access to state
+        if let Ok(mut allow_peer) = self.allow_peers.lock() {
+            let close_peers: Vec<PeerId> = allow_peer.difference(&new_list).cloned().collect();
 
-        // Actualizar la lista de Peers permitidos, revisar la lista actual más la nueva, los que no estén se añaden a close_connections
-        if let Some(waker) = self.waker.take() {
-            waker.wake()
-        }
+            // Close connections with new blocked peers
+            if let Ok(mut close_connections) = self.close_connections.lock() {
+                close_connections.extend(close_peers.clone());
+            }
+
+            // Update new allow list
+            allow_peer.clone_from(&new_list);
+
+            if let Some(waker) = self.waker.take() {
+                waker.wake()
+            }
+        } else {
+            error!(
+                TARGET_CONTROL_LIST,
+                "Access to allowed nodes state is not possible"
+            );
+        };
     }
 
     /// Method that update block list
@@ -327,12 +338,18 @@ impl Behaviour {
         );
 
         // Close connections with new blocked peers
-        self.close_connections.extend(new_list.clone());
+        if let Ok(mut close_connections) = self.close_connections.lock() {
+            close_connections.extend(new_list.clone());
+        }
 
         // Update new block list
-        self.block_peers = new_list;
+        if let Ok(mut block_peers) = self.block_peers.lock() {
+            block_peers.clone_from(&new_list);
+        } else {
+            error!("Access to blocked nodes state is not possible");
+            return;
+        };
 
-        // Actualizar la lista de Peers bloqueados y añadirlos a close_connection
         if let Some(waker) = self.waker.take() {
             waker.wake()
         }
@@ -340,20 +357,32 @@ impl Behaviour {
 
     /// Method that check if a peer is in allow list
     fn check_allow(&self, peer: &PeerId) -> Result<(), ConnectionDenied> {
-        if !self.allow_peers.contains(peer) {
-            return Err(ConnectionDenied::new(NotAllowed { peer: *peer }));
+        if let Ok(allow_peers) = self.allow_peers.lock() {
+            if allow_peers.contains(peer) {
+                return Ok(());
+            }
         }
 
-        Ok(())
+        warn!(
+            TARGET_CONTROL_LIST,
+            "Node {} has been blocked, it is not in the allowed list.", peer
+        );
+        Err(ConnectionDenied::new(NotAllowed { peer: *peer }))
     }
 
     /// Method that check if a peer is in block list
     fn check_block(&self, peer: &PeerId) -> Result<(), ConnectionDenied> {
-        if self.block_peers.contains(peer) {
-            return Err(ConnectionDenied::new(Blocked { peer: *peer }));
+        if let Ok(block_peers) = self.block_peers.lock() {
+            if !block_peers.contains(peer) {
+                return Ok(());
+            }
         }
 
-        Ok(())
+        warn!(
+            TARGET_CONTROL_LIST,
+            "Node {} has been blocked, it is in the blocked list.", peer
+        );
+        Err(ConnectionDenied::new(Blocked { peer: *peer }))
     }
 
     /// Method that check all List
@@ -447,9 +476,8 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         _: PeerId,
         _: libp2p::swarm::ConnectionId,
-        event: libp2p::swarm::THandlerOutEvent<Self>,
+        _: libp2p::swarm::THandlerOutEvent<Self>,
     ) {
-        void::unreachable(event)
     }
 
     fn poll(
@@ -457,24 +485,18 @@ impl NetworkBehaviour for Behaviour {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
-        if let Some(peer) = self.close_connections.pop_front() {
-            return Poll::Ready(ToSwarm::CloseConnection {
-                peer_id: peer,
-                connection: CloseConnection::All,
-            });
+        if let Ok(mut close_connections) = self.close_connections.lock() {
+            if let Some(peer) = close_connections.pop_front() {
+                return Poll::Ready(ToSwarm::CloseConnection {
+                    peer_id: peer,
+                    connection: CloseConnection::All,
+                });
+            }
         }
+        
 
         self.waker = Some(cx.waker().clone());
         Poll::Pending
-    }
-
-    fn handle_pending_inbound_connection(
-        &mut self,
-        _connection_id: libp2p::swarm::ConnectionId,
-        _local_addr: &libp2p::Multiaddr,
-        _remote_addr: &libp2p::Multiaddr,
-    ) -> Result<(), ConnectionDenied> {
-        Ok(())
     }
 }
 
@@ -492,8 +514,8 @@ mod tests {
 
     impl Behaviour {
         pub fn block_peer(&mut self, peer: PeerId) {
-            self.block_peers.insert(peer);
-            self.close_connections.push_back(peer);
+            self.block_peers.lock().unwrap().insert(peer);
+            self.close_connections.lock().unwrap().push_back(peer);
 
             if let Some(waker) = self.waker.take() {
                 waker.wake()
@@ -501,7 +523,7 @@ mod tests {
         }
 
         pub fn allow_peer(&mut self, peer: PeerId) {
-            self.allow_peers.insert(peer);
+            self.allow_peers.lock().unwrap().insert(peer);
             if let Some(waker) = self.waker.take() {
                 waker.wake()
             }

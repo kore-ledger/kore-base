@@ -39,6 +39,7 @@ use tracing::{debug, info};
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 pub struct Behaviour {
+    /// The `control-list` behaviour.
     control_list: control_list::Behaviour,
 
     /// The `request-response` behaviour.
